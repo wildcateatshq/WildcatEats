@@ -150,15 +150,19 @@ document.getElementById("orderForm").onsubmit = async (e) => {
   }
 };
 
+const seenMineIds = new Set();
+
 async function refreshMine() {
   const { orders } = await api("/api/orders/mine");
   const list = document.getElementById("myOrdersList");
   if (orders.length === 0) {
     list.innerHTML = `<div class="empty">You haven't placed any orders yet.</div>`;
     syncMaps([]);
+    seenMineIds.clear();
     return;
   }
   list.innerHTML = orders.map((o, i) => renderOrder(o, i)).join("");
+  orders.forEach(o => seenMineIds.add(o.id));
   wireChatBlocks(list, user.id);
   syncMaps(orders);
 
@@ -196,7 +200,9 @@ async function refreshMine() {
 }
 
 function renderOrder(o, i = 0) {
-  const delay = `style="animation-delay:${Math.min(i, 8) * 0.06}s"`;
+  const isNew = !seenMineIds.has(o.id);
+  const entering = isNew ? "entering" : "";
+  const delay = isNew ? `style="animation-delay:${Math.min(i, 8) * 0.06}s"` : "";
   let banner = "";
   if (o.arrivedAt && o.status !== "delivered") {
     banner = `<div class="banner">🔔 Your runner has arrived!</div>`;
@@ -230,7 +236,7 @@ function renderOrder(o, i = 0) {
     : "";
 
   return `
-    <div class="order-item" ${delay}>
+    <div class="order-item ${entering}" ${delay}>
       <div class="top-row">
         <div>
           <div class="store">${escapeHtml(o.store)}</div>

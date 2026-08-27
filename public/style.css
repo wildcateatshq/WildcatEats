@@ -247,8 +247,11 @@ button.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !import
   margin-bottom: 12px;
   background: white;
   transition: box-shadow 0.25s var(--ease), transform 0.25s var(--ease), border-color 0.25s var(--ease);
-  animation: fadeInUp 0.4s var(--ease) both;
 }
+/* Only newly-appeared cards animate in — added via JS the first time an
+   order id is seen, so polling refreshes don't replay it on every card
+   every few seconds. */
+.order-item.entering { animation: fadeInUp 0.4s var(--ease) both; }
 .order-item:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); border-color: #d3daea; }
 .order-item .top-row {
   display: flex;
