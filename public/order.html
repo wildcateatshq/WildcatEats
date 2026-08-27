@@ -109,6 +109,7 @@ async function refreshMine() {
     return;
   }
   list.innerHTML = orders.map(renderOrder).join("");
+  wireChatBlocks(list, user.id);
 
   orders.forEach(o => {
     const cancelBtn = document.getElementById(`cancel-${o.id}`);
@@ -158,6 +159,7 @@ function renderOrder(o) {
       ${banner}
       <div class="meta">Posted ${timeAgo(o.createdAt)} · Tip: <span class="tip">$${Number(o.tip).toFixed(2)}</span></div>
       ${runnerLine}
+      ${chatSectionHtml(o, o.runnerName)}
       ${cancelBtn}
     </div>
   `;

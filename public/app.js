@@ -66,3 +66,94 @@ const STATUS_LABEL = {
   picked_up: "Picked up",
   delivered: "Delivered"
 };
+
+// ---------- in-order chat (orderer <-> runner, once claimed) ----------
+
+const openChatIds = new Set();
+
+// otherName is the counterpart's display name — the runner's name on the
+// orderer's page, the orderer's name on the runner's page. No runner yet
+// means no one to message, so the block is omitted entirely.
+function chatSectionHtml(order, otherName) {
+  if (!otherName) return "";
+  const isOpen = openChatIds.has(order.id);
+  return `
+    <div class="chat-block">
+      <button type="button" class="chat-toggle" data-chat-id="${order.id}" data-other-name="${escapeHtml(otherName)}">
+        💬 ${isOpen ? "Hide messages" : `Message ${escapeHtml(otherName)}`}
+      </button>
+      <div class="chat-thread" id="chat-thread-${order.id}" style="display:${isOpen ? "flex" : "none"}">
+        <div class="chat-messages" id="chat-messages-${order.id}"></div>
+        <form class="chat-form" data-order-id="${order.id}">
+          <input type="text" class="chat-input" placeholder="Type a message…" maxlength="1000" required />
+          <button class="btn" type="submit">Send</button>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+// Call after rendering any list containing chatSectionHtml() blocks — wires
+// up the toggle/send buttons and loads messages for threads already open.
+function wireChatBlocks(container, currentUserId) {
+  container.querySelectorAll("[data-chat-id]").forEach((btn) => {
+    const id = Number(btn.dataset.chatId);
+    btn.onclick = () => {
+      const thread = document.getElementById(`chat-thread-${id}`);
+      if (openChatIds.has(id)) {
+        openChatIds.delete(id);
+        thread.style.display = "none";
+        btn.textContent = `💬 Message ${btn.dataset.otherName}`;
+      } else {
+        openChatIds.add(id);
+        thread.style.display = "flex";
+        btn.textContent = "💬 Hide messages";
+        loadChatMessages(id, currentUserId);
+      }
+    };
+    if (openChatIds.has(id)) loadChatMessages(id, currentUserId);
+  });
+
+  container.querySelectorAll("form[data-order-id]").forEach((form) => {
+    form.onsubmit = async (e) => {
+      e.preventDefault();
+      const id = Number(form.dataset.orderId);
+      const input = form.querySelector("input");
+      const text = input.value.trim();
+      if (!text) return;
+      input.disabled = true;
+      try {
+        await api(`/api/orders/${id}/messages`, { method: "POST", body: { text } });
+        input.value = "";
+        await loadChatMessages(id, currentUserId);
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        input.disabled = false;
+        input.focus();
+      }
+    };
+  });
+}
+
+async function loadChatMessages(orderId, currentUserId) {
+  const box = document.getElementById(`chat-messages-${orderId}`);
+  if (!box) return;
+  try {
+    const { messages } = await api(`/api/orders/${orderId}/messages`);
+    box.innerHTML =
+      messages
+        .map(
+          (m) => `
+        <div class="chat-msg ${m.senderId === currentUserId ? "mine" : ""}">
+          <span class="chat-sender">${escapeHtml(m.senderName)}</span>
+          <span class="chat-text">${escapeHtml(m.text)}</span>
+        </div>
+      `
+        )
+        .join("") || `<div class="chat-empty">No messages yet — say hi!</div>`;
+    box.scrollTop = box.scrollHeight;
+  } catch (err) {
+    // transient poll failure — leave the box as-is, next poll will retry
+  }
+}

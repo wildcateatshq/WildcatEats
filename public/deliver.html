@@ -103,6 +103,7 @@ async function refreshMine() {
 
   list.innerHTML = active.map(renderMine).join("") +
     (done.length ? `<h2 style="font-size:1rem; color:#6b7280; margin-top:24px;">Completed</h2>` + done.map(renderMine).join("") : "");
+  wireChatBlocks(list, user.id);
 
   orders.forEach(o => {
     const pickedBtn = document.getElementById(`picked-${o.id}`);
@@ -152,6 +153,7 @@ function renderMine(o) {
       <div class="items">${escapeHtml(o.items)}</div>
       ${arrivedNote}
       <div class="meta">For ${escapeHtml(o.ordererName)} · Tip: <span class="tip">$${Number(o.tip).toFixed(2)}</span></div>
+      ${chatSectionHtml(o, o.ordererName)}
       ${actionBtn}
     </div>
   `;

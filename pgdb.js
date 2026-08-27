@@ -48,6 +48,15 @@ async function init() {
       delivered_at timestamptz
     );
   `);
+  await pool.query(`
+    create table if not exists messages (
+      id serial primary key,
+      order_id integer not null references orders(id),
+      sender_id integer not null references users(id),
+      text text not null,
+      created_at timestamptz not null default now()
+    );
+  `);
 }
 
 function rowToUser(r) {
@@ -200,6 +209,38 @@ async function deleteOrder(id) {
   await pool.query("delete from orders where id = $1", [id]);
 }
 
+const MESSAGE_SELECT = `
+  select m.*, u.name as sender_name
+  from messages m
+  join users u on u.id = m.sender_id
+`;
+
+function rowToMessage(r) {
+  if (!r) return null;
+  return {
+    id: r.id,
+    orderId: r.order_id,
+    senderId: r.sender_id,
+    senderName: r.sender_name,
+    text: r.text,
+    createdAt: r.created_at.getTime()
+  };
+}
+
+async function getMessagesByOrder(orderId) {
+  const { rows } = await pool.query(`${MESSAGE_SELECT} where m.order_id = $1 order by m.created_at asc`, [orderId]);
+  return rows.map(rowToMessage);
+}
+
+async function createMessage({ orderId, senderId, text }) {
+  const { rows } = await pool.query(
+    "insert into messages (order_id, sender_id, text) values ($1,$2,$3) returning id",
+    [orderId, senderId, text]
+  );
+  const { rows: full } = await pool.query(`${MESSAGE_SELECT} where m.id = $1`, [rows[0].id]);
+  return rowToMessage(full[0]);
+}
+
 module.exports = {
   backend: "postgres",
   init,
@@ -215,5 +256,7 @@ module.exports = {
   getOrdersByOrderer,
   getOrdersByRunner,
   updateOrder,
-  deleteOrder
+  deleteOrder,
+  getMessagesByOrder,
+  createMessage
 };

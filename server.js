@@ -68,6 +68,22 @@ function publicOrder(o) {
   };
 }
 
+function isParticipant(order, userId) {
+  return order.ordererId === userId || order.runnerId === userId;
+}
+
+function publicMessage(m, viewerId) {
+  return {
+    id: m.id,
+    orderId: m.orderId,
+    senderId: m.senderId,
+    senderName: m.senderName,
+    text: m.text,
+    createdAt: m.createdAt,
+    mine: m.senderId === viewerId
+  };
+}
+
 function isVillanovaEmail(email) {
   return /^[^\s@]+@villanova\.edu$/i.test(email || "");
 }
@@ -314,6 +330,32 @@ app.post("/api/orders/:id/delivered", requireAuth, async (req, res) => {
 
   const updated = await db.updateOrder(order.id, { status: "delivered", deliveredAt: Date.now() });
   res.json({ order: publicOrder(updated) });
+});
+
+// ---------- messages (orderer <-> runner, once claimed) ----------
+
+app.get("/api/orders/:id/messages", requireAuth, async (req, res) => {
+  const order = await findOrderOr404(req, res);
+  if (!order) return;
+  if (!isParticipant(order, req.session.userId)) return res.status(403).json({ error: "Not your order." });
+  if (!order.runnerId) return res.status(400).json({ error: "No one has claimed this order yet." });
+
+  const messages = await db.getMessagesByOrder(order.id);
+  res.json({ messages: messages.map((m) => publicMessage(m, req.session.userId)) });
+});
+
+app.post("/api/orders/:id/messages", requireAuth, async (req, res) => {
+  const order = await findOrderOr404(req, res);
+  if (!order) return;
+  if (!isParticipant(order, req.session.userId)) return res.status(403).json({ error: "Not your order." });
+  if (!order.runnerId) return res.status(400).json({ error: "No one has claimed this order yet." });
+
+  const text = (req.body?.text || "").trim();
+  if (!text) return res.status(400).json({ error: "Message can't be empty." });
+  if (text.length > 1000) return res.status(400).json({ error: "Message is too long." });
+
+  const message = await db.createMessage({ orderId: order.id, senderId: req.session.userId, text });
+  res.json({ message: publicMessage(message, req.session.userId) });
 });
 
 // Cancel an order (only the orderer, only while still open)

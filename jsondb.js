@@ -9,10 +9,20 @@ const FILE = path.join(__dirname, "db.json");
 
 function load() {
   if (!fs.existsSync(FILE)) {
-    return { users: [], orders: [], pendingVerifications: {}, nextUserId: 1, nextOrderId: 1 };
+    return {
+      users: [],
+      orders: [],
+      messages: [],
+      pendingVerifications: {},
+      nextUserId: 1,
+      nextOrderId: 1,
+      nextMessageId: 1
+    };
   }
   const data = JSON.parse(fs.readFileSync(FILE, "utf8"));
   if (!data.pendingVerifications) data.pendingVerifications = {};
+  if (!data.messages) data.messages = [];
+  if (!data.nextMessageId) data.nextMessageId = 1;
   return data;
 }
 
@@ -117,6 +127,25 @@ async function deleteOrder(id) {
   save();
 }
 
+function withMessageSender(m) {
+  const sender = db.users.find((u) => u.id === m.senderId);
+  return { ...m, senderName: sender ? sender.name : "Unknown" };
+}
+
+async function getMessagesByOrder(orderId) {
+  return db.messages
+    .filter((m) => m.orderId === Number(orderId))
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .map(withMessageSender);
+}
+
+async function createMessage({ orderId, senderId, text }) {
+  const message = { id: db.nextMessageId++, orderId: Number(orderId), senderId, text, createdAt: Date.now() };
+  db.messages.push(message);
+  save();
+  return withMessageSender(message);
+}
+
 module.exports = {
   backend: "json-file",
   init,
@@ -132,5 +161,7 @@ module.exports = {
   getOrdersByOrderer,
   getOrdersByRunner,
   updateOrder,
-  deleteOrder
+  deleteOrder,
+  getMessagesByOrder,
+  createMessage
 };
