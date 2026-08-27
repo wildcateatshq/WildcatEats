@@ -67,6 +67,30 @@ const STATUS_LABEL = {
   delivered: "Delivered"
 };
 
+// ---------- toasts (replaces alert() everywhere) ----------
+
+function toastContainer() {
+  let el = document.querySelector(".toast-container");
+  if (!el) {
+    el = document.createElement("div");
+    el.className = "toast-container";
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+function toast(message, type = "info") {
+  const container = toastContainer();
+  const el = document.createElement("div");
+  el.className = `toast ${type}`;
+  el.textContent = message;
+  container.appendChild(el);
+  setTimeout(() => {
+    el.classList.add("leaving");
+    el.addEventListener("animationend", () => el.remove(), { once: true });
+  }, 3800);
+}
+
 // ---------- in-order chat (orderer <-> runner, once claimed) ----------
 
 const openChatIds = new Set();
@@ -82,12 +106,16 @@ function chatSectionHtml(order, otherName) {
       <button type="button" class="chat-toggle" data-chat-id="${order.id}" data-other-name="${escapeHtml(otherName)}">
         💬 ${isOpen ? "Hide messages" : `Message ${escapeHtml(otherName)}`}
       </button>
-      <div class="chat-thread" id="chat-thread-${order.id}" style="display:${isOpen ? "flex" : "none"}">
-        <div class="chat-messages" id="chat-messages-${order.id}"></div>
-        <form class="chat-form" data-order-id="${order.id}">
-          <input type="text" class="chat-input" placeholder="Type a message…" maxlength="1000" required />
-          <button class="btn" type="submit">Send</button>
-        </form>
+      <div class="chat-thread-wrap ${isOpen ? "open" : ""}" id="chat-wrap-${order.id}">
+        <div class="chat-thread-inner">
+          <div class="chat-thread">
+            <div class="chat-messages" id="chat-messages-${order.id}"></div>
+            <form class="chat-form" data-order-id="${order.id}">
+              <input type="text" class="chat-input" placeholder="Type a message…" maxlength="1000" required />
+              <button class="btn" type="submit">Send</button>
+            </form>
+          </div>
+        </div>
       </div>
     </div>
   `;
@@ -99,14 +127,14 @@ function wireChatBlocks(container, currentUserId) {
   container.querySelectorAll("[data-chat-id]").forEach((btn) => {
     const id = Number(btn.dataset.chatId);
     btn.onclick = () => {
-      const thread = document.getElementById(`chat-thread-${id}`);
+      const wrap = document.getElementById(`chat-wrap-${id}`);
       if (openChatIds.has(id)) {
         openChatIds.delete(id);
-        thread.style.display = "none";
+        wrap.classList.remove("open");
         btn.textContent = `💬 Message ${btn.dataset.otherName}`;
       } else {
         openChatIds.add(id);
-        thread.style.display = "flex";
+        wrap.classList.add("open");
         btn.textContent = "💬 Hide messages";
         loadChatMessages(id, currentUserId);
       }
@@ -127,7 +155,7 @@ function wireChatBlocks(container, currentUserId) {
         input.value = "";
         await loadChatMessages(id, currentUserId);
       } catch (err) {
-        alert(err.message);
+        toast(err.message, "error");
       } finally {
         input.disabled = false;
         input.focus();

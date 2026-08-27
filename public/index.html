@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>WildcatEats</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -15,7 +18,7 @@
 
     <div id="errorBox"></div>
 
-    <form id="loginForm">
+    <form id="loginForm" class="auth-step">
       <label for="loginEmail">Email</label>
       <input type="email" id="loginEmail" placeholder="you@villanova.edu" required />
       <label for="loginPassword">Password</label>
@@ -23,7 +26,7 @@
       <button class="btn" type="submit" style="width:100%; margin-top:16px;">Log in</button>
     </form>
 
-    <form id="signupForm" style="display:none;">
+    <form id="signupForm" class="auth-step" style="display:none;">
       <label for="signupName">Name</label>
       <input type="text" id="signupName" placeholder="Jane Wildcat" required />
       <label for="signupEmail">Villanova email</label>
@@ -35,7 +38,7 @@
       <button class="btn gold" type="submit" style="width:100%; margin-top:16px;">Create account</button>
     </form>
 
-    <form id="verifyForm" style="display:none;">
+    <form id="verifyForm" class="auth-step" style="display:none;">
       <p style="font-size:0.9rem; color:var(--muted); margin-top:0;">
         We emailed a 6-digit code to <b id="verifyEmailLabel"></b>. Enter it below to finish signing up.
       </p>

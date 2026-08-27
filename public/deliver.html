@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Deliver · WildcatEats</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -101,8 +104,8 @@ async function refreshOpen() {
     list.innerHTML = `<div class="empty">No open orders right now. Check back soon!</div>`;
     return;
   }
-  list.innerHTML = orders.map(o => `
-    <div class="order-item">
+  list.innerHTML = orders.map((o, i) => `
+    <div class="order-item" style="animation-delay:${Math.min(i, 8) * 0.06}s">
       <div class="top-row">
         <div>
           <div class="store">${escapeHtml(o.store)}</div>
@@ -124,7 +127,7 @@ async function refreshOpen() {
         await api(`/api/orders/${btn.dataset.id}/claim`, { method: "POST" });
         switchTab("mine");
       } catch (err) {
-        alert(err.message);
+        toast(err.message, "error");
         refreshOpen();
       }
     };
@@ -142,8 +145,8 @@ async function refreshMine() {
     return;
   }
 
-  list.innerHTML = active.map(renderMine).join("") +
-    (done.length ? `<h2 style="font-size:1rem; color:#6b7280; margin-top:24px;">Completed</h2>` + done.map(renderMine).join("") : "");
+  list.innerHTML = active.map((o, i) => renderMine(o, i)).join("") +
+    (done.length ? `<h2 style="font-size:1rem; color:#6b7280; margin-top:24px;">Completed</h2>` + done.map((o, i) => renderMine(o, i)).join("") : "");
   wireChatBlocks(list, user.id);
 
   orders.forEach(o => {
@@ -164,12 +167,13 @@ async function act(orderId, action, btn) {
     await api(`/api/orders/${orderId}/${action}`, { method: "POST" });
     refreshMine();
   } catch (err) {
-    alert(err.message);
+    toast(err.message, "error");
     btn.disabled = false;
   }
 }
 
-function renderMine(o) {
+function renderMine(o, i = 0) {
+  const delay = `style="animation-delay:${Math.min(i, 8) * 0.06}s"`;
   let actionBtn = "";
   if (o.status === "claimed") {
     actionBtn = `<button class="btn" id="picked-${o.id}" style="margin-top:10px;">I picked it up</button>`;
@@ -183,7 +187,7 @@ function renderMine(o) {
     ? `<div class="banner">🔔 You notified them you've arrived</div>` : "";
 
   return `
-    <div class="order-item">
+    <div class="order-item" ${delay}>
       <div class="top-row">
         <div>
           <div class="store">${escapeHtml(o.store)}</div>

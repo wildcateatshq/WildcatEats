@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Order Food · WildcatEats</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -144,7 +147,7 @@ async function refreshMine() {
     list.innerHTML = `<div class="empty">You haven't placed any orders yet.</div>`;
     return;
   }
-  list.innerHTML = orders.map(renderOrder).join("");
+  list.innerHTML = orders.map((o, i) => renderOrder(o, i)).join("");
   wireChatBlocks(list, user.id);
 
   orders.forEach(o => {
@@ -156,7 +159,7 @@ async function refreshMine() {
           await api(`/api/orders/${o.id}/cancel`, { method: "POST" });
           refreshMine();
         } catch (err) {
-          alert(err.message);
+          toast(err.message, "error");
           cancelBtn.disabled = false;
         }
       };
@@ -172,7 +175,7 @@ async function refreshMine() {
           await api(`/api/orders/${o.id}/report`, { method: "POST", body: { reason: reason.trim() } });
           refreshMine();
         } catch (err) {
-          alert(err.message);
+          toast(err.message, "error");
           reportBtn.disabled = false;
         }
       };
@@ -180,7 +183,8 @@ async function refreshMine() {
   });
 }
 
-function renderOrder(o) {
+function renderOrder(o, i = 0) {
+  const delay = `style="animation-delay:${Math.min(i, 8) * 0.06}s"`;
   let banner = "";
   if (o.arrivedAt && o.status !== "delivered") {
     banner = `<div class="banner">🔔 Your runner has arrived!</div>`;
@@ -208,7 +212,7 @@ function renderOrder(o) {
   }
 
   return `
-    <div class="order-item">
+    <div class="order-item" ${delay}>
       <div class="top-row">
         <div>
           <div class="store">${escapeHtml(o.store)}</div>
