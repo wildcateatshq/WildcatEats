@@ -112,7 +112,10 @@ async function createOrder({ ordererId, store, hall, dropoffDetails, items, tip,
     paymentStatus: "unpaid",
     disputeReason: null,
     disputedAt: null,
-    refundedAt: null
+    refundedAt: null,
+    runnerLat: null,
+    runnerLng: null,
+    runnerLocationAt: null
   };
   db.orders.push(order);
   save();

@@ -136,6 +136,7 @@ async function refreshOpen() {
 
 async function refreshMine() {
   const { orders } = await api("/api/orders/delivering");
+  updateLocationSharing(orders);
   const list = document.getElementById("mineList");
   const active = orders.filter(o => o.status !== "delivered");
   const done = orders.filter(o => o.status === "delivered");
@@ -159,6 +160,45 @@ async function refreshMine() {
     const deliveredBtn = document.getElementById(`delivered-${o.id}`);
     if (deliveredBtn) deliveredBtn.onclick = () => act(o.id, "delivered", deliveredBtn);
   });
+}
+
+// ---------- share live location while actively delivering ----------
+
+let watchId = null;
+let activeOrderIds = [];
+let lastLocationSentAt = 0;
+let locationErrorShown = false;
+
+function updateLocationSharing(orders) {
+  activeOrderIds = orders.filter(o => o.status === "claimed" || o.status === "picked_up").map(o => o.id);
+
+  if (activeOrderIds.length === 0) {
+    if (watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
+    return;
+  }
+  if (watchId !== null || !navigator.geolocation) return;
+
+  watchId = navigator.geolocation.watchPosition(
+    (pos) => {
+      const now = Date.now();
+      if (now - lastLocationSentAt < 8000) return; // throttle — no need to hammer the server
+      lastLocationSentAt = now;
+      const { latitude, longitude } = pos.coords;
+      activeOrderIds.forEach(id => {
+        api(`/api/orders/${id}/location`, { method: "POST", body: { lat: latitude, lng: longitude } }).catch(() => {});
+      });
+    },
+    () => {
+      if (!locationErrorShown) {
+        locationErrorShown = true;
+        toast("Couldn't access your location — the orderer won't see a live map for this delivery.", "error");
+      }
+    },
+    { enableHighAccuracy: true, maximumAge: 5000 }
+  );
 }
 
 async function act(orderId, action, btn) {

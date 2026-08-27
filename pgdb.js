@@ -69,6 +69,9 @@ async function init() {
   await pool.query(`alter table orders add column if not exists dispute_reason text;`);
   await pool.query(`alter table orders add column if not exists disputed_at timestamptz;`);
   await pool.query(`alter table orders add column if not exists refunded_at timestamptz;`);
+  await pool.query(`alter table orders add column if not exists runner_lat double precision;`);
+  await pool.query(`alter table orders add column if not exists runner_lng double precision;`);
+  await pool.query(`alter table orders add column if not exists runner_location_at timestamptz;`);
 }
 
 function rowToUser(r) {
@@ -109,7 +112,10 @@ function rowToOrder(r) {
     paymentStatus: r.payment_status,
     disputeReason: r.dispute_reason || null,
     disputedAt: r.disputed_at ? r.disputed_at.getTime() : null,
-    refundedAt: r.refunded_at ? r.refunded_at.getTime() : null
+    refundedAt: r.refunded_at ? r.refunded_at.getTime() : null,
+    runnerLat: r.runner_lat != null ? Number(r.runner_lat) : null,
+    runnerLng: r.runner_lng != null ? Number(r.runner_lng) : null,
+    runnerLocationAt: r.runner_location_at ? r.runner_location_at.getTime() : null
   };
 }
 
@@ -230,7 +236,8 @@ const TIMESTAMP_FIELDS = new Set([
   "arrivedAt",
   "deliveredAt",
   "disputedAt",
-  "refundedAt"
+  "refundedAt",
+  "runnerLocationAt"
 ]);
 const FIELD_COLUMN = {
   runnerId: "runner_id",
@@ -243,7 +250,10 @@ const FIELD_COLUMN = {
   paymentStatus: "payment_status",
   disputeReason: "dispute_reason",
   disputedAt: "disputed_at",
-  refundedAt: "refunded_at"
+  refundedAt: "refunded_at",
+  runnerLat: "runner_lat",
+  runnerLng: "runner_lng",
+  runnerLocationAt: "runner_location_at"
 };
 
 async function updateOrder(id, patch) {

@@ -32,3 +32,5 @@ services:
         sync: false
       - key: ADMIN_EMAIL
         sync: false
+      - key: MAPBOX_TOKEN
+        sync: false

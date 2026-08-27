@@ -301,6 +301,17 @@ button.btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !import
   animation: popIn 0.35s var(--ease) both;
 }
 
+.map-slot {
+  width: 100%;
+  height: 220px;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  margin: 10px 0;
+  background: var(--bg);
+  animation: popIn 0.35s var(--ease) both;
+}
+
 .card-element {
   border: 1px solid var(--border);
   border-radius: 8px;

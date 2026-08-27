@@ -87,7 +87,10 @@ function publicOrder(o, { forRunner = false } = {}) {
     paymentStatus: o.paymentStatus,
     disputeReason: o.disputeReason,
     disputedAt: o.disputedAt,
-    refundedAt: o.refundedAt
+    refundedAt: o.refundedAt,
+    runnerLat: o.runnerLat,
+    runnerLng: o.runnerLng,
+    runnerLocationAt: o.runnerLocationAt
   };
 }
 
@@ -253,6 +256,11 @@ app.get("/api/stripe/config", (req, res) => {
   res.json({ enabled: payments.enabled, publishableKey: payments.publishableKey, minFee: payments.MIN_FEE_DOLLARS });
 });
 
+app.get("/api/mapbox/config", (req, res) => {
+  const token = process.env.MAPBOX_TOKEN || "";
+  res.json({ enabled: Boolean(token), token });
+});
+
 // ---------- order routes ----------
 
 // Step 1 of placing an order: save a card against the orderer's Stripe
@@ -413,6 +421,25 @@ app.post("/api/orders/:id/claim", requireAuth, async (req, res) => {
   res.json({ order: publicOrder(updated, { forRunner: true }) });
 });
 
+// Runner's live GPS while actively delivering — only accepted while
+// claimed/picked_up, only the assigned runner can post it. The orderer
+// picks it up via their own polling of /api/orders/mine.
+app.post("/api/orders/:id/location", requireAuth, async (req, res) => {
+  const order = await findOrderOr404(req, res);
+  if (!order) return;
+  if (order.runnerId !== req.session.userId) return res.status(403).json({ error: "Not your delivery." });
+  if (order.status !== "claimed" && order.status !== "picked_up") {
+    return res.status(400).json({ error: "This delivery isn't active." });
+  }
+  const lat = Number(req.body?.lat);
+  const lng = Number(req.body?.lng);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng) || Math.abs(lat) > 90 || Math.abs(lng) > 180) {
+    return res.status(400).json({ error: "Invalid coordinates." });
+  }
+  await db.updateOrder(order.id, { runnerLat: lat, runnerLng: lng, runnerLocationAt: Date.now() });
+  res.json({ ok: true });
+});
+
 // Mark picked up from the store
 app.post("/api/orders/:id/picked-up", requireAuth, async (req, res) => {
   const order = await findOrderOr404(req, res);
@@ -452,7 +479,15 @@ app.post("/api/orders/:id/delivered", requireAuth, async (req, res) => {
   if (order.runnerId !== req.session.userId) return res.status(403).json({ error: "Not your delivery." });
   if (order.status !== "picked_up") return res.status(400).json({ error: "Wrong order status." });
 
-  const updated = await db.updateOrder(order.id, { status: "delivered", deliveredAt: Date.now() });
+  // Clear the runner's location once the delivery's done — no reason to
+  // keep sharing (or storing) where they are after this point.
+  const updated = await db.updateOrder(order.id, {
+    status: "delivered",
+    deliveredAt: Date.now(),
+    runnerLat: null,
+    runnerLng: null,
+    runnerLocationAt: null
+  });
   res.json({ order: publicOrder(updated, { forRunner: true }) });
 });
 

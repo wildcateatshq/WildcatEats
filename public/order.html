@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/style.css" />
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet" />
 </head>
 <body>
 <header class="nav" id="nav"></header>
@@ -53,21 +54,30 @@
 </main>
 
 <script src="https://js.stripe.com/v3/"></script>
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
 <script src="/app.js"></script>
 <script>
 let user = null;
 let pollTimer = null;
 let stripeClient = null;
 let cardElement = null;
+let mapboxEnabled = false;
 
 (async () => {
   user = await requireAuthOrRedirect();
   if (!user) return;
   await loadConfig();
   await initStripe();
+  await initMapbox();
   await refreshMine();
   pollTimer = setInterval(refreshMine, 4000);
 })();
+
+async function initMapbox() {
+  const { enabled, token } = await api("/api/mapbox/config");
+  mapboxEnabled = enabled;
+  if (enabled) mapboxgl.accessToken = token;
+}
 
 async function loadConfig() {
   const cfg = await api("/api/config");
@@ -145,10 +155,12 @@ async function refreshMine() {
   const list = document.getElementById("myOrdersList");
   if (orders.length === 0) {
     list.innerHTML = `<div class="empty">You haven't placed any orders yet.</div>`;
+    syncMaps([]);
     return;
   }
   list.innerHTML = orders.map((o, i) => renderOrder(o, i)).join("");
   wireChatBlocks(list, user.id);
+  syncMaps(orders);
 
   orders.forEach(o => {
     const cancelBtn = document.getElementById(`cancel-${o.id}`);
@@ -211,6 +223,12 @@ function renderOrder(o, i = 0) {
     runnerLine = `<div class="meta">Runner: ${escapeHtml(o.runnerName)}</div>`;
   }
 
+  const hasLiveLocation =
+    mapboxEnabled && (o.status === "claimed" || o.status === "picked_up") && o.runnerLat != null && o.runnerLng != null;
+  const mapBlock = hasLiveLocation
+    ? `<div class="map-slot" data-map-slot="${o.id}"></div>`
+    : "";
+
   return `
     <div class="order-item" ${delay}>
       <div class="top-row">
@@ -224,11 +242,69 @@ function renderOrder(o, i = 0) {
       ${banner}
       <div class="meta">Posted ${timeAgo(o.createdAt)} · Delivery fee: <span class="tip">$${Number(o.tip).toFixed(2)}</span> · ${o.paymentStatus === "paid" ? "Paid ✅" : o.paymentStatus === "refunded" ? "Refunded 💸" : "Not charged yet"}</div>
       ${runnerLine}
+      ${mapBlock}
       ${chatSectionHtml(o, o.runnerName)}
       ${cancelBtn}
       ${reportBtn}
     </div>
   `;
+}
+
+// ---------- live runner map ----------
+// The order list's innerHTML gets rebuilt on every poll, which would
+// normally destroy and recreate each Mapbox instance (flicker, wasted
+// map-load quota). Instead we keep one persistent container div per order
+// in memory and re-parent it into the freshly rendered slot each time —
+// the underlying map survives, only its position in the DOM changes.
+
+const mapInstances = {};
+const mapContainers = {};
+const markerInstances = {};
+
+function syncMaps(orders) {
+  if (!mapboxEnabled) return;
+  const activeIds = new Set();
+
+  orders.forEach(o => {
+    const hasLocation = (o.status === "claimed" || o.status === "picked_up") && o.runnerLat != null && o.runnerLng != null;
+    if (!hasLocation) return;
+    activeIds.add(o.id);
+
+    const slot = document.querySelector(`[data-map-slot="${o.id}"]`);
+    if (!slot) return;
+
+    if (!mapInstances[o.id]) {
+      const container = document.createElement("div");
+      container.style.width = "100%";
+      container.style.height = "100%";
+      mapContainers[o.id] = container;
+
+      const map = new mapboxgl.Map({
+        container,
+        style: "mapbox://styles/mapbox/streets-v12",
+        center: [o.runnerLng, o.runnerLat],
+        zoom: 15
+      });
+      const marker = new mapboxgl.Marker({ color: "#cfa438" }).setLngLat([o.runnerLng, o.runnerLat]).addTo(map);
+      mapInstances[o.id] = map;
+      markerInstances[o.id] = marker;
+    } else {
+      markerInstances[o.id].setLngLat([o.runnerLng, o.runnerLat]);
+      mapInstances[o.id].easeTo({ center: [o.runnerLng, o.runnerLat], duration: 800 });
+    }
+
+    slot.appendChild(mapContainers[o.id]);
+    mapInstances[o.id].resize();
+  });
+
+  Object.keys(mapInstances).forEach(id => {
+    if (!activeIds.has(Number(id))) {
+      mapInstances[id].remove();
+      delete mapInstances[id];
+      delete mapContainers[id];
+      delete markerInstances[id];
+    }
+  });
 }
 </script>
 </body>
