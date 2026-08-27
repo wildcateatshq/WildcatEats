@@ -212,8 +212,6 @@ button.btn:disabled { opacity: 0.5; cursor: not-allowed; }
   color: var(--warn);
 }
 
-.you-keep { color: var(--success); font-weight: 600; }
-
 .card-element {
   border: 1px solid var(--border);
   border-radius: 8px;

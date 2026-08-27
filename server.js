@@ -51,7 +51,9 @@ function publicUser(u) {
   return { id: u.id, name: u.name, email: u.email, phone: u.phone, stripeOnboarded: Boolean(u.stripeOnboarded) };
 }
 
-function publicOrder(o) {
+// forRunner: runners see what THEY earn, never the full fee the orderer
+// paid — the platform's cut isn't any of their business to see.
+function publicOrder(o, { forRunner = false } = {}) {
   if (!o) return null;
   return {
     id: o.id,
@@ -59,7 +61,7 @@ function publicOrder(o) {
     hall: o.hall,
     dropoffDetails: o.dropoffDetails,
     items: o.items,
-    tip: o.tip,
+    ...(forRunner ? { runnerEarnings: Math.round(o.tip * (1 - payments.PLATFORM_CUT) * 100) / 100 } : { tip: o.tip }),
     status: o.status,
     createdAt: o.createdAt,
     claimedAt: o.claimedAt,
@@ -283,19 +285,19 @@ app.post("/api/orders", requireAuth, async (req, res) => {
 // Open orders available to claim (not mine, not yet claimed)
 app.get("/api/orders/open", requireAuth, async (req, res) => {
   const open = await db.getOpenOrders(req.session.userId);
-  res.json({ orders: open.map(publicOrder) });
+  res.json({ orders: open.map((o) => publicOrder(o, { forRunner: true })) });
 });
 
 // Orders I placed
 app.get("/api/orders/mine", requireAuth, async (req, res) => {
   const mine = await db.getOrdersByOrderer(req.session.userId);
-  res.json({ orders: mine.map(publicOrder) });
+  res.json({ orders: mine.map((o) => publicOrder(o)) });
 });
 
 // Orders I'm delivering
 app.get("/api/orders/delivering", requireAuth, async (req, res) => {
   const mine = await db.getOrdersByRunner(req.session.userId);
-  res.json({ orders: mine.map(publicOrder) });
+  res.json({ orders: mine.map((o) => publicOrder(o, { forRunner: true })) });
 });
 
 // ---------- runner payouts (Stripe Connect) ----------
@@ -391,7 +393,7 @@ app.post("/api/orders/:id/claim", requireAuth, async (req, res) => {
     );
   }
 
-  res.json({ order: publicOrder(updated) });
+  res.json({ order: publicOrder(updated, { forRunner: true }) });
 });
 
 // Mark picked up from the store
@@ -402,7 +404,7 @@ app.post("/api/orders/:id/picked-up", requireAuth, async (req, res) => {
   if (order.status !== "claimed") return res.status(400).json({ error: "Wrong order status." });
 
   const updated = await db.updateOrder(order.id, { status: "picked_up", pickedUpAt: Date.now() });
-  res.json({ order: publicOrder(updated) });
+  res.json({ order: publicOrder(updated, { forRunner: true }) });
 });
 
 // "I'm here!" — notify the orderer the runner has arrived
@@ -423,7 +425,7 @@ app.post("/api/orders/:id/arrived", requireAuth, async (req, res) => {
     );
   }
 
-  res.json({ order: publicOrder(updated) });
+  res.json({ order: publicOrder(updated, { forRunner: true }) });
 });
 
 // Mark fully delivered / handed off
@@ -434,7 +436,7 @@ app.post("/api/orders/:id/delivered", requireAuth, async (req, res) => {
   if (order.status !== "picked_up") return res.status(400).json({ error: "Wrong order status." });
 
   const updated = await db.updateOrder(order.id, { status: "delivered", deliveredAt: Date.now() });
-  res.json({ order: publicOrder(updated) });
+  res.json({ order: publicOrder(updated, { forRunner: true }) });
 });
 
 // ---------- messages (orderer <-> runner, once claimed) ----------

@@ -111,7 +111,7 @@ async function refreshOpen() {
         <span class="badge open">Open</span>
       </div>
       <div class="items">${escapeHtml(o.items)}</div>
-      <div class="meta">Posted ${timeAgo(o.createdAt)} by ${escapeHtml(o.ordererName)} · Delivery fee: <span class="tip">$${Number(o.tip).toFixed(2)}</span> <span class="you-keep">(you keep $${(Number(o.tip) * 0.75).toFixed(2)})</span></div>
+      <div class="meta">Posted ${timeAgo(o.createdAt)} by ${escapeHtml(o.ordererName)} · You earn: <span class="tip">$${Number(o.runnerEarnings).toFixed(2)}</span></div>
       <button class="btn gold" style="margin-top:10px;" data-id="${o.id}">Claim this delivery</button>
     </div>
   `).join("");
@@ -193,7 +193,7 @@ function renderMine(o) {
       </div>
       <div class="items">${escapeHtml(o.items)}</div>
       ${arrivedNote}
-      <div class="meta">For ${escapeHtml(o.ordererName)} · Delivery fee: <span class="tip">$${Number(o.tip).toFixed(2)}</span> <span class="you-keep">(you keep $${(Number(o.tip) * 0.75).toFixed(2)})</span></div>
+      <div class="meta">For ${escapeHtml(o.ordererName)} · You earn: <span class="tip">$${Number(o.runnerEarnings).toFixed(2)}</span></div>
       ${chatSectionHtml(o, o.ordererName)}
       ${actionBtn}
     </div>
