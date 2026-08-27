@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Order Food · WildcatEats</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<header class="nav" id="nav"></header>
+<main>
+  <div class="tabs">
+    <button id="tabNew" class="active">Place an order</button>
+    <button id="tabMine">My orders</button>
+  </div>
+
+  <section id="newOrderSection">
+    <h1>What do you need?</h1>
+    <p class="subtitle">Pick a spot, tell us where you are, and a fellow student will bring it to you.</p>
+    <div id="errorBox"></div>
+    <form id="orderForm" class="card">
+      <label for="store">Pick up from</label>
+      <select id="store" required></select>
+
+      <label for="hall">Deliver to</label>
+      <select id="hall" required></select>
+
+      <label for="dropoffDetails">Room / meeting spot details</label>
+      <input type="text" id="dropoffDetails" placeholder="e.g. Room 214, or lobby by the front desk" />
+
+      <label for="items">What do you want? (items, sizes, notes)</label>
+      <textarea id="items" placeholder="e.g. Large pepperoni pizza, extra ranch. Venmo @janedoe for the total." required></textarea>
+
+      <label for="tip">Tip for your runner ($)</label>
+      <input type="number" id="tip" min="0" step="0.5" value="5" />
+
+      <button class="btn" type="submit" style="margin-top:18px;">Post order</button>
+    </form>
+  </section>
+
+  <section id="myOrdersSection" style="display:none;">
+    <h1>My orders</h1>
+    <p class="subtitle">Live status of the food you've requested.</p>
+    <div id="myOrdersList"></div>
+  </section>
+</main>
+
+<script src="/app.js"></script>
+<script>
+let user = null;
+let pollTimer = null;
+
+(async () => {
+  user = await requireAuthOrRedirect();
+  if (!user) return;
+  await loadConfig();
+  await refreshMine();
+  pollTimer = setInterval(refreshMine, 4000);
+})();
+
+async function loadConfig() {
+  const cfg = await api("/api/config");
+  const storeSel = document.getElementById("store");
+  const hallSel = document.getElementById("hall");
+  storeSel.innerHTML = cfg.stores.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+  hallSel.innerHTML = cfg.halls.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join("");
+}
+
+document.getElementById("tabNew").onclick = () => switchTab("new");
+document.getElementById("tabMine").onclick = () => switchTab("mine");
+
+function switchTab(which) {
+  document.getElementById("tabNew").classList.toggle("active", which === "new");
+  document.getElementById("tabMine").classList.toggle("active", which === "mine");
+  document.getElementById("newOrderSection").style.display = which === "new" ? "block" : "none";
+  document.getElementById("myOrdersSection").style.display = which === "mine" ? "block" : "none";
+  if (which === "mine") refreshMine();
+}
+
+const errorBox = document.getElementById("errorBox");
+
+document.getElementById("orderForm").onsubmit = async (e) => {
+  e.preventDefault();
+  errorBox.innerHTML = "";
+  try {
+    await api("/api/orders", {
+      method: "POST",
+      body: {
+        store: document.getElementById("store").value,
+        hall: document.getElementById("hall").value,
+        dropoffDetails: document.getElementById("dropoffDetails").value,
+        items: document.getElementById("items").value,
+        tip: document.getElementById("tip").value
+      }
+    });
+    document.getElementById("items").value = "";
+    document.getElementById("dropoffDetails").value = "";
+    switchTab("mine");
+  } catch (err) {
+    errorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+  }
+};
+
+async function refreshMine() {
+  const { orders } = await api("/api/orders/mine");
+  const list = document.getElementById("myOrdersList");
+  if (orders.length === 0) {
+    list.innerHTML = `<div class="empty">You haven't placed any orders yet.</div>`;
+    return;
+  }
+  list.innerHTML = orders.map(renderOrder).join("");
+
+  orders.forEach(o => {
+    const cancelBtn = document.getElementById(`cancel-${o.id}`);
+    if (cancelBtn) {
+      cancelBtn.onclick = async () => {
+        cancelBtn.disabled = true;
+        try {
+          await api(`/api/orders/${o.id}/cancel`, { method: "POST" });
+          refreshMine();
+        } catch (err) {
+          alert(err.message);
+          cancelBtn.disabled = false;
+        }
+      };
+    }
+  });
+}
+
+function renderOrder(o) {
+  let banner = "";
+  if (o.arrivedAt && o.status !== "delivered") {
+    banner = `<div class="banner">🔔 Your runner has arrived!</div>`;
+  } else if (o.status === "delivered") {
+    banner = `<div class="banner">✅ Delivered — enjoy!</div>`;
+  }
+
+  let cancelBtn = "";
+  if (o.status === "open") {
+    cancelBtn = `<button class="btn danger" id="cancel-${o.id}" style="margin-top:10px;">Cancel order</button>`;
+  }
+
+  let runnerLine = "";
+  if (o.runnerName) {
+    runnerLine = `<div class="meta">Runner: ${escapeHtml(o.runnerName)}</div>`;
+  }
+
+  return `
+    <div class="order-item">
+      <div class="top-row">
+        <div>
+          <div class="store">${escapeHtml(o.store)}</div>
+          <div class="hall">→ ${escapeHtml(o.hall)}${o.dropoffDetails ? " · " + escapeHtml(o.dropoffDetails) : ""}</div>
+        </div>
+        <span class="badge ${o.status}">${STATUS_LABEL[o.status]}</span>
+      </div>
+      <div class="items">${escapeHtml(o.items)}</div>
+      ${banner}
+      <div class="meta">Posted ${timeAgo(o.createdAt)} · Tip: <span class="tip">$${Number(o.tip).toFixed(2)}</span></div>
+      ${runnerLine}
+      ${cancelBtn}
+    </div>
+  `;
+}
+</script>
+</body>
+</html>

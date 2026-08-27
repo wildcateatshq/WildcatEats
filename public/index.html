@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>WildcatEats</title>
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div class="center-page">
+  <div class="card">
+    <div class="logo"><span class="paw">🐾</span> WildcatEats</div>
+    <p class="tagline">Campus food delivery, run by students, for students.</p>
+
+    <div id="errorBox"></div>
+
+    <form id="loginForm">
+      <label for="loginEmail">Email</label>
+      <input type="email" id="loginEmail" placeholder="you@villanova.edu" required />
+      <label for="loginPassword">Password</label>
+      <input type="password" id="loginPassword" required />
+      <button class="btn" type="submit" style="width:100%; margin-top:16px;">Log in</button>
+    </form>
+
+    <form id="signupForm" style="display:none;">
+      <label for="signupName">Name</label>
+      <input type="text" id="signupName" placeholder="Jane Wildcat" required />
+      <label for="signupEmail">Villanova email</label>
+      <input type="email" id="signupEmail" placeholder="you@villanova.edu" required />
+      <label for="signupPhone">Phone number</label>
+      <input type="text" id="signupPhone" placeholder="(610) 555-1234" required />
+      <label for="signupPassword">Password</label>
+      <input type="password" id="signupPassword" required minlength="4" />
+      <button class="btn gold" type="submit" style="width:100%; margin-top:16px;">Create account</button>
+    </form>
+
+    <form id="verifyForm" style="display:none;">
+      <p style="font-size:0.9rem; color:var(--muted); margin-top:0;">
+        We emailed a 6-digit code to <b id="verifyEmailLabel"></b>. Enter it below to finish signing up.
+      </p>
+      <div id="devCodeBox"></div>
+      <label for="verifyCode">Verification code</label>
+      <input type="text" id="verifyCode" inputmode="numeric" maxlength="6" placeholder="123456" required />
+      <button class="btn gold" type="submit" style="width:100%; margin-top:16px;">Verify & create account</button>
+      <div class="switch-link"><span><a id="resendCode">Resend code</a></span></div>
+    </form>
+
+    <div class="switch-link" id="switchLinks">
+      <span id="toSignup">New here? <a>Create an account</a></span>
+      <span id="toLogin" style="display:none;">Already have an account? <a>Log in</a></span>
+    </div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script>
+(async () => {
+  const existing = await getMe();
+  if (existing) { window.location.href = "/order.html"; return; }
+})();
+
+const loginForm = document.getElementById("loginForm");
+const signupForm = document.getElementById("signupForm");
+const verifyForm = document.getElementById("verifyForm");
+const switchLinks = document.getElementById("switchLinks");
+const errorBox = document.getElementById("errorBox");
+let pendingEmail = null;
+
+document.getElementById("toSignup").onclick = () => {
+  loginForm.style.display = "none";
+  signupForm.style.display = "block";
+  document.getElementById("toSignup").style.display = "none";
+  document.getElementById("toLogin").style.display = "block";
+  errorBox.innerHTML = "";
+};
+document.getElementById("toLogin").onclick = () => {
+  signupForm.style.display = "none";
+  loginForm.style.display = "block";
+  document.getElementById("toLogin").style.display = "none";
+  document.getElementById("toSignup").style.display = "block";
+  errorBox.innerHTML = "";
+};
+
+loginForm.onsubmit = async (e) => {
+  e.preventDefault();
+  errorBox.innerHTML = "";
+  try {
+    await api("/api/login", {
+      method: "POST",
+      body: {
+        email: document.getElementById("loginEmail").value,
+        password: document.getElementById("loginPassword").value
+      }
+    });
+    window.location.href = "/order.html";
+  } catch (err) {
+    errorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+  }
+};
+
+signupForm.onsubmit = async (e) => {
+  e.preventDefault();
+  errorBox.innerHTML = "";
+  try {
+    const data = await api("/api/signup", {
+      method: "POST",
+      body: {
+        name: document.getElementById("signupName").value,
+        email: document.getElementById("signupEmail").value,
+        phone: document.getElementById("signupPhone").value,
+        password: document.getElementById("signupPassword").value
+      }
+    });
+    showVerifyStep(data);
+  } catch (err) {
+    errorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+  }
+};
+
+function showVerifyStep(data) {
+  pendingEmail = data.email;
+  document.getElementById("verifyEmailLabel").textContent = data.email;
+  showDevCode(data.devCode);
+  signupForm.style.display = "none";
+  switchLinks.style.display = "none";
+  verifyForm.style.display = "block";
+}
+
+function showDevCode(devCode) {
+  const box = document.getElementById("devCodeBox");
+  if (devCode) {
+    box.innerHTML = `<div class="error" style="background:#fff8e6; color:#8a6d1a; border-color:#f2e2a8;">
+      Email sending isn't configured yet (see .env.example) — for testing, your code is <b>${escapeHtml(devCode)}</b>.
+    </div>`;
+  } else {
+    box.innerHTML = "";
+  }
+}
+
+verifyForm.onsubmit = async (e) => {
+  e.preventDefault();
+  errorBox.innerHTML = "";
+  try {
+    await api("/api/verify-email", {
+      method: "POST",
+      body: { email: pendingEmail, code: document.getElementById("verifyCode").value }
+    });
+    window.location.href = "/order.html";
+  } catch (err) {
+    errorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+  }
+};
+
+document.getElementById("resendCode").onclick = async () => {
+  errorBox.innerHTML = "";
+  try {
+    const data = await api("/api/resend-code", { method: "POST", body: { email: pendingEmail } });
+    showDevCode(data.devCode);
+  } catch (err) {
+    errorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+  }
+};
+</script>
+</body>
+</html>
