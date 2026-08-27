@@ -307,9 +307,10 @@ app.post("/api/orders", requireAuth, async (req, res) => {
   res.json({ order: publicOrder(order) });
 });
 
-// Open orders available to claim (not mine, not yet claimed)
+// Open orders available to claim — includes your own posted orders too
+// (you're allowed to claim/deliver those yourself; see the claim route).
 app.get("/api/orders/open", requireAuth, async (req, res) => {
-  const open = await db.getOpenOrders(req.session.userId);
+  const open = await db.getOpenOrders();
   res.json({ orders: open.map((o) => publicOrder(o, { forRunner: true })) });
 });
 
@@ -371,8 +372,6 @@ app.post("/api/orders/:id/claim", requireAuth, async (req, res) => {
   const order = await findOrderOr404(req, res);
   if (!order) return;
   if (order.status !== "open") return res.status(400).json({ error: "Order already claimed." });
-  if (order.ordererId === req.session.userId)
-    return res.status(400).json({ error: "You can't deliver your own order." });
 
   const runner = await db.getUserById(req.session.userId);
 

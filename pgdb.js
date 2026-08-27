@@ -211,11 +211,8 @@ async function getOrderById(id) {
   return rowToOrder(rows[0]);
 }
 
-async function getOpenOrders(excludeUserId) {
-  const { rows } = await pool.query(
-    `${ORDER_SELECT} where o.status = 'open' and o.orderer_id <> $1 order by o.created_at desc`,
-    [excludeUserId]
-  );
+async function getOpenOrders() {
+  const { rows } = await pool.query(`${ORDER_SELECT} where o.status = 'open' order by o.created_at desc`);
   return rows.map(rowToOrder);
 }
 

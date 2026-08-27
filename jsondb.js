@@ -127,8 +127,8 @@ async function getOrderById(id) {
   return o ? withOrderNames(o) : null;
 }
 
-async function getOpenOrders(excludeUserId) {
-  return db.orders.filter((o) => o.status === "open" && o.ordererId !== excludeUserId).map(withOrderNames);
+async function getOpenOrders() {
+  return db.orders.filter((o) => o.status === "open").map(withOrderNames);
 }
 
 async function getOrdersByOrderer(userId) {
