@@ -57,11 +57,29 @@ async function init() {
       created_at timestamptz not null default now()
     );
   `);
+
+  // Added after the initial release — `add column if not exists` keeps this
+  // safe to run against a database that already has these tables.
+  await pool.query(`alter table users add column if not exists stripe_customer_id text;`);
+  await pool.query(`alter table users add column if not exists stripe_account_id text;`);
+  await pool.query(`alter table users add column if not exists stripe_onboarded boolean not null default false;`);
+  await pool.query(`alter table orders add column if not exists stripe_payment_method_id text;`);
+  await pool.query(`alter table orders add column if not exists stripe_payment_intent_id text;`);
+  await pool.query(`alter table orders add column if not exists payment_status text not null default 'unpaid';`);
 }
 
 function rowToUser(r) {
   if (!r) return null;
-  return { id: r.id, name: r.name, email: r.email, phone: r.phone, passwordHash: r.password_hash };
+  return {
+    id: r.id,
+    name: r.name,
+    email: r.email,
+    phone: r.phone,
+    passwordHash: r.password_hash,
+    stripeCustomerId: r.stripe_customer_id || null,
+    stripeAccountId: r.stripe_account_id || null,
+    stripeOnboarded: Boolean(r.stripe_onboarded)
+  };
 }
 
 function rowToOrder(r) {
@@ -82,7 +100,10 @@ function rowToOrder(r) {
     arrivedAt: r.arrived_at ? r.arrived_at.getTime() : null,
     deliveredAt: r.delivered_at ? r.delivered_at.getTime() : null,
     ordererName: r.orderer_name,
-    runnerName: r.runner_name || null
+    runnerName: r.runner_name || null,
+    stripePaymentMethodId: r.stripe_payment_method_id || null,
+    stripePaymentIntentId: r.stripe_payment_intent_id || null,
+    paymentStatus: r.payment_status
   };
 }
 
@@ -109,6 +130,29 @@ async function createUser({ name, email, phone, passwordHash }) {
     [name, email, phone, passwordHash]
   );
   return rowToUser(rows[0]);
+}
+
+const USER_FIELD_COLUMN = {
+  stripeCustomerId: "stripe_customer_id",
+  stripeAccountId: "stripe_account_id",
+  stripeOnboarded: "stripe_onboarded"
+};
+
+async function updateUser(id, patch) {
+  const sets = [];
+  const values = [];
+  let i = 1;
+  for (const [key, value] of Object.entries(patch)) {
+    const col = USER_FIELD_COLUMN[key];
+    if (!col) continue;
+    sets.push(`${col} = $${i}`);
+    values.push(value);
+    i++;
+  }
+  if (sets.length === 0) return getUserById(id);
+  values.push(id);
+  await pool.query(`update users set ${sets.join(", ")} where id = $${i}`, values);
+  return getUserById(id);
 }
 
 async function getPendingVerification(emailKey) {
@@ -141,11 +185,11 @@ async function deletePendingVerification(emailKey) {
   await pool.query("delete from pending_verifications where email = $1", [emailKey]);
 }
 
-async function createOrder({ ordererId, store, hall, dropoffDetails, items, tip }) {
+async function createOrder({ ordererId, store, hall, dropoffDetails, items, tip, stripePaymentMethodId }) {
   const { rows } = await pool.query(
-    `insert into orders (orderer_id, store, hall, dropoff_details, items, tip)
-     values ($1,$2,$3,$4,$5,$6) returning id`,
-    [ordererId, store, hall, dropoffDetails || "", items, Number(tip) || 0]
+    `insert into orders (orderer_id, store, hall, dropoff_details, items, tip, stripe_payment_method_id)
+     values ($1,$2,$3,$4,$5,$6,$7) returning id`,
+    [ordererId, store, hall, dropoffDetails || "", items, Number(tip) || 0, stripePaymentMethodId || null]
   );
   return getOrderById(rows[0].id);
 }
@@ -181,7 +225,9 @@ const FIELD_COLUMN = {
   claimedAt: "claimed_at",
   pickedUpAt: "picked_up_at",
   arrivedAt: "arrived_at",
-  deliveredAt: "delivered_at"
+  deliveredAt: "delivered_at",
+  stripePaymentIntentId: "stripe_payment_intent_id",
+  paymentStatus: "payment_status"
 };
 
 async function updateOrder(id, patch) {
@@ -258,5 +304,6 @@ module.exports = {
   updateOrder,
   deleteOrder,
   getMessagesByOrder,
-  createMessage
+  createMessage,
+  updateUser
 };

@@ -17,7 +17,8 @@
 
   <section id="openSection">
     <h1>Make some cash</h1>
-    <p class="subtitle">Claim an order, pick it up, and let them know when you've arrived.</p>
+    <p class="subtitle">Claim an order, pick it up, and let them know when you've arrived. You keep 75% of the delivery fee.</p>
+    <div id="payoutBanner"></div>
     <div id="openList"></div>
   </section>
 
@@ -31,10 +32,14 @@
 <script src="/app.js"></script>
 <script>
 let user = null;
+let paymentsEnabled = false;
 
 (async () => {
   user = await requireAuthOrRedirect();
   if (!user) return;
+  paymentsEnabled = (await api("/api/stripe/config")).enabled;
+  await handleStripeRedirect();
+  renderPayoutBanner();
   await refreshOpen();
   await refreshMine();
   setInterval(() => {
@@ -42,6 +47,41 @@ let user = null;
     else refreshMine();
   }, 4000);
 })();
+
+// Stripe redirects the browser back here after (or mid-) Connect onboarding.
+async function handleStripeRedirect() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has("stripe_refresh")) {
+    // The onboarding link expired before they finished — get a fresh one.
+    await startPayoutOnboarding();
+    return;
+  }
+  if (params.has("stripe_return")) {
+    const { onboarded } = await api("/api/stripe/connect/check", { method: "POST" });
+    user.stripeOnboarded = onboarded;
+    history.replaceState(null, "", "/deliver.html");
+  }
+}
+
+async function startPayoutOnboarding() {
+  const { url } = await api("/api/stripe/connect/start", { method: "POST" });
+  window.location.href = url;
+}
+
+function renderPayoutBanner() {
+  const el = document.getElementById("payoutBanner");
+  if (!paymentsEnabled || user.stripeOnboarded) {
+    el.innerHTML = "";
+    return;
+  }
+  el.innerHTML = `
+    <div class="banner warn">
+      💳 Set up payouts before you can claim a delivery — takes about 2 minutes.
+      <button class="btn gold" id="setupPayoutsBtn" style="margin-left:10px;">Set up payouts</button>
+    </div>
+  `;
+  document.getElementById("setupPayoutsBtn").onclick = startPayoutOnboarding;
+}
 
 document.getElementById("tabOpen").onclick = () => switchTab("open");
 document.getElementById("tabMine").onclick = () => switchTab("mine");
@@ -71,7 +111,7 @@ async function refreshOpen() {
         <span class="badge open">Open</span>
       </div>
       <div class="items">${escapeHtml(o.items)}</div>
-      <div class="meta">Posted ${timeAgo(o.createdAt)} by ${escapeHtml(o.ordererName)} · Tip: <span class="tip">$${Number(o.tip).toFixed(2)}</span></div>
+      <div class="meta">Posted ${timeAgo(o.createdAt)} by ${escapeHtml(o.ordererName)} · Delivery fee: <span class="tip">$${Number(o.tip).toFixed(2)}</span> <span class="you-keep">(you keep $${(Number(o.tip) * 0.75).toFixed(2)})</span></div>
       <button class="btn gold" style="margin-top:10px;" data-id="${o.id}">Claim this delivery</button>
     </div>
   `).join("");
@@ -153,7 +193,7 @@ function renderMine(o) {
       </div>
       <div class="items">${escapeHtml(o.items)}</div>
       ${arrivedNote}
-      <div class="meta">For ${escapeHtml(o.ordererName)} · Tip: <span class="tip">$${Number(o.tip).toFixed(2)}</span></div>
+      <div class="meta">For ${escapeHtml(o.ordererName)} · Delivery fee: <span class="tip">$${Number(o.tip).toFixed(2)}</span> <span class="you-keep">(you keep $${(Number(o.tip) * 0.75).toFixed(2)})</span></div>
       ${chatSectionHtml(o, o.ordererName)}
       ${actionBtn}
     </div>

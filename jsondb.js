@@ -41,18 +41,40 @@ function withOrderNames(o) {
 async function init() {}
 
 async function getUserByEmail(email) {
-  return db.users.find((u) => u.email.toLowerCase() === (email || "").toLowerCase()) || null;
+  return normalizeUser(db.users.find((u) => u.email.toLowerCase() === (email || "").toLowerCase()) || null);
 }
 
 async function getUserById(id) {
-  return db.users.find((u) => u.id === Number(id)) || null;
+  return normalizeUser(db.users.find((u) => u.id === Number(id)) || null);
+}
+
+function normalizeUser(u) {
+  if (!u) return null;
+  return { stripeCustomerId: null, stripeAccountId: null, stripeOnboarded: false, ...u };
 }
 
 async function createUser({ name, email, phone, passwordHash }) {
-  const user = { id: db.nextUserId++, name, email, phone, passwordHash };
+  const user = {
+    id: db.nextUserId++,
+    name,
+    email,
+    phone,
+    passwordHash,
+    stripeCustomerId: null,
+    stripeAccountId: null,
+    stripeOnboarded: false
+  };
   db.users.push(user);
   save();
   return user;
+}
+
+async function updateUser(id, patch) {
+  const u = db.users.find((u) => u.id === Number(id));
+  if (!u) return null;
+  Object.assign(u, patch);
+  save();
+  return normalizeUser(u);
 }
 
 async function getPendingVerification(emailKey) {
@@ -69,7 +91,7 @@ async function deletePendingVerification(emailKey) {
   save();
 }
 
-async function createOrder({ ordererId, store, hall, dropoffDetails, items, tip }) {
+async function createOrder({ ordererId, store, hall, dropoffDetails, items, tip, stripePaymentMethodId }) {
   const order = {
     id: db.nextOrderId++,
     ordererId,
@@ -84,7 +106,10 @@ async function createOrder({ ordererId, store, hall, dropoffDetails, items, tip 
     claimedAt: null,
     pickedUpAt: null,
     arrivedAt: null,
-    deliveredAt: null
+    deliveredAt: null,
+    stripePaymentMethodId: stripePaymentMethodId || null,
+    stripePaymentIntentId: null,
+    paymentStatus: "unpaid"
   };
   db.orders.push(order);
   save();
@@ -163,5 +188,6 @@ module.exports = {
   updateOrder,
   deleteOrder,
   getMessagesByOrder,
-  createMessage
+  createMessage,
+  updateUser
 };

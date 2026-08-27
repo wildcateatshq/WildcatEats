@@ -32,8 +32,11 @@
       <label for="items">What do you want? (items, sizes, notes)</label>
       <textarea id="items" placeholder="e.g. Large pepperoni pizza, extra ranch. Venmo @janedoe for the total." required></textarea>
 
-      <label for="tip">Tip for your runner ($)</label>
-      <input type="number" id="tip" min="0" step="0.5" value="5" />
+      <label for="tip">Delivery fee — split 75/25 with your runner ($)</label>
+      <input type="number" id="tip" min="1" step="0.5" value="5" />
+
+      <label for="card-element">Payment method (charged once someone claims your order)</label>
+      <div id="card-element" class="card-element"></div>
 
       <button class="btn" type="submit" style="margin-top:18px;">Post order</button>
     </form>
@@ -46,15 +49,19 @@
   </section>
 </main>
 
+<script src="https://js.stripe.com/v3/"></script>
 <script src="/app.js"></script>
 <script>
 let user = null;
 let pollTimer = null;
+let stripeClient = null;
+let cardElement = null;
 
 (async () => {
   user = await requireAuthOrRedirect();
   if (!user) return;
   await loadConfig();
+  await initStripe();
   await refreshMine();
   pollTimer = setInterval(refreshMine, 4000);
 })();
@@ -65,6 +72,18 @@ async function loadConfig() {
   const hallSel = document.getElementById("hall");
   storeSel.innerHTML = cfg.stores.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
   hallSel.innerHTML = cfg.halls.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join("");
+}
+
+async function initStripe() {
+  const { enabled, publishableKey } = await api("/api/stripe/config");
+  if (!enabled) {
+    document.getElementById("card-element").outerHTML =
+      `<div class="empty" style="padding:14px 0;">Payments aren't set up on this server yet.</div>`;
+    return;
+  }
+  stripeClient = Stripe(publishableKey);
+  cardElement = stripeClient.elements().create("card");
+  cardElement.mount("#card-element");
 }
 
 document.getElementById("tabNew").onclick = () => switchTab("new");
@@ -83,7 +102,19 @@ const errorBox = document.getElementById("errorBox");
 document.getElementById("orderForm").onsubmit = async (e) => {
   e.preventDefault();
   errorBox.innerHTML = "";
+  const submitBtn = e.target.querySelector("button[type=submit]");
+  submitBtn.disabled = true;
   try {
+    let stripePaymentMethodId = null;
+    if (stripeClient) {
+      const { clientSecret } = await api("/api/orders/setup-intent", { method: "POST" });
+      const { setupIntent, error } = await stripeClient.confirmCardSetup(clientSecret, {
+        payment_method: { card: cardElement }
+      });
+      if (error) throw new Error(error.message);
+      stripePaymentMethodId = setupIntent.payment_method;
+    }
+
     await api("/api/orders", {
       method: "POST",
       body: {
@@ -91,14 +122,18 @@ document.getElementById("orderForm").onsubmit = async (e) => {
         hall: document.getElementById("hall").value,
         dropoffDetails: document.getElementById("dropoffDetails").value,
         items: document.getElementById("items").value,
-        tip: document.getElementById("tip").value
+        tip: document.getElementById("tip").value,
+        stripePaymentMethodId
       }
     });
     document.getElementById("items").value = "";
     document.getElementById("dropoffDetails").value = "";
+    if (cardElement) cardElement.clear();
     switchTab("mine");
   } catch (err) {
     errorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+  } finally {
+    submitBtn.disabled = false;
   }
 };
 
@@ -158,7 +193,7 @@ function renderOrder(o) {
       </div>
       <div class="items">${escapeHtml(o.items)}</div>
       ${banner}
-      <div class="meta">Posted ${timeAgo(o.createdAt)} · Tip: <span class="tip">$${Number(o.tip).toFixed(2)}</span></div>
+      <div class="meta">Posted ${timeAgo(o.createdAt)} · Delivery fee: <span class="tip">$${Number(o.tip).toFixed(2)}</span> · ${o.paymentStatus === "paid" ? "Paid ✅" : "Not charged yet"}</div>
       ${runnerLine}
       ${chatSectionHtml(o, o.runnerName)}
       ${cancelBtn}

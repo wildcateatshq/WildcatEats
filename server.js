@@ -7,12 +7,15 @@ const config = require("./config");
 const db = require("./db");
 const mailer = require("./mailer");
 const notifications = require("./notifications");
+const payments = require("./payments");
 
 const VERIFICATION_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const RESEND_COOLDOWN_MS = 30 * 1000;
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+app.set("trust proxy", 1); // Render sits behind a proxy — needed for correct https:// URLs (Stripe Connect links)
 
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
@@ -45,7 +48,7 @@ function requireAuth(req, res, next) {
 
 function publicUser(u) {
   if (!u) return null;
-  return { id: u.id, name: u.name, email: u.email, phone: u.phone };
+  return { id: u.id, name: u.name, email: u.email, phone: u.phone, stripeOnboarded: Boolean(u.stripeOnboarded) };
 }
 
 function publicOrder(o) {
@@ -64,7 +67,8 @@ function publicOrder(o) {
     arrivedAt: o.arrivedAt,
     deliveredAt: o.deliveredAt,
     ordererName: o.ordererName,
-    runnerName: o.runnerName
+    runnerName: o.runnerName,
+    paymentStatus: o.paymentStatus
   };
 }
 
@@ -226,13 +230,43 @@ app.get("/api/config", (req, res) => {
   res.json(config);
 });
 
+app.get("/api/stripe/config", (req, res) => {
+  res.json({ enabled: payments.enabled, publishableKey: payments.publishableKey, minFee: payments.MIN_FEE_DOLLARS });
+});
+
 // ---------- order routes ----------
 
-// Create a new order (place a food request)
+// Step 1 of placing an order: save a card against the orderer's Stripe
+// Customer (no charge yet — that happens when a runner claims the order).
+// The frontend confirms this SetupIntent client-side with Stripe.js.
+app.post("/api/orders/setup-intent", requireAuth, async (req, res) => {
+  try {
+    const user = await db.getUserById(req.session.userId);
+    const customerId = await payments.getOrCreateCustomer(user);
+    if (customerId !== user.stripeCustomerId) {
+      await db.updateUser(user.id, { stripeCustomerId: customerId });
+    }
+    const setupIntent = await payments.createSetupIntent(customerId);
+    res.json({ clientSecret: setupIntent.client_secret });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Create a new order (place a food request). Requires a card already saved
+// via /api/orders/setup-intent — the resulting payment method is what gets
+// charged once someone claims it.
 app.post("/api/orders", requireAuth, async (req, res) => {
-  const { store: storeName, hall, dropoffDetails, items, tip } = req.body || {};
+  const { store: storeName, hall, dropoffDetails, items, tip, stripePaymentMethodId } = req.body || {};
   if (!storeName || !hall || !items) {
     return res.status(400).json({ error: "Store, hall, and items are required." });
+  }
+  const feeAmount = Number(tip);
+  if (!feeAmount || feeAmount < payments.MIN_FEE_DOLLARS) {
+    return res.status(400).json({ error: `Delivery fee must be at least $${payments.MIN_FEE_DOLLARS}.` });
+  }
+  if (payments.enabled && !stripePaymentMethodId) {
+    return res.status(400).json({ error: "Add a payment method for the delivery fee before posting." });
   }
   const order = await db.createOrder({
     ordererId: req.session.userId,
@@ -240,7 +274,8 @@ app.post("/api/orders", requireAuth, async (req, res) => {
     hall,
     dropoffDetails: dropoffDetails || "",
     items,
-    tip: Number(tip) || 0
+    tip: feeAmount,
+    stripePaymentMethodId: stripePaymentMethodId || null
   });
   res.json({ order: publicOrder(order) });
 });
@@ -263,6 +298,47 @@ app.get("/api/orders/delivering", requireAuth, async (req, res) => {
   res.json({ orders: mine.map(publicOrder) });
 });
 
+// ---------- runner payouts (Stripe Connect) ----------
+
+// Kicks off (or resumes) a runner's payout onboarding. Returns a one-time
+// Stripe-hosted URL to redirect the browser to — can't be done from inside
+// a fetch(), the frontend does `window.location.href = url`.
+app.post("/api/stripe/connect/start", requireAuth, async (req, res) => {
+  try {
+    const user = await db.getUserById(req.session.userId);
+    let accountId = user.stripeAccountId;
+    if (!accountId) {
+      accountId = await payments.createConnectAccount(user);
+      await db.updateUser(user.id, { stripeAccountId: accountId });
+    }
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    const link = await payments.createAccountLink(
+      accountId,
+      `${baseUrl}/deliver.html?stripe_refresh=1`,
+      `${baseUrl}/deliver.html?stripe_return=1`
+    );
+    res.json({ url: link.url });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Called when the runner lands back from Stripe's hosted onboarding —
+// checks whether their account is actually ready to receive transfers yet.
+app.post("/api/stripe/connect/check", requireAuth, async (req, res) => {
+  try {
+    const user = await db.getUserById(req.session.userId);
+    if (!user.stripeAccountId) return res.json({ onboarded: false });
+    const ready = await payments.isAccountReady(user.stripeAccountId);
+    if (ready !== user.stripeOnboarded) {
+      await db.updateUser(user.id, { stripeOnboarded: ready });
+    }
+    res.json({ onboarded: ready });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Claim an order to deliver
 app.post("/api/orders/:id/claim", requireAuth, async (req, res) => {
   const order = await findOrderOr404(req, res);
@@ -272,6 +348,35 @@ app.post("/api/orders/:id/claim", requireAuth, async (req, res) => {
     return res.status(400).json({ error: "You can't deliver your own order." });
 
   const runner = await db.getUserById(req.session.userId);
+
+  if (payments.enabled) {
+    if (!runner.stripeOnboarded || !runner.stripeAccountId) {
+      return res
+        .status(400)
+        .json({ error: "Set up payouts before claiming a delivery — see the banner above." });
+    }
+    const orderer = await db.getUserById(order.ordererId);
+    if (!orderer.stripeCustomerId || !order.stripePaymentMethodId) {
+      return res.status(400).json({ error: "This order's payment method is missing — it can't be claimed." });
+    }
+    try {
+      const paymentIntent = await payments.chargeDeliveryFee({
+        customerId: orderer.stripeCustomerId,
+        paymentMethodId: order.stripePaymentMethodId,
+        runnerAccountId: runner.stripeAccountId,
+        amountDollars: order.tip
+      });
+      await db.updateOrder(order.id, {
+        stripePaymentIntentId: paymentIntent.id,
+        paymentStatus: "paid"
+      });
+    } catch (err) {
+      return res.status(402).json({
+        error: `Payment failed (${err.message}) — this order is still open for someone else.`
+      });
+    }
+  }
+
   const updated = await db.updateOrder(order.id, {
     runnerId: req.session.userId,
     status: "claimed",

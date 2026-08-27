@@ -20,6 +20,7 @@
     "express-session": "^1.19.0",
     "nodemailer": "^9.0.5",
     "pg": "^8.23.0",
+    "stripe": "^22.6.0",
     "twilio": "^6.1.0"
   }
 }

@@ -26,3 +26,7 @@ services:
         sync: false
       - key: TWILIO_FROM_NUMBER
         sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
