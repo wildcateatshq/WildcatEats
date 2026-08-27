@@ -66,6 +66,9 @@ async function init() {
   await pool.query(`alter table orders add column if not exists stripe_payment_method_id text;`);
   await pool.query(`alter table orders add column if not exists stripe_payment_intent_id text;`);
   await pool.query(`alter table orders add column if not exists payment_status text not null default 'unpaid';`);
+  await pool.query(`alter table orders add column if not exists dispute_reason text;`);
+  await pool.query(`alter table orders add column if not exists disputed_at timestamptz;`);
+  await pool.query(`alter table orders add column if not exists refunded_at timestamptz;`);
 }
 
 function rowToUser(r) {
@@ -103,7 +106,10 @@ function rowToOrder(r) {
     runnerName: r.runner_name || null,
     stripePaymentMethodId: r.stripe_payment_method_id || null,
     stripePaymentIntentId: r.stripe_payment_intent_id || null,
-    paymentStatus: r.payment_status
+    paymentStatus: r.payment_status,
+    disputeReason: r.dispute_reason || null,
+    disputedAt: r.disputed_at ? r.disputed_at.getTime() : null,
+    refundedAt: r.refunded_at ? r.refunded_at.getTime() : null
   };
 }
 
@@ -218,7 +224,14 @@ async function getOrdersByRunner(userId) {
 }
 
 // Maps our camelCase patch keys to columns; timestamp fields are passed as ms and converted.
-const TIMESTAMP_FIELDS = new Set(["claimedAt", "pickedUpAt", "arrivedAt", "deliveredAt"]);
+const TIMESTAMP_FIELDS = new Set([
+  "claimedAt",
+  "pickedUpAt",
+  "arrivedAt",
+  "deliveredAt",
+  "disputedAt",
+  "refundedAt"
+]);
 const FIELD_COLUMN = {
   runnerId: "runner_id",
   status: "status",
@@ -227,7 +240,10 @@ const FIELD_COLUMN = {
   arrivedAt: "arrived_at",
   deliveredAt: "delivered_at",
   stripePaymentIntentId: "stripe_payment_intent_id",
-  paymentStatus: "payment_status"
+  paymentStatus: "payment_status",
+  disputeReason: "dispute_reason",
+  disputedAt: "disputed_at",
+  refundedAt: "refunded_at"
 };
 
 async function updateOrder(id, patch) {
@@ -253,6 +269,11 @@ async function updateOrder(id, patch) {
 
 async function deleteOrder(id) {
   await pool.query("delete from orders where id = $1", [id]);
+}
+
+async function getDisputedOrders() {
+  const { rows } = await pool.query(`${ORDER_SELECT} where o.disputed_at is not null order by o.disputed_at desc`);
+  return rows.map(rowToOrder);
 }
 
 const MESSAGE_SELECT = `
@@ -305,5 +326,6 @@ module.exports = {
   deleteOrder,
   getMessagesByOrder,
   createMessage,
-  updateUser
+  updateUser,
+  getDisputedOrders
 };

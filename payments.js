@@ -77,6 +77,21 @@ async function chargeDeliveryFee({ customerId, paymentMethodId, runnerAccountId,
   });
 }
 
+// Refunds the orderer and tries to claw the transfer back from the runner's
+// connected account. If the runner has already been paid out to their bank,
+// Stripe can't reverse that part — we still refund the orderer, but flag
+// that the runner's share needs manual recovery.
+async function refundPayment(paymentIntentId) {
+  const s = requireStripe();
+  try {
+    const refund = await s.refunds.create({ payment_intent: paymentIntentId, reverse_transfer: true });
+    return { refund, transferReversed: true };
+  } catch (err) {
+    const refund = await s.refunds.create({ payment_intent: paymentIntentId });
+    return { refund, transferReversed: false };
+  }
+}
+
 module.exports = {
   enabled: Boolean(stripe),
   publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
@@ -87,5 +102,6 @@ module.exports = {
   createConnectAccount,
   createAccountLink,
   isAccountReady,
-  chargeDeliveryFee
+  chargeDeliveryFee,
+  refundPayment
 };

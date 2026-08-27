@@ -46,6 +46,20 @@ function requireAuth(req, res, next) {
   next();
 }
 
+// Gated on ADMIN_EMAIL rather than a DB role — this app has exactly one
+// admin (whoever runs it), so a normal account matching that env var is
+// enough. No ADMIN_EMAIL set means the admin tooling is fully disabled.
+async function requireAdmin(req, res, next) {
+  if (!req.session.userId) return res.status(401).json({ error: "Not logged in" });
+  const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase();
+  if (!adminEmail) return res.status(403).json({ error: "Admin tools aren't configured on this server." });
+  const user = await db.getUserById(req.session.userId);
+  if (!user || user.email.toLowerCase() !== adminEmail) {
+    return res.status(403).json({ error: "Not authorized." });
+  }
+  next();
+}
+
 function publicUser(u) {
   if (!u) return null;
   return { id: u.id, name: u.name, email: u.email, phone: u.phone, stripeOnboarded: Boolean(u.stripeOnboarded) };
@@ -70,7 +84,10 @@ function publicOrder(o, { forRunner = false } = {}) {
     deliveredAt: o.deliveredAt,
     ordererName: o.ordererName,
     runnerName: o.runnerName,
-    paymentStatus: o.paymentStatus
+    paymentStatus: o.paymentStatus,
+    disputeReason: o.disputeReason,
+    disputedAt: o.disputedAt,
+    refundedAt: o.refundedAt
   };
 }
 
@@ -463,6 +480,54 @@ app.post("/api/orders/:id/messages", requireAuth, async (req, res) => {
 
   const message = await db.createMessage({ orderId: order.id, senderId: req.session.userId, text });
   res.json({ message: publicMessage(message, req.session.userId) });
+});
+
+// Orderer reports a problem with a delivered order (e.g. never actually
+// got the food) — flags it for admin review, doesn't refund automatically.
+app.post("/api/orders/:id/report", requireAuth, async (req, res) => {
+  const order = await findOrderOr404(req, res);
+  if (!order) return;
+  if (order.ordererId !== req.session.userId) return res.status(403).json({ error: "Not your order." });
+  if (order.status !== "delivered") return res.status(400).json({ error: "Can only report a delivered order." });
+  if (order.disputedAt) return res.status(400).json({ error: "This order was already reported." });
+
+  const reason = (req.body?.reason || "").trim();
+  if (!reason) return res.status(400).json({ error: "Tell us what happened." });
+  if (reason.length > 1000) return res.status(400).json({ error: "That's a bit long — keep it under 1000 characters." });
+
+  const updated = await db.updateOrder(order.id, { disputeReason: reason, disputedAt: Date.now() });
+  res.json({ order: publicOrder(updated) });
+});
+
+// ---------- admin (dispute review) ----------
+
+app.get("/api/admin/reports", requireAdmin, async (req, res) => {
+  const reports = await db.getDisputedOrders();
+  res.json({ orders: reports.map((o) => publicOrder(o)) });
+});
+
+// Refunds the orderer and tries to reverse the runner's transfer too. If the
+// runner already cashed out, the transfer can't be clawed back — the
+// response says so, and that money needs recovering from the runner directly.
+app.post("/api/admin/orders/:id/refund", requireAdmin, async (req, res) => {
+  const order = await findOrderOr404(req, res);
+  if (!order) return;
+  if (order.paymentStatus !== "paid") return res.status(400).json({ error: "This order isn't in a refundable state." });
+  if (!order.stripePaymentIntentId) return res.status(400).json({ error: "No payment on record for this order." });
+
+  try {
+    const { transferReversed } = await payments.refundPayment(order.stripePaymentIntentId);
+    const updated = await db.updateOrder(order.id, { paymentStatus: "refunded", refundedAt: Date.now() });
+    res.json({
+      order: publicOrder(updated),
+      transferReversed,
+      warning: transferReversed
+        ? undefined
+        : "Refunded the orderer, but the runner already cashed out — recover their share manually."
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Cancel an order (only the orderer, only while still open)

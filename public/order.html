@@ -161,6 +161,22 @@ async function refreshMine() {
         }
       };
     }
+
+    const reportBtn = document.getElementById(`report-${o.id}`);
+    if (reportBtn) {
+      reportBtn.onclick = async () => {
+        const reason = prompt("What happened? (e.g. never got the food, wrong order, etc.)");
+        if (!reason || !reason.trim()) return;
+        reportBtn.disabled = true;
+        try {
+          await api(`/api/orders/${o.id}/report`, { method: "POST", body: { reason: reason.trim() } });
+          refreshMine();
+        } catch (err) {
+          alert(err.message);
+          reportBtn.disabled = false;
+        }
+      };
+    }
   });
 }
 
@@ -171,10 +187,19 @@ function renderOrder(o) {
   } else if (o.status === "delivered") {
     banner = `<div class="banner">✅ Delivered — enjoy!</div>`;
   }
+  if (o.refundedAt) {
+    banner += `<div class="banner warn">💸 Refunded</div>`;
+  } else if (o.disputedAt) {
+    banner += `<div class="banner warn">🚩 Reported — under review</div>`;
+  }
 
   let cancelBtn = "";
   if (o.status === "open") {
     cancelBtn = `<button class="btn danger" id="cancel-${o.id}" style="margin-top:10px;">Cancel order</button>`;
+  }
+  let reportBtn = "";
+  if (o.status === "delivered" && o.paymentStatus === "paid" && !o.disputedAt) {
+    reportBtn = `<button class="btn danger" id="report-${o.id}" style="margin-top:10px;">Report a problem</button>`;
   }
 
   let runnerLine = "";
@@ -193,10 +218,11 @@ function renderOrder(o) {
       </div>
       <div class="items">${escapeHtml(o.items)}</div>
       ${banner}
-      <div class="meta">Posted ${timeAgo(o.createdAt)} · Delivery fee: <span class="tip">$${Number(o.tip).toFixed(2)}</span> · ${o.paymentStatus === "paid" ? "Paid ✅" : "Not charged yet"}</div>
+      <div class="meta">Posted ${timeAgo(o.createdAt)} · Delivery fee: <span class="tip">$${Number(o.tip).toFixed(2)}</span> · ${o.paymentStatus === "paid" ? "Paid ✅" : o.paymentStatus === "refunded" ? "Refunded 💸" : "Not charged yet"}</div>
       ${runnerLine}
       ${chatSectionHtml(o, o.runnerName)}
       ${cancelBtn}
+      ${reportBtn}
     </div>
   `;
 }

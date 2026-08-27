@@ -109,7 +109,10 @@ async function createOrder({ ordererId, store, hall, dropoffDetails, items, tip,
     deliveredAt: null,
     stripePaymentMethodId: stripePaymentMethodId || null,
     stripePaymentIntentId: null,
-    paymentStatus: "unpaid"
+    paymentStatus: "unpaid",
+    disputeReason: null,
+    disputedAt: null,
+    refundedAt: null
   };
   db.orders.push(order);
   save();
@@ -152,6 +155,13 @@ async function deleteOrder(id) {
   save();
 }
 
+async function getDisputedOrders() {
+  return db.orders
+    .filter((o) => o.disputedAt)
+    .sort((a, b) => b.disputedAt - a.disputedAt)
+    .map(withOrderNames);
+}
+
 function withMessageSender(m) {
   const sender = db.users.find((u) => u.id === m.senderId);
   return { ...m, senderName: sender ? sender.name : "Unknown" };
@@ -189,5 +199,6 @@ module.exports = {
   deleteOrder,
   getMessagesByOrder,
   createMessage,
-  updateUser
+  updateUser,
+  getDisputedOrders
 };

@@ -30,3 +30,5 @@ services:
         sync: false
       - key: STRIPE_PUBLISHABLE_KEY
         sync: false
+      - key: ADMIN_EMAIL
+        sync: false

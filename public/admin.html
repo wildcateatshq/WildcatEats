@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Admin · WildcatEats</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<header class="nav" id="nav"></header>
+<main>
+  <h1>Reported orders</h1>
+  <p class="subtitle">Orders orderers have flagged as a problem. Refunding also tries to reverse the runner's payout.</p>
+  <div id="errorBox"></div>
+  <div id="reportsList"></div>
+</main>
+
+<script src="/app.js"></script>
+<script>
+(async () => {
+  const user = await requireAuthOrRedirect();
+  if (!user) return;
+  await refresh();
+})();
+
+const errorBox = document.getElementById("errorBox");
+
+async function refresh() {
+  const list = document.getElementById("reportsList");
+  try {
+    const { orders } = await api("/api/admin/reports");
+    if (orders.length === 0) {
+      list.innerHTML = `<div class="empty">No reported orders right now.</div>`;
+      return;
+    }
+    list.innerHTML = orders.map(renderReport).join("");
+    orders.forEach(o => {
+      const btn = document.getElementById(`refund-${o.id}`);
+      if (btn) {
+        btn.onclick = async () => {
+          if (!confirm(`Refund $${Number(o.tip).toFixed(2)} to ${o.ordererName} and try to reverse ${o.runnerName}'s payout?`)) return;
+          btn.disabled = true;
+          try {
+            const res = await api(`/api/admin/orders/${o.id}/refund`, { method: "POST" });
+            if (res.warning) alert(res.warning);
+            refresh();
+          } catch (err) {
+            alert(err.message);
+            btn.disabled = false;
+          }
+        };
+      }
+    });
+  } catch (err) {
+    errorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderReport(o) {
+  let actionArea = "";
+  if (o.refundedAt) {
+    actionArea = `<div class="banner warn">💸 Refunded</div>`;
+  } else if (o.paymentStatus === "paid") {
+    actionArea = `<button class="btn danger" id="refund-${o.id}" style="margin-top:10px;">Refund $${Number(o.tip).toFixed(2)}</button>`;
+  }
+
+  return `
+    <div class="order-item">
+      <div class="top-row">
+        <div>
+          <div class="store">${escapeHtml(o.store)}</div>
+          <div class="hall">→ ${escapeHtml(o.hall)}${o.dropoffDetails ? " · " + escapeHtml(o.dropoffDetails) : ""}</div>
+        </div>
+        <span class="badge ${o.status}">${STATUS_LABEL[o.status]}</span>
+      </div>
+      <div class="items">${escapeHtml(o.items)}</div>
+      <div class="meta">Orderer: ${escapeHtml(o.ordererName)} · Runner: ${escapeHtml(o.runnerName || "—")} · Fee: $${Number(o.tip).toFixed(2)}</div>
+      <div class="meta">Reported ${timeAgo(o.disputedAt)}</div>
+      <div class="card" style="margin-top:10px; padding:12px;"><strong>Reason:</strong> ${escapeHtml(o.disputeReason)}</div>
+      ${actionArea}
+    </div>
+  `;
+}
+</script>
+</body>
+</html>
