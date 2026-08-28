@@ -42,6 +42,19 @@ async function createConnectAccount(user) {
   return account.id;
 }
 
+// Guards against a stored account id that belongs to the other Stripe mode
+// (e.g. a test-mode account left over from before this server had live
+// keys) — those ids look valid but Stripe rejects any operation on them.
+async function accountExists(accountId) {
+  const s = requireStripe();
+  try {
+    await s.accounts.retrieve(accountId);
+    return true;
+  } catch (err) {
+    return false;
+  }
+}
+
 async function createAccountLink(accountId, refreshUrl, returnUrl) {
   const s = requireStripe();
   return s.accountLinks.create({
@@ -103,5 +116,6 @@ module.exports = {
   createAccountLink,
   isAccountReady,
   chargeDeliveryFee,
-  refundPayment
+  refundPayment,
+  accountExists
 };

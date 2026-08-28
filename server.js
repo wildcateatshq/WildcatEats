@@ -335,9 +335,15 @@ app.post("/api/stripe/connect/start", requireAuth, async (req, res) => {
   try {
     const user = await db.getUserById(req.session.userId);
     let accountId = user.stripeAccountId;
+    if (accountId && !(await payments.accountExists(accountId))) {
+      // Belongs to the other Stripe mode (e.g. a test-mode account from
+      // before this server had live keys) — start fresh instead of
+      // failing on it.
+      accountId = null;
+    }
     if (!accountId) {
       accountId = await payments.createConnectAccount(user);
-      await db.updateUser(user.id, { stripeAccountId: accountId });
+      await db.updateUser(user.id, { stripeAccountId: accountId, stripeOnboarded: false });
     }
     const baseUrl = `${req.protocol}://${req.get("host")}`;
     const link = await payments.createAccountLink(

@@ -352,7 +352,9 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
   justify-content: center;
   position: relative;
   overflow: hidden;
-  background: radial-gradient(circle at 20% 20%, #ffffff 0%, var(--bg) 55%);
+  background:
+    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.9) 0%, rgba(244, 246, 251, 0.94) 55%),
+    url("/campus.jpg") center / cover no-repeat;
   padding: 24px;
 }
 
