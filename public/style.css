@@ -210,7 +210,10 @@ button.btn:active:not(:disabled) { transform: translateY(0) scale(0.98); }
 button.btn.secondary { background: white; color: var(--navy); border: 1.5px solid var(--navy); }
 button.btn.secondary:hover:not(:disabled) { background: #eef1f8; }
 button.btn.gold { background: linear-gradient(135deg, var(--gold-light), var(--gold)); color: var(--navy-dark); }
-button.btn.gold:hover:not(:disabled) { filter: brightness(1.03); }
+button.btn.gold:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--gold-light), var(--gold));
+  filter: brightness(1.03);
+}
 button.btn.gold:active:not(:disabled) { background: #ffffff; color: var(--navy-dark); }
 button.btn.danger { background: white; color: var(--danger); border: 1.5px solid var(--danger); }
 button.btn.danger:hover:not(:disabled) { background: #fdecea; }
