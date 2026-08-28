@@ -25,12 +25,22 @@ async function requireAuthOrRedirect() {
   return user;
 }
 
+// White vector paw (matches favicon.svg) — used instead of the 🐾 emoji,
+// whose colors are baked in and can't be recolored via CSS.
+const PAW_ICON = `<svg class="paw" viewBox="0 0 100 100" width="20" height="20" fill="currentColor" style="vertical-align:-4px;">
+  <ellipse cx="50" cy="66" rx="20" ry="16"/>
+  <ellipse cx="26" cy="42" rx="9" ry="12" transform="rotate(-18 26 42)"/>
+  <ellipse cx="46" cy="30" rx="9" ry="12" transform="rotate(-6 46 30)"/>
+  <ellipse cx="66" cy="30" rx="9" ry="12" transform="rotate(6 66 30)"/>
+  <ellipse cx="86" cy="42" rx="9" ry="12" transform="rotate(18 86 42)"/>
+</svg>`;
+
 function renderNav(user) {
   const el = document.getElementById("nav");
   if (!el) return;
   const path = window.location.pathname;
   el.innerHTML = `
-    <a class="brand" href="/order.html"><span class="paw">🐾</span> WildcatEats</a>
+    <a class="brand" href="/order.html">${PAW_ICON} WildcatEats</a>
     <nav>
       <a class="navlink ${path === "/order.html" ? "active" : ""}" href="/order.html">Order Food</a>
       <a class="navlink ${path === "/deliver.html" ? "active" : ""}" href="/deliver.html">Deliver</a>

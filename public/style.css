@@ -99,7 +99,7 @@ header.nav .brand {
 }
 
 header.nav .brand .paw {
-  color: var(--gold);
+  color: #ffffff;
   display: inline-block;
   transition: transform 0.3s var(--ease);
 }
