@@ -7,10 +7,16 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
+<div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading WildcatEats">
+  <div class="page-loader-mark">
+    <svg viewBox="0 0 100 100" fill="currentColor"><ellipse cx="50" cy="66" rx="20" ry="16"/><ellipse cx="26" cy="42" rx="9" ry="12" transform="rotate(-18 26 42)"/><ellipse cx="46" cy="30" rx="9" ry="12" transform="rotate(-6 46 30)"/><ellipse cx="66" cy="30" rx="9" ry="12" transform="rotate(6 66 30)"/><ellipse cx="86" cy="42" rx="9" ry="12" transform="rotate(18 86 42)"/></svg>
+  </div>
+  <div class="page-loader-bar"><div class="page-loader-bar-fill"></div></div>
+</div>
 <header class="nav" id="nav"></header>
 <main>
   <h1>Reported orders</h1>
@@ -21,23 +27,53 @@
 
 <script src="/app.js"></script>
 <script>
+let user = null;
+
 (async () => {
-  const user = await requireAuthOrRedirect();
+  user = await requireAuthOrRedirect();
   if (!user) return;
-  await refresh();
+  document.getElementById("reportsList").innerHTML = skeletonList(2);
+  try {
+    await refresh();
+  } finally {
+    hidePageLoader();
+  }
+  setInterval(refresh, 4000);
 })();
 
 const errorBox = document.getElementById("errorBox");
+
+// A full rebuild every 4s (polling for new reports/messages) was resetting
+// hover state and flickering any open chat thread even when nothing had
+// actually changed — the common case. Skip the rebuild when the fetched
+// data matches what's already rendered; still refresh any open chat
+// threads on their own, since new messages don't show up in this payload.
+let lastReportsSnapshot = null;
 
 async function refresh() {
   const list = document.getElementById("reportsList");
   try {
     const { orders } = await api("/api/admin/reports");
+
     if (orders.length === 0) {
-      list.innerHTML = `<div class="empty">No reported orders right now.</div>`;
+      if (lastReportsSnapshot !== "empty") {
+        lastReportsSnapshot = "empty";
+        list.innerHTML = `<div class="empty">No reported orders right now.</div>`;
+      }
       return;
     }
+
+    const snapshot = JSON.stringify(orders);
+    if (snapshot === lastReportsSnapshot) {
+      refreshOpenReportChats(orders);
+      return;
+    }
+    lastReportsSnapshot = snapshot;
+
+    const drafts = captureChatDrafts(list);
     list.innerHTML = orders.map(renderReport).join("");
+    wireChatBlocks(list, user.id);
+    restoreChatDrafts(list, drafts);
     orders.forEach(o => {
       const btn = document.getElementById(`refund-${o.id}`);
       if (btn) {
@@ -54,18 +90,58 @@ async function refresh() {
           }
         };
       }
+
+      const dismissBtn = document.getElementById(`dismiss-${o.id}`);
+      if (dismissBtn) {
+        dismissBtn.onclick = async () => {
+          if (!confirm(`Dismiss this report with no refund? ${o.ordererName} will get a message saying so.`)) return;
+          dismissBtn.disabled = true;
+          try {
+            await api(`/api/admin/orders/${o.id}/dismiss`, { method: "POST" });
+            refresh();
+          } catch (err) {
+            toast(err.message, "error");
+            dismissBtn.disabled = false;
+          }
+        };
+      }
     });
   } catch (err) {
     errorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
   }
 }
 
+function refreshOpenReportChats(orders) {
+  orders.forEach(o => {
+    const orderThreadKey = `admin-${o.id}-orderer`;
+    if (openChatIds.has(orderThreadKey)) {
+      loadChatMessages(orderThreadKey, user.id, `/api/admin/orders/${o.id}/messages/orderer`);
+    }
+    if (o.runnerName) {
+      const runnerThreadKey = `admin-${o.id}-runner`;
+      if (openChatIds.has(runnerThreadKey)) {
+        loadChatMessages(runnerThreadKey, user.id, `/api/admin/orders/${o.id}/messages/runner`);
+      }
+    }
+  });
+}
+
 function renderReport(o) {
   let actionArea = "";
   if (o.refundedAt) {
-    actionArea = `<div class="banner warn">💸 Refunded</div>`;
-  } else if (o.paymentStatus === "paid") {
-    actionArea = `<button class="btn danger" id="refund-${o.id}" style="margin-top:10px;">Refund $${Number(o.tip).toFixed(2)}</button>`;
+    actionArea = `<div class="banner warn">Refunded</div>`;
+  } else if (o.disputeDismissedAt) {
+    actionArea = `<div class="banner warn">Dismissed — no refund issued</div>`;
+  } else {
+    const refundBtn = o.paymentStatus === "paid"
+      ? `<button class="btn danger" id="refund-${o.id}">Refund $${Number(o.tip).toFixed(2)}</button>`
+      : "";
+    actionArea = `
+      <div class="row" style="margin-top:10px;">
+        ${refundBtn}
+        <button class="btn secondary" id="dismiss-${o.id}">Dismiss report</button>
+      </div>
+    `;
   }
 
   return `
@@ -81,6 +157,8 @@ function renderReport(o) {
       <div class="meta">Orderer: ${escapeHtml(o.ordererName)} · Runner: ${escapeHtml(o.runnerName || "—")} · Fee: $${Number(o.tip).toFixed(2)}</div>
       <div class="meta">Reported ${timeAgo(o.disputedAt)}</div>
       <div class="card" style="margin-top:10px; padding:12px;"><strong>Reason:</strong> ${escapeHtml(o.disputeReason)}</div>
+      ${chatSectionHtml(o, o.ordererName, { threadKey: `admin-${o.id}-orderer`, endpoint: `/api/admin/orders/${o.id}/messages/orderer` })}
+      ${o.runnerName ? chatSectionHtml(o, o.runnerName, { threadKey: `admin-${o.id}-runner`, endpoint: `/api/admin/orders/${o.id}/messages/runner` }) : ""}
       ${actionArea}
     </div>
   `;

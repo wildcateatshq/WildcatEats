@@ -7,11 +7,17 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/style.css" />
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet" />
 </head>
 <body>
+<div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading WildcatEats">
+  <div class="page-loader-mark">
+    <svg viewBox="0 0 100 100" fill="currentColor"><ellipse cx="50" cy="66" rx="20" ry="16"/><ellipse cx="26" cy="42" rx="9" ry="12" transform="rotate(-18 26 42)"/><ellipse cx="46" cy="30" rx="9" ry="12" transform="rotate(-6 46 30)"/><ellipse cx="66" cy="30" rx="9" ry="12" transform="rotate(6 66 30)"/><ellipse cx="86" cy="42" rx="9" ry="12" transform="rotate(18 86 42)"/></svg>
+  </div>
+  <div class="page-loader-bar"><div class="page-loader-bar-fill"></div></div>
+</div>
 <header class="nav" id="nav"></header>
 <main>
   <div class="tabs">
@@ -66,10 +72,15 @@ let mapboxEnabled = false;
 (async () => {
   user = await requireAuthOrRedirect();
   if (!user) return;
-  await loadConfig();
-  await initStripe();
-  await initMapbox();
-  await refreshMine();
+  document.getElementById("myOrdersList").innerHTML = skeletonList(2);
+  try {
+    await loadConfig();
+    await initStripe();
+    await initMapbox();
+    await refreshMine();
+  } finally {
+    hidePageLoader();
+  }
   pollTimer = setInterval(refreshMine, 4000);
 })();
 
@@ -150,20 +161,18 @@ document.getElementById("orderForm").onsubmit = async (e) => {
   }
 };
 
-const seenMineIds = new Set();
-
 async function refreshMine() {
   const { orders } = await api("/api/orders/mine");
   const list = document.getElementById("myOrdersList");
   if (orders.length === 0) {
     list.innerHTML = `<div class="empty">You haven't placed any orders yet.</div>`;
     syncMaps([]);
-    seenMineIds.clear();
     return;
   }
-  list.innerHTML = orders.map((o, i) => renderOrder(o, i)).join("");
-  orders.forEach(o => seenMineIds.add(o.id));
+  const drafts = captureChatDrafts(list);
+  list.innerHTML = orders.map((o) => renderOrder(o)).join("");
   wireChatBlocks(list, user.id);
+  restoreChatDrafts(list, drafts);
   syncMaps(orders);
 
   orders.forEach(o => {
@@ -199,20 +208,28 @@ async function refreshMine() {
   });
 }
 
-function renderOrder(o, i = 0) {
-  const isNew = !seenMineIds.has(o.id);
-  const entering = isNew ? "entering" : "";
-  const delay = isNew ? `style="animation-delay:${Math.min(i, 8) * 0.06}s"` : "";
+function renderOrder(o) {
   let banner = "";
   if (o.arrivedAt && o.status !== "delivered") {
-    banner = `<div class="banner">🔔 Your runner has arrived!</div>`;
+    banner = `<div class="banner">Your runner has arrived!</div>`;
   } else if (o.status === "delivered") {
-    banner = `<div class="banner">✅ Delivered — enjoy!</div>`;
+    banner = `<div class="banner">Delivered — enjoy!</div>`;
   }
   if (o.refundedAt) {
-    banner += `<div class="banner warn">💸 Refunded</div>`;
+    banner += `<div class="banner warn">Refunded</div>`;
+  } else if (o.disputeDismissedAt) {
+    banner += `<div class="banner warn">Reported — no refund issued</div>`;
   } else if (o.disputedAt) {
-    banner += `<div class="banner warn">🚩 Reported — under review</div>`;
+    banner += `<div class="banner warn">Reported — under review</div>`;
+  }
+
+  // Admin's replies matter enough that this shouldn't hide behind a
+  // collapsed toggle someone has to know exists — auto-expand it.
+  let adminChatBlock = "";
+  if (o.disputedAt) {
+    const adminThreadKey = `admin-${o.id}`;
+    ensureThreadOpen(adminThreadKey);
+    adminChatBlock = chatSectionHtml(o, "WildcatEats Admin", { threadKey: adminThreadKey, endpoint: `/api/orders/${o.id}/admin-messages` });
   }
 
   let cancelBtn = "";
@@ -236,7 +253,7 @@ function renderOrder(o, i = 0) {
     : "";
 
   return `
-    <div class="order-item ${entering}" ${delay}>
+    <div class="order-item">
       <div class="top-row">
         <div>
           <div class="store">${escapeHtml(o.store)}</div>
@@ -246,10 +263,11 @@ function renderOrder(o, i = 0) {
       </div>
       <div class="items">${escapeHtml(o.items)}</div>
       ${banner}
-      <div class="meta">Posted ${timeAgo(o.createdAt)} · Delivery fee: <span class="tip">$${Number(o.tip).toFixed(2)}</span> · ${o.paymentStatus === "paid" ? "Paid ✅" : o.paymentStatus === "refunded" ? "Refunded 💸" : "Not charged yet"}</div>
+      <div class="meta">Posted ${timeAgo(o.createdAt)} · Delivery fee: <span class="tip">$${Number(o.tip).toFixed(2)}</span> · ${o.paymentStatus === "paid" ? "Paid" : o.paymentStatus === "refunded" ? "Refunded" : "Not charged yet"}</div>
       ${runnerLine}
       ${mapBlock}
       ${chatSectionHtml(o, o.runnerName)}
+      ${adminChatBlock}
       ${cancelBtn}
       ${reportBtn}
     </div>

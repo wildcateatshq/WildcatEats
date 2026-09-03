@@ -16,13 +16,15 @@
   --shadow-md: 0 4px 16px rgba(16, 24, 40, 0.08);
   --shadow-lg: 0 12px 32px rgba(0, 32, 91, 0.14);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: "Barlow Condensed", "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 * { box-sizing: border-box; }
 
 body {
   margin: 0;
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-body);
   background:
     linear-gradient(rgba(244, 246, 251, 0.94), rgba(244, 246, 251, 0.94)),
     url("/campus.jpg") center / cover no-repeat fixed;
@@ -31,43 +33,17 @@ body {
   min-height: 100vh;
 }
 
+/* Condensed display face for headlines/brand marks — gives the collegiate
+   "Wildcats" energy some punch without touching body/form typography. */
+h1, .logo, header.nav .brand, .hero-panel h1, .hero-panel .eyebrow {
+  font-family: var(--font-display);
+}
+
 /* Kill the default mobile tap-highlight (a translucent blue flash on tap)
    on anything tappable — buttons/links/badges get their own hover/active
    styling instead. */
 button, a, .order-item, .badge {
   -webkit-tap-highlight-color: transparent;
-}
-
-@keyframes fadeInUp {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes popIn {
-  from { opacity: 0; transform: scale(0.94); }
-  to { opacity: 1; transform: scale(1); }
-}
-
-@keyframes softPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(28, 138, 74, 0.28); }
-  50% { box-shadow: 0 0 0 8px rgba(28, 138, 74, 0); }
-}
-
-@keyframes drift {
-  0% { transform: translate(0, 0) scale(1); }
-  50% { transform: translate(3%, -4%) scale(1.08); }
-  100% { transform: translate(0, 0) scale(1); }
-}
-
-@keyframes wiggle {
-  0%, 100% { transform: rotate(0deg); }
-  25% { transform: rotate(-8deg); }
-  75% { transform: rotate(8deg); }
 }
 
 /* ---------- nav ---------- */
@@ -88,9 +64,9 @@ header.nav {
 }
 
 header.nav .brand {
-  font-weight: 800;
-  font-size: 1.3rem;
-  letter-spacing: -0.5px;
+  font-weight: 700;
+  font-size: 1.6rem;
+  letter-spacing: 0;
   color: white;
   text-decoration: none;
   display: flex;
@@ -101,9 +77,7 @@ header.nav .brand {
 header.nav .brand .paw {
   color: #ffffff;
   display: inline-block;
-  transition: transform 0.3s var(--ease);
 }
-header.nav .brand:hover .paw { animation: wiggle 0.5s var(--ease); }
 
 header.nav nav {
   display: flex;
@@ -124,7 +98,20 @@ header.nav a.navlink {
 }
 
 header.nav a.navlink:hover { background: rgba(255, 255, 255, 0.12); opacity: 1; }
-header.nav a.navlink.active { background: rgba(255, 255, 255, 0.18); opacity: 1; }
+header.nav a.navlink.active { background: rgba(255, 255, 255, 0.18); opacity: 1; box-shadow: inset 0 -2px 0 var(--gold); }
+
+header.nav .nav-user {
+  color: var(--gold-light);
+  font-weight: 700;
+  font-size: 0.88rem;
+  letter-spacing: 0.1px;
+  margin-left: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  white-space: nowrap;
+}
 
 header.nav button.logout {
   background: transparent;
@@ -146,17 +133,16 @@ main {
 }
 
 h1 {
-  font-size: 1.6rem;
+  font-size: 2.1rem;
+  font-weight: 700;
   margin-bottom: 4px;
-  letter-spacing: -0.3px;
-  animation: fadeInUp 0.5s var(--ease) both;
+  letter-spacing: -0.2px;
+  line-height: 1.1;
 }
 p.subtitle {
   color: var(--muted);
   margin-top: 0;
   margin-bottom: 20px;
-  animation: fadeInUp 0.5s var(--ease) both;
-  animation-delay: 0.05s;
 }
 
 .card {
@@ -230,15 +216,12 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
   border-radius: 8px;
   font-size: 0.9rem;
   margin-bottom: 14px;
-  animation: fadeInUp 0.3s var(--ease) both;
 }
 
 .tabs {
   display: flex;
   gap: 8px;
   margin-bottom: 18px;
-  animation: fadeInUp 0.5s var(--ease) both;
-  animation-delay: 0.03s;
 }
 .tabs button {
   background: white;
@@ -263,10 +246,6 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
   background: white;
   transition: box-shadow 0.25s var(--ease), transform 0.25s var(--ease), border-color 0.25s var(--ease);
 }
-/* Only newly-appeared cards animate in — added via JS the first time an
-   order id is seen, so polling refreshes don't replay it on every card
-   every few seconds. */
-.order-item.entering { animation: fadeInUp 0.4s var(--ease) both; }
 .order-item:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); border-color: #d3daea; }
 .order-item .top-row {
   display: flex;
@@ -309,14 +288,12 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  animation: popIn 0.35s var(--ease) both, softPulse 2.2s ease-in-out 0.35s 2;
 }
 
 .banner.warn {
   background: #fdf2e0;
   border-color: #f0d9ac;
   color: var(--warn);
-  animation: popIn 0.35s var(--ease) both;
 }
 
 .map-slot {
@@ -327,7 +304,6 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
   border: 1px solid var(--border);
   margin: 10px 0;
   background: var(--bg);
-  animation: popIn 0.35s var(--ease) both;
 }
 
 .card-element {
@@ -347,78 +323,23 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
   color: var(--muted);
   padding: 48px 10px;
   font-size: 0.95rem;
-  animation: fadeIn 0.4s var(--ease) both;
 }
 
 /* ---------- landing / auth page ---------- */
 
-.center-page {
-  min-height: 100vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-  background:
-    radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.9) 0%, rgba(244, 246, 251, 0.94) 55%),
-    url("/campus.jpg") center / cover no-repeat;
-  padding: 24px;
-}
-
-.center-page::before,
-.center-page::after {
-  content: "";
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(60px);
-  opacity: 0.35;
-  z-index: 0;
-  animation: drift 14s ease-in-out infinite;
-}
-.center-page::before {
-  width: 420px;
-  height: 420px;
-  background: radial-gradient(circle, var(--navy-light), transparent 70%);
-  top: -120px;
-  left: -100px;
-}
-.center-page::after {
-  width: 380px;
-  height: 380px;
-  background: radial-gradient(circle, var(--gold-light), transparent 70%);
-  bottom: -120px;
-  right: -100px;
-  animation-delay: -7s;
-}
-
-.center-page .card {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  max-width: 400px;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.6);
-  box-shadow: var(--shadow-lg);
-  animation: fadeInUp 0.6s var(--ease) both;
-}
-
-.center-page .logo {
+.auth-panel .card .logo {
   text-align: center;
-  font-size: 1.75rem;
-  font-weight: 800;
+  font-size: 1.9rem;
+  font-weight: 700;
   color: var(--navy);
   margin-bottom: 4px;
-  letter-spacing: -0.5px;
+  letter-spacing: 0;
 }
-.center-page .logo .paw {
+.auth-panel .card .logo .paw {
   color: var(--gold);
   display: inline-block;
-  animation: wiggle 1.6s ease-in-out 0.6s;
 }
-.center-page p.tagline { text-align: center; color: var(--muted); margin-top: 0; margin-bottom: 22px; font-size: 0.9rem; }
-
-.auth-step { animation: fadeIn 0.35s var(--ease) both; }
+.auth-panel .card p.tagline { text-align: center; color: var(--muted); margin-top: 0; margin-bottom: 22px; font-size: 0.9rem; }
 
 .switch-link { text-align: center; margin-top: 14px; font-size: 0.9rem; }
 .switch-link a {
@@ -482,7 +403,6 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
   max-width: 80%;
   font-size: 0.88rem;
   word-break: break-word;
-  animation: popIn 0.25s var(--ease) both;
 }
 .chat-msg.mine {
   align-self: flex-end;
@@ -510,6 +430,101 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
 .chat-form { display: flex; gap: 8px; }
 .chat-form input { flex: 1; }
 
+/* ---------- messages inbox ---------- */
+
+.messages-shell {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.thread-list {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.thread-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  background: white;
+  cursor: pointer;
+  font: inherit;
+  transition: background 0.15s var(--ease);
+}
+.thread-item:last-child { border-bottom: none; }
+.thread-item:hover { background: var(--bg); }
+.thread-item.active { background: #eef1f8; }
+.thread-item .top-row { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.thread-item .name { font-weight: 700; font-size: 0.95rem; }
+.thread-item .order-ref { font-size: 0.78rem; color: var(--muted); margin-top: 2px; }
+.thread-item .preview {
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-top: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.thread-view {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  display: flex;
+  flex-direction: column;
+  min-height: 520px;
+}
+.thread-view .chat-messages { flex: 1; max-height: none; padding: 16px 18px; }
+.thread-view .chat-form { padding: 12px 18px; border-top: 1px solid var(--border); margin: 0; }
+
+.thread-view-header {
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.thread-view-header .name { font-weight: 700; font-size: 1.02rem; }
+.thread-view-header .order-ref { font-size: 0.82rem; color: var(--muted); }
+.thread-view-header .badge { margin-left: auto; }
+
+.thread-back {
+  display: none;
+  background: white;
+  border: 1px solid var(--border);
+  color: var(--navy);
+  padding: 6px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.thread-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  color: var(--muted);
+  text-align: center;
+  padding: 40px 20px;
+}
+
+@media (max-width: 760px) {
+  .messages-shell { grid-template-columns: 1fr; }
+  .messages-shell:not(.thread-open) .thread-view { display: none; }
+  .messages-shell.thread-open .thread-list { display: none; }
+  .thread-view { min-height: 65vh; }
+  .thread-back { display: inline-block; }
+}
+
 /* ---------- toasts ---------- */
 
 .toast-container {
@@ -534,22 +549,200 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
   font-size: 0.9rem;
   font-weight: 600;
   max-width: 340px;
-  animation: toastIn 0.3s var(--ease) both;
 }
 .toast.error { background: var(--danger); }
 .toast.success { background: var(--success); }
-.toast.leaving { animation: toastOut 0.25s var(--ease) both; }
-
-@keyframes toastIn {
-  from { opacity: 0; transform: translateY(12px) scale(0.96); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes toastOut {
-  from { opacity: 1; transform: translateY(0) scale(1); }
-  to { opacity: 0; transform: translateY(8px) scale(0.96); }
-}
 
 @media (max-width: 480px) {
   .toast-container { left: 12px; right: 12px; align-items: stretch; }
   .toast { max-width: none; }
+}
+
+/* ---------- page loader ---------- */
+/* Shown inline in the HTML (not injected by JS) so it paints before any
+   script runs, covering the auth-check + first-fetch gap that used to be a
+   blank white flash. Each page's init script calls hidePageLoader() once
+   it has something real to show. A JS max-wait fallback (see app.js)
+   guarantees it never traps the user if a script throws before reaching
+   that call. */
+
+.page-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  background: linear-gradient(160deg, var(--navy) 0%, var(--navy-dark) 100%);
+  opacity: 1;
+}
+.page-loader.hidden { opacity: 0; pointer-events: none; }
+
+.page-loader-mark {
+  width: 68px;
+  height: 68px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.page-loader-mark svg { width: 34px; height: 34px; color: var(--gold-light); }
+
+.page-loader-bar {
+  width: 120px;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.14);
+  overflow: hidden;
+}
+.page-loader-bar-fill {
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: var(--gold-light);
+  opacity: 0.6;
+}
+
+/* ---------- list skeletons ---------- */
+/* Stable placeholder cards (same box as .order-item) shown only on a
+   page's very first fetch, so the list doesn't pop from nothing to
+   content — later polling refreshes swap straight to real cards. */
+
+.order-item.skeleton { cursor: default; }
+.order-item.skeleton * { visibility: hidden; }
+.order-item.skeleton {
+  position: relative;
+  overflow: hidden;
+}
+.order-item.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(16, 24, 40, 0.04);
+}
+
+/* ---------- landing page: full-bleed hero with a dead-centered card ---------- */
+/* The hero background + copy spans the entire page (not a column reserved
+   next to the card) — the card is centered on the true page middle via the
+   overlay below. The marketing copy only appears once the viewport is wide
+   enough that it can't run under the centered card (see the breakpoint at
+   the bottom); narrower than that, it's just the background image behind
+   a centered card, same as the original mobile treatment. */
+
+.landing-shell {
+  position: relative;
+  min-height: 100vh;
+  overflow: hidden;
+}
+
+.hero-panel {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 56px 64px;
+  color: white;
+  background:
+    linear-gradient(155deg, rgba(0, 32, 91, 0.94), rgba(0, 20, 51, 0.96)),
+    url("/campus.jpg") center / cover no-repeat;
+  overflow: hidden;
+}
+.hero-panel::before {
+  content: "";
+  position: absolute;
+  width: 460px;
+  height: 460px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(207, 164, 56, 0.35), transparent 70%);
+  top: -160px;
+  right: -160px;
+  filter: blur(10px);
+}
+
+.hero-panel .content { position: relative; z-index: 1; max-width: 420px; display: none; }
+
+.hero-panel .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  color: var(--gold-light);
+  font-weight: 700;
+  font-size: 0.82rem;
+  letter-spacing: 0.4px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  margin-bottom: 20px;
+}
+
+.hero-panel h1 {
+  font-size: 3.1rem;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.5px;
+  margin: 0 0 16px;
+}
+.hero-panel h1 .accent { color: var(--gold-light); }
+
+.hero-panel p.lede {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 1.05rem;
+  line-height: 1.55;
+  margin: 0 0 32px;
+}
+
+.hero-features {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.hero-features .feature {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.hero-features .feature .icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--gold-light);
+}
+.hero-features .feature .icon svg { width: 17px; height: 17px; }
+.hero-features .feature .text b { display: block; font-size: 0.95rem; }
+.hero-features .feature .text span { display: block; font-size: 0.85rem; color: rgba(255, 255, 255, 0.65); }
+
+.auth-panel {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  pointer-events: none;
+}
+
+.auth-panel .card {
+  width: 100%;
+  max-width: 380px;
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+}
+
+/* Wide enough that the hero copy (anchored left, capped at 420px + 64px
+   padding) can never reach under the centered card — see the comment
+   above .landing-shell for the math this threshold is picked from. */
+@media (min-width: 1480px) {
+  .hero-panel .content { display: block; }
 }
