@@ -69,6 +69,8 @@ async function init() {
   await pool.query(`alter table orders add column if not exists dispute_reason text;`);
   await pool.query(`alter table orders add column if not exists disputed_at timestamptz;`);
   await pool.query(`alter table orders add column if not exists refunded_at timestamptz;`);
+  await pool.query(`alter table orders add column if not exists dispute_dismissed_at timestamptz;`);
+  await pool.query(`alter table messages add column if not exists thread_user_id integer references users(id);`);
   await pool.query(`alter table orders add column if not exists runner_lat double precision;`);
   await pool.query(`alter table orders add column if not exists runner_lng double precision;`);
   await pool.query(`alter table orders add column if not exists runner_location_at timestamptz;`);
@@ -113,6 +115,7 @@ function rowToOrder(r) {
     disputeReason: r.dispute_reason || null,
     disputedAt: r.disputed_at ? r.disputed_at.getTime() : null,
     refundedAt: r.refunded_at ? r.refunded_at.getTime() : null,
+    disputeDismissedAt: r.dispute_dismissed_at ? r.dispute_dismissed_at.getTime() : null,
     runnerLat: r.runner_lat != null ? Number(r.runner_lat) : null,
     runnerLng: r.runner_lng != null ? Number(r.runner_lng) : null,
     runnerLocationAt: r.runner_location_at ? r.runner_location_at.getTime() : null
@@ -234,6 +237,7 @@ const TIMESTAMP_FIELDS = new Set([
   "deliveredAt",
   "disputedAt",
   "refundedAt",
+  "disputeDismissedAt",
   "runnerLocationAt"
 ]);
 const FIELD_COLUMN = {
@@ -248,6 +252,7 @@ const FIELD_COLUMN = {
   disputeReason: "dispute_reason",
   disputedAt: "disputed_at",
   refundedAt: "refunded_at",
+  disputeDismissedAt: "dispute_dismissed_at",
   runnerLat: "runner_lat",
   runnerLng: "runner_lng",
   runnerLocationAt: "runner_location_at"
@@ -297,19 +302,26 @@ function rowToMessage(r) {
     senderId: r.sender_id,
     senderName: r.sender_name,
     text: r.text,
+    threadUserId: r.thread_user_id || null,
     createdAt: r.created_at.getTime()
   };
 }
 
-async function getMessagesByOrder(orderId) {
-  const { rows } = await pool.query(`${MESSAGE_SELECT} where m.order_id = $1 order by m.created_at asc`, [orderId]);
+// threadUserId is null for the normal orderer<->runner thread on an order,
+// or a specific user id for a private admin<->that-user side channel on the
+// same order — keeps the two kinds of conversation from mixing.
+async function getMessagesByOrder(orderId, threadUserId = null) {
+  const { rows } = await pool.query(
+    `${MESSAGE_SELECT} where m.order_id = $1 and m.thread_user_id is not distinct from $2 order by m.created_at asc`,
+    [orderId, threadUserId]
+  );
   return rows.map(rowToMessage);
 }
 
-async function createMessage({ orderId, senderId, text }) {
+async function createMessage({ orderId, senderId, text, threadUserId = null }) {
   const { rows } = await pool.query(
-    "insert into messages (order_id, sender_id, text) values ($1,$2,$3) returning id",
-    [orderId, senderId, text]
+    "insert into messages (order_id, sender_id, text, thread_user_id) values ($1,$2,$3,$4) returning id",
+    [orderId, senderId, text, threadUserId || null]
   );
   const { rows: full } = await pool.query(`${MESSAGE_SELECT} where m.id = $1`, [rows[0].id]);
   return rowToMessage(full[0]);
