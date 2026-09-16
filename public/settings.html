@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Settings · WildcatEats</title>
+<link rel="icon" href="/wildcat-eats-logo.png" type="image/png" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading WildcatEats">
+  <div class="page-loader-mark">
+    <img src="/wildcat-eats-logo.png" alt="" style="width:34px; height:34px; object-fit:contain;" />
+  </div>
+  <div class="page-loader-bar"><div class="page-loader-bar-fill"></div></div>
+</div>
+<header class="nav" id="nav"></header>
+<main>
+  <h1>Settings</h1>
+  <p class="subtitle">Your account details.</p>
+  <div class="card">
+    <label for="settingsName">Name</label>
+    <input type="text" id="settingsName" disabled />
+
+    <label for="settingsEmail">Email</label>
+    <input type="text" id="settingsEmail" disabled />
+
+    <label for="settingsPhone">Phone</label>
+    <input type="text" id="settingsPhone" disabled />
+  </div>
+</main>
+
+<script src="/app.js"></script>
+<script>
+(async () => {
+  const user = await requireAuthOrRedirect();
+  if (!user) return;
+  document.getElementById("settingsName").value = user.name;
+  document.getElementById("settingsEmail").value = user.email;
+  document.getElementById("settingsPhone").value = user.phone;
+  hidePageLoader();
+})();
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Deliver · WildcatEats</title>
-<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/wildcat-eats-logo.png" type="image/png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
@@ -13,7 +13,7 @@
 <body>
 <div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading WildcatEats">
   <div class="page-loader-mark">
-    <svg viewBox="0 0 100 100" fill="currentColor"><ellipse cx="50" cy="66" rx="20" ry="16"/><ellipse cx="26" cy="42" rx="9" ry="12" transform="rotate(-18 26 42)"/><ellipse cx="46" cy="30" rx="9" ry="12" transform="rotate(-6 46 30)"/><ellipse cx="66" cy="30" rx="9" ry="12" transform="rotate(6 66 30)"/><ellipse cx="86" cy="42" rx="9" ry="12" transform="rotate(18 86 42)"/></svg>
+    <img src="/wildcat-eats-logo.png" alt="" style="width:34px; height:34px; object-fit:contain;" />
   </div>
   <div class="page-loader-bar"><div class="page-loader-bar-fill"></div></div>
 </div>
@@ -56,11 +56,48 @@ let paymentsEnabled = false;
   } finally {
     hidePageLoader();
   }
+  startPresenceTracking();
   setInterval(() => {
     if (document.getElementById("openSection").style.display !== "none") refreshOpen();
     else refreshMine();
   }, 4000);
 })();
+
+// ---------- "Active Runners" presence — counts you as active once you've ----------
+// stayed on "Available deliveries" for 5s straight, until you leave it.
+
+let presenceQualifyTimer = null;
+let presenceHeartbeatInterval = null;
+let presenceActive = false;
+
+function startPresenceTracking() {
+  if (presenceQualifyTimer || presenceActive) return;
+  presenceQualifyTimer = setTimeout(() => {
+    presenceQualifyTimer = null;
+    presenceActive = true;
+    sendPresenceHeartbeat();
+    presenceHeartbeatInterval = setInterval(sendPresenceHeartbeat, 4000);
+  }, 5000);
+}
+
+function stopPresenceTracking() {
+  if (presenceQualifyTimer) {
+    clearTimeout(presenceQualifyTimer);
+    presenceQualifyTimer = null;
+  }
+  if (presenceHeartbeatInterval) {
+    clearInterval(presenceHeartbeatInterval);
+    presenceHeartbeatInterval = null;
+  }
+  if (presenceActive) {
+    presenceActive = false;
+    api("/api/runner-presence/leave", { method: "POST" }).catch(() => {});
+  }
+}
+
+function sendPresenceHeartbeat() {
+  api("/api/runner-presence/heartbeat", { method: "POST" }).catch(() => {});
+}
 
 // Stripe redirects the browser back here after (or mid-) Connect onboarding.
 async function handleStripeRedirect() {
@@ -112,7 +149,13 @@ function switchTab(which) {
   document.getElementById("tabMine").classList.toggle("active", which === "mine");
   document.getElementById("openSection").style.display = which === "open" ? "block" : "none";
   document.getElementById("mineSection").style.display = which === "mine" ? "block" : "none";
-  if (which === "open") refreshOpen(); else refreshMine();
+  if (which === "open") {
+    startPresenceTracking();
+    refreshOpen();
+  } else {
+    stopPresenceTracking();
+    refreshMine();
+  }
 }
 
 async function refreshOpen() {

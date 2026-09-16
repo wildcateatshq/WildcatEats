@@ -25,14 +25,10 @@ async function requireAuthOrRedirect() {
   return user;
 }
 
-// White vector paw (matches favicon.svg) — used instead of the 🐾 emoji,
-// whose colors are baked in and can't be recolored via CSS.
-const PAW_ICON = `<svg class="paw" viewBox="0 0 100 100" width="20" height="20" fill="currentColor" style="vertical-align:-4px;">
-  <ellipse cx="50" cy="66" rx="20" ry="16"/>
-  <ellipse cx="26" cy="42" rx="9" ry="12" transform="rotate(-18 26 42)"/>
-  <ellipse cx="46" cy="30" rx="9" ry="12" transform="rotate(-6 46 30)"/>
-  <ellipse cx="66" cy="30" rx="9" ry="12" transform="rotate(6 66 30)"/>
-  <ellipse cx="86" cy="42" rx="9" ry="12" transform="rotate(18 86 42)"/>
+const PAW_ICON = '<img src="/wildcat-eats-logo.png" alt="" style="height:28px; width:auto; vertical-align:-8px; margin-right:2px;" />';
+
+const GEAR_ICON = `<svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="vertical-align:-4px;">
+  <path d="M19.14 12.94a7.14 7.14 0 0 0 .06-.94 7.14 7.14 0 0 0-.06-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.5.5 0 0 0-.5-.42h-3.84a.5.5 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.84a.5.5 0 0 0 .12.64l2.03 1.58a7.14 7.14 0 0 0 0 1.88L2.83 14.5a.5.5 0 0 0-.12.64l1.92 3.32c.14.24.4.32.6.22l2.39-.96c.49.38 1.03.7 1.62.94l.36 2.54c.05.24.26.42.5.42h3.84c.24 0 .45-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.24.1.5 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z"/>
 </svg>`;
 
 // ---------- page loader ----------
@@ -81,6 +77,7 @@ function renderNav(user) {
       <a class="navlink ${path === "/deliver.html" ? "active" : ""}" href="/deliver.html">Deliver</a>
       <a class="navlink ${path === "/messages.html" ? "active" : ""}" href="/messages.html">Messages</a>
       ${user.isAdmin ? `<a class="navlink ${path === "/admin.html" ? "active" : ""}" href="/admin.html">Reports</a>` : ""}
+      <a class="navlink ${path === "/settings.html" ? "active" : ""}" href="/settings.html" aria-label="Settings" title="Settings">${GEAR_ICON}</a>
       <span class="nav-user">Hi, ${escapeHtml(user.name.split(" ")[0])}</span>
       <button class="logout" id="logoutBtn">Log out</button>
     </nav>

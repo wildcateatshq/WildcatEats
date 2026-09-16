@@ -46,6 +46,24 @@ function requireAuth(req, res, next) {
   next();
 }
 
+// Ephemeral "browsing available deliveries" presence — in-memory only
+// (unlike orders, this is pure liveness, not something worth persisting).
+// The client only starts sending heartbeats after 5s on that tab, and a
+// runner drops out if no heartbeat arrives for PRESENCE_TTL_MS (a couple
+// missed beats' worth of grace beyond the client's 4s heartbeat interval).
+const runnerPresence = new Map(); // userId -> last heartbeat timestamp
+const PRESENCE_TTL_MS = 12000;
+
+function getPresentRunnerIds() {
+  const cutoff = Date.now() - PRESENCE_TTL_MS;
+  const ids = [];
+  for (const [userId, lastSeen] of runnerPresence) {
+    if (lastSeen > cutoff) ids.push(userId);
+    else runnerPresence.delete(userId);
+  }
+  return ids;
+}
+
 // Gated on ADMIN_EMAIL rather than a DB role — this app has exactly one
 // admin (whoever runs it), so a normal account matching that env var is
 // enough. No ADMIN_EMAIL set means the admin tooling is fully disabled.
@@ -265,6 +283,26 @@ app.get("/api/stripe/config", (req, res) => {
 app.get("/api/mapbox/config", (req, res) => {
   const token = process.env.MAPBOX_TOKEN || "";
   res.json({ enabled: Boolean(token), token });
+});
+
+// Distinct runners currently out on a delivery, who finished one within the
+// last 2 minutes, or who've been browsing "Available deliveries" for at
+// least 5 seconds — powers the live "Active Runners" counter.
+app.get("/api/stats/active-deliverers", requireAuth, async (req, res) => {
+  const orders = await db.getActiveDeliveryOrders();
+  const runnerIds = new Set(orders.filter((o) => o.runnerId != null).map((o) => o.runnerId));
+  getPresentRunnerIds().forEach((id) => runnerIds.add(id));
+  res.json({ count: runnerIds.size });
+});
+
+app.post("/api/runner-presence/heartbeat", requireAuth, (req, res) => {
+  runnerPresence.set(req.session.userId, Date.now());
+  res.json({ ok: true });
+});
+
+app.post("/api/runner-presence/leave", requireAuth, (req, res) => {
+  runnerPresence.delete(req.session.userId);
+  res.json({ ok: true });
 });
 
 // ---------- order routes ----------
@@ -756,6 +794,34 @@ app.post("/api/orders/:id/cancel", requireAuth, async (req, res) => {
 
   await db.deleteOrder(order.id);
   res.json({ ok: true });
+});
+
+// Edit an order's details — only allowed before anyone's claimed it, same
+// window as cancel. Payment method isn't editable here; the card attached
+// at posting time stays as-is.
+app.post("/api/orders/:id/edit", requireAuth, async (req, res) => {
+  const order = await findOrderOr404(req, res);
+  if (!order) return;
+  if (order.ordererId !== req.session.userId) return res.status(403).json({ error: "Not your order." });
+  if (order.status !== "open") return res.status(400).json({ error: "Can't edit after it's claimed." });
+
+  const { store: storeName, hall, dropoffDetails, items, tip } = req.body || {};
+  if (!storeName || !hall || !items) {
+    return res.status(400).json({ error: "Store, hall, and items are required." });
+  }
+  const feeAmount = Number(tip);
+  if (!feeAmount || feeAmount < payments.MIN_FEE_DOLLARS) {
+    return res.status(400).json({ error: `Delivery fee must be at least $${payments.MIN_FEE_DOLLARS}.` });
+  }
+
+  const updated = await db.updateOrder(order.id, {
+    store: storeName,
+    hall,
+    dropoffDetails: dropoffDetails || "",
+    items,
+    tip: feeAmount
+  });
+  res.json({ order: publicOrder(updated) });
 });
 
 // Catch-all error handler — Express 5 forwards rejected async handlers here.

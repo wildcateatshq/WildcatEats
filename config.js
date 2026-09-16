@@ -1,24 +1,25 @@
 // Editable lists — tweak these to match what's actually around campus.
 module.exports = {
-  // Places a runner can pick food up from
+  // Places a runner can pick food up from. Buildings listed in
+  // vendorsByBuilding below are multi-vendor — the client shows a second
+  // "which spot inside?" dropdown once one of those is picked.
   stores: [
-    "The Italian Kitchen (COVA)",
-    "Acai Bowls (COVA)",
-    "COVA Greens",
-    "The Corner Grill (COVA)",
-    "Southwest Station (COVA)",
-    "Pacific Rim (Bellesini)",
-    "Corner Grill (Bellesini)",
-    "La Cocina (Bellesini)",
-    "Local Grounds (Cascia)",
-    "Menu Maker (Cascia)",
-    "Rooted (Cascia)",
-    "VSushi (Connelly Center)",
-    "Nova Noodle Company (Connelly Center)",
-    "2nd Storey Deli (St. Mary's)",
-    "2nd Storey Pizza (St. Mary's)",
+    "COVA",
+    "Cascia",
+    "Connelly Center",
+    "St. Mary's",
+    "Wawa",
     "Holy Grounds (Bartley)"
   ],
+
+  // Specific vendors inside each multi-vendor building — keyed by the
+  // matching entry in `stores` above.
+  vendorsByBuilding: {
+    "COVA": ["The Italian Kitchen", "Acai Bowls", "COVA Greens", "The Corner Grill", "Southwest Station"],
+    "Cascia": ["Local Grounds", "Menu Maker", "Rooted"],
+    "Connelly Center": ["VSushi", "Nova Noodle Company"],
+    "St. Mary's": ["2nd Storey Deli", "2nd Storey Pizza"]
+  },
 
   // Dropoff locations (residence halls / campus areas)
   halls: [

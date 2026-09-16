@@ -4,17 +4,51 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>Order Food · WildcatEats</title>
-<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="icon" href="/wildcat-eats-logo.png" type="image/png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/style.css" />
 <link href="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.css" rel="stylesheet" />
+<style>
+.record-dot {
+  position: absolute;
+  top: -3px;
+  right: 0;
+  width: 5.7px;
+  height: 5.7px;
+  border-radius: 50%;
+  background: red;
+  animation: recordBlink 1.5s infinite;
+}
+@keyframes recordBlink {
+  0%, 49.99% { opacity: 1; }
+  50%, 99.99% { opacity: 0; }
+  100% { opacity: 1; }
+}
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  z-index: 50;
+}
+.modal-card {
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lg);
+}
+</style>
 </head>
 <body>
 <div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading WildcatEats">
   <div class="page-loader-mark">
-    <svg viewBox="0 0 100 100" fill="currentColor"><ellipse cx="50" cy="66" rx="20" ry="16"/><ellipse cx="26" cy="42" rx="9" ry="12" transform="rotate(-18 26 42)"/><ellipse cx="46" cy="30" rx="9" ry="12" transform="rotate(-6 46 30)"/><ellipse cx="66" cy="30" rx="9" ry="12" transform="rotate(6 66 30)"/><ellipse cx="86" cy="42" rx="9" ry="12" transform="rotate(18 86 42)"/></svg>
+    <img src="/wildcat-eats-logo.png" alt="" style="width:34px; height:34px; object-fit:contain;" />
   </div>
   <div class="page-loader-bar"><div class="page-loader-bar-fill"></div></div>
 </div>
@@ -23,6 +57,10 @@
   <div class="tabs">
     <button id="tabNew" class="active">Place an order</button>
     <button id="tabMine">My orders</button>
+    <div id="liveDeliverers" style="margin-left:auto; align-self:center; position:relative; padding-right:8px; font-size:10pt; color:red; font-weight:600; white-space:nowrap;">
+      <span id="liveDeliverersText"></span>
+      <span class="record-dot"></span>
+    </div>
   </div>
 
   <section id="newOrderSection">
@@ -32,6 +70,9 @@
     <form id="orderForm" class="card">
       <label for="store">Pick up from</label>
       <select id="store" required></select>
+
+      <label for="storeVendor" id="storeVendorLabel" style="display:none;">Which Restaurant?</label>
+      <select id="storeVendor" style="display:none;"></select>
 
       <label for="hall">Deliver to</label>
       <select id="hall" required></select>
@@ -59,6 +100,31 @@
   </section>
 </main>
 
+<div id="editOrderOverlay" class="modal-overlay" style="display:none;">
+  <div class="card modal-card">
+    <h1 style="font-size:1.5rem;">Edit order</h1>
+    <div id="editErrorBox"></div>
+    <form id="editOrderForm">
+      <label for="editHall">Deliver to</label>
+      <select id="editHall" required></select>
+
+      <label for="editDropoffDetails">Room / meeting spot details</label>
+      <input type="text" id="editDropoffDetails" placeholder="e.g. Room 214, or lobby by the front desk" />
+
+      <label for="editItems">What did you order? (items, sizes, notes)</label>
+      <textarea id="editItems" required></textarea>
+
+      <label for="editTip">Delivery fee ($)</label>
+      <input type="number" id="editTip" min="1" step="0.5" />
+
+      <div class="row" style="margin-top:18px;">
+        <button class="btn" type="submit">Save changes</button>
+        <button class="btn secondary" type="button" id="editCancelBtn">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script src="https://js.stripe.com/v3/"></script>
 <script src="https://api.mapbox.com/mapbox-gl-js/v3.7.0/mapbox-gl.js"></script>
 <script src="/app.js"></script>
@@ -78,11 +144,24 @@ let mapboxEnabled = false;
     await initStripe();
     await initMapbox();
     await refreshMine();
+    await refreshLiveDeliverers();
   } finally {
     hidePageLoader();
   }
-  pollTimer = setInterval(refreshMine, 4000);
+  pollTimer = setInterval(() => {
+    refreshMine();
+    refreshLiveDeliverers();
+  }, 4000);
 })();
+
+async function refreshLiveDeliverers() {
+  try {
+    const { count } = await api("/api/stats/active-deliverers");
+    document.getElementById("liveDeliverersText").textContent = `Active Runners: ${count}`;
+  } catch (err) {
+    // Non-critical — just leave the last known count showing.
+  }
+}
 
 async function initMapbox() {
   const { enabled, token } = await api("/api/mapbox/config");
@@ -90,12 +169,43 @@ async function initMapbox() {
   if (enabled) mapboxgl.accessToken = token;
 }
 
+let vendorsByBuilding = {};
+
 async function loadConfig() {
   const cfg = await api("/api/config");
+  vendorsByBuilding = cfg.vendorsByBuilding || {};
   const storeSel = document.getElementById("store");
   const hallSel = document.getElementById("hall");
+  const editHallSel = document.getElementById("editHall");
   storeSel.innerHTML = cfg.stores.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
   hallSel.innerHTML = cfg.halls.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join("");
+  editHallSel.innerHTML = cfg.halls.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join("");
+  updateStoreVendorField();
+  storeSel.onchange = updateStoreVendorField;
+}
+
+function updateStoreVendorField() {
+  const store = document.getElementById("store").value;
+  const label = document.getElementById("storeVendorLabel");
+  const vendorSel = document.getElementById("storeVendor");
+  const vendors = vendorsByBuilding[store];
+  if (vendors && vendors.length) {
+    label.style.display = "block";
+    vendorSel.style.display = "block";
+    vendorSel.required = true;
+    vendorSel.innerHTML = vendors.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+  } else {
+    label.style.display = "none";
+    vendorSel.style.display = "none";
+    vendorSel.required = false;
+    vendorSel.innerHTML = "";
+  }
+}
+
+function storeValue() {
+  const store = document.getElementById("store").value;
+  const vendor = document.getElementById("storeVendor").value;
+  return vendor ? `${vendor} (${store})` : store;
 }
 
 async function initStripe() {
@@ -142,7 +252,7 @@ document.getElementById("orderForm").onsubmit = async (e) => {
     await api("/api/orders", {
       method: "POST",
       body: {
-        store: document.getElementById("store").value,
+        store: storeValue(),
         hall: document.getElementById("hall").value,
         dropoffDetails: document.getElementById("dropoffDetails").value,
         items: document.getElementById("items").value,
@@ -176,6 +286,11 @@ async function refreshMine() {
   syncMaps(orders);
 
   orders.forEach(o => {
+    const editBtn = document.getElementById(`edit-${o.id}`);
+    if (editBtn) {
+      editBtn.onclick = () => openEditModal(o);
+    }
+
     const cancelBtn = document.getElementById(`cancel-${o.id}`);
     if (cancelBtn) {
       cancelBtn.onclick = async () => {
@@ -208,6 +323,60 @@ async function refreshMine() {
   });
 }
 
+// ---------- edit order popup ----------
+// Only order/hall/items/fee are editable here — the store/vendor picked at
+// posting time isn't touched, so it's sent back unchanged on save.
+
+let editingOrder = null;
+const editOverlay = document.getElementById("editOrderOverlay");
+const editErrorBox = document.getElementById("editErrorBox");
+
+function openEditModal(o) {
+  editingOrder = o;
+  editErrorBox.innerHTML = "";
+  document.getElementById("editHall").value = o.hall;
+  document.getElementById("editDropoffDetails").value = o.dropoffDetails || "";
+  document.getElementById("editItems").value = o.items;
+  document.getElementById("editTip").value = o.tip;
+  editOverlay.style.display = "flex";
+}
+
+function closeEditModal() {
+  editOverlay.style.display = "none";
+  editingOrder = null;
+}
+
+document.getElementById("editCancelBtn").onclick = closeEditModal;
+editOverlay.onclick = (e) => {
+  if (e.target === editOverlay) closeEditModal();
+};
+
+document.getElementById("editOrderForm").onsubmit = async (e) => {
+  e.preventDefault();
+  if (!editingOrder) return;
+  editErrorBox.innerHTML = "";
+  const submitBtn = e.target.querySelector("button[type=submit]");
+  submitBtn.disabled = true;
+  try {
+    await api(`/api/orders/${editingOrder.id}/edit`, {
+      method: "POST",
+      body: {
+        store: editingOrder.store,
+        hall: document.getElementById("editHall").value,
+        dropoffDetails: document.getElementById("editDropoffDetails").value,
+        items: document.getElementById("editItems").value,
+        tip: document.getElementById("editTip").value
+      }
+    });
+    closeEditModal();
+    refreshMine();
+  } catch (err) {
+    editErrorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+  } finally {
+    submitBtn.disabled = false;
+  }
+};
+
 function renderOrder(o) {
   let banner = "";
   if (o.arrivedAt && o.status !== "delivered") {
@@ -233,7 +402,9 @@ function renderOrder(o) {
   }
 
   let cancelBtn = "";
+  let editBtn = "";
   if (o.status === "open") {
+    editBtn = `<button class="btn" id="edit-${o.id}" style="margin-top:10px;">Edit order</button>`;
     cancelBtn = `<button class="btn danger" id="cancel-${o.id}" style="margin-top:10px;">Cancel order</button>`;
   }
   let reportBtn = "";
@@ -268,6 +439,7 @@ function renderOrder(o) {
       ${mapBlock}
       ${chatSectionHtml(o, o.runnerName)}
       ${adminChatBlock}
+      ${editBtn}
       ${cancelBtn}
       ${reportBtn}
     </div>

@@ -243,6 +243,11 @@ const TIMESTAMP_FIELDS = new Set([
 const FIELD_COLUMN = {
   runnerId: "runner_id",
   status: "status",
+  store: "store",
+  hall: "hall",
+  dropoffDetails: "dropoff_details",
+  items: "items",
+  tip: "tip",
   claimedAt: "claimed_at",
   pickedUpAt: "picked_up_at",
   arrivedAt: "arrived_at",
@@ -281,6 +286,21 @@ async function updateOrder(id, patch) {
 
 async function deleteOrder(id) {
   await pool.query("delete from orders where id = $1", [id]);
+}
+
+// "Active" = currently out on a delivery, or finished one within the last 2
+// minutes. Used to power the live "delivering now" counter.
+async function getActiveDeliveryOrders() {
+  const { rows } = await pool.query(
+    `select runner_id, status, delivered_at from orders
+     where status in ('claimed','picked_up')
+        or (status = 'delivered' and delivered_at > now() - interval '2 minutes')`
+  );
+  return rows.map((r) => ({
+    runnerId: r.runner_id,
+    status: r.status,
+    deliveredAt: r.delivered_at ? r.delivered_at.getTime() : null
+  }));
 }
 
 async function getDisputedOrders() {
@@ -346,5 +366,6 @@ module.exports = {
   getMessagesByOrder,
   createMessage,
   updateUser,
-  getDisputedOrders
+  getDisputedOrders,
+  getActiveDeliveryOrders
 };

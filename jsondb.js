@@ -158,6 +158,17 @@ async function deleteOrder(id) {
   save();
 }
 
+// "Active" = currently out on a delivery, or finished one within the last 2
+// minutes. Used to power the live "delivering now" counter.
+async function getActiveDeliveryOrders() {
+  const cutoff = Date.now() - 2 * 60 * 1000;
+  return db.orders.filter((o) =>
+    o.status === "claimed" ||
+    o.status === "picked_up" ||
+    (o.status === "delivered" && o.deliveredAt && o.deliveredAt > cutoff)
+  );
+}
+
 async function getDisputedOrders() {
   return db.orders
     .filter((o) => o.disputedAt)
@@ -213,5 +224,6 @@ module.exports = {
   getMessagesByOrder,
   createMessage,
   updateUser,
-  getDisputedOrders
+  getDisputedOrders,
+  getActiveDeliveryOrders
 };
