@@ -49,20 +49,25 @@ function requireAuth(req, res, next) {
 // Gated on ADMIN_EMAIL rather than a DB role — this app has exactly one
 // admin (whoever runs it), so a normal account matching that env var is
 // enough. No ADMIN_EMAIL set means the admin tooling is fully disabled.
+async function isUserAdmin(userId) {
+  const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase();
+  if (!adminEmail || !userId) return false;
+  const user = await db.getUserById(userId);
+  return Boolean(user) && user.email.toLowerCase() === adminEmail;
+}
+
 async function requireAdmin(req, res, next) {
   if (!req.session.userId) return res.status(401).json({ error: "Not logged in" });
-  const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase();
-  if (!adminEmail) return res.status(403).json({ error: "Admin tools aren't configured on this server." });
-  const user = await db.getUserById(req.session.userId);
-  if (!user || user.email.toLowerCase() !== adminEmail) {
-    return res.status(403).json({ error: "Not authorized." });
-  }
+  if (!process.env.ADMIN_EMAIL) return res.status(403).json({ error: "Admin tools aren't configured on this server." });
+  if (!(await isUserAdmin(req.session.userId))) return res.status(403).json({ error: "Not authorized." });
   next();
 }
 
 function publicUser(u) {
   if (!u) return null;
-  return { id: u.id, name: u.name, email: u.email, phone: u.phone, stripeOnboarded: Boolean(u.stripeOnboarded) };
+  const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase();
+  const isAdmin = Boolean(adminEmail) && u.email.toLowerCase() === adminEmail;
+  return { id: u.id, name: u.name, email: u.email, phone: u.phone, stripeOnboarded: Boolean(u.stripeOnboarded), isAdmin };
 }
 
 // forRunner: runners see what THEY earn, never the full fee the orderer
@@ -88,6 +93,7 @@ function publicOrder(o, { forRunner = false } = {}) {
     disputeReason: o.disputeReason,
     disputedAt: o.disputedAt,
     refundedAt: o.refundedAt,
+    disputeDismissedAt: o.disputeDismissedAt,
     runnerLat: o.runnerLat,
     runnerLng: o.runnerLng,
     runnerLocationAt: o.runnerLocationAt
@@ -498,13 +504,109 @@ app.post("/api/orders/:id/delivered", requireAuth, async (req, res) => {
 
 // ---------- messages (orderer <-> runner, once claimed) ----------
 
+// Three kinds of conversation can exist on a claimed order:
+//   1. orderer <-> runner   — the normal delivery-logistics thread (threadUserId null)
+//   2. admin <-> orderer    — private, only once the order's been reported (threadUserId = orderer's id)
+//   3. admin <-> runner     — private, only once the order's been reported (threadUserId = runner's id)
+// Keeping admin's conversations with each party separate (rather than one
+// merged thread) means what the admin says to the runner never leaks to
+// the orderer and vice versa.
+
+function roleFor(order, userId) {
+  if (order.ordererId === userId) return "orderer";
+  if (order.runnerId === userId) return "runner";
+  return null;
+}
+
+// Every conversation the current user is part of — across all their orders,
+// newest activity first. Powers the Messages inbox page, so people don't
+// have to hunt through each order card to find a chat thread.
+app.get("/api/messages/threads", requireAuth, async (req, res) => {
+  const userId = req.session.userId;
+  const admin = await isUserAdmin(userId);
+  const [asOrderer, asRunner, disputed] = await Promise.all([
+    db.getOrdersByOrderer(userId),
+    db.getOrdersByRunner(userId),
+    admin ? db.getDisputedOrders() : Promise.resolve([])
+  ]);
+
+  const byId = new Map();
+  for (const o of [...asOrderer, ...asRunner]) byId.set(o.id, o);
+  const own = [...byId.values()].filter((o) => o.runnerId && o.runnerId !== o.ordererId);
+
+  const threads = [];
+
+  for (const o of own) {
+    const messages = await db.getMessagesByOrder(o.id, null);
+    const last = messages[messages.length - 1] || null;
+    const role = roleFor(o, userId);
+    threads.push({
+      threadKey: `order-${o.id}`,
+      endpoint: `/api/orders/${o.id}/messages`,
+      orderId: o.id,
+      store: o.store,
+      hall: o.hall,
+      status: o.status,
+      otherName: role === "orderer" ? o.runnerName : o.ordererName,
+      lastMessage: last ? last.text : null,
+      lastMessageAt: last ? last.createdAt : null,
+      lastMessageMine: last ? last.senderId === userId : false
+    });
+
+    if (!admin && o.disputedAt) {
+      const adminMessages = await db.getMessagesByOrder(o.id, userId);
+      const adminLast = adminMessages[adminMessages.length - 1] || null;
+      threads.push({
+        threadKey: `admin-${o.id}`,
+        endpoint: `/api/orders/${o.id}/admin-messages`,
+        orderId: o.id,
+        store: o.store,
+        hall: o.hall,
+        status: o.status,
+        otherName: "WildcatEats Admin",
+        lastMessage: adminLast ? adminLast.text : null,
+        lastMessageAt: adminLast ? adminLast.createdAt : null,
+        lastMessageMine: adminLast ? adminLast.senderId === userId : false
+      });
+    }
+  }
+
+  if (admin) {
+    for (const o of disputed.filter((o) => o.runnerId && o.runnerId !== o.ordererId)) {
+      for (const role of ["orderer", "runner"]) {
+        const partyId = role === "orderer" ? o.ordererId : o.runnerId;
+        const partyName = role === "orderer" ? o.ordererName : o.runnerName;
+        const messages = await db.getMessagesByOrder(o.id, partyId);
+        const last = messages[messages.length - 1] || null;
+        threads.push({
+          threadKey: `admin-${o.id}-${role}`,
+          endpoint: `/api/admin/orders/${o.id}/messages/${role}`,
+          orderId: o.id,
+          store: o.store,
+          hall: o.hall,
+          status: o.status,
+          otherName: partyName,
+          lastMessage: last ? last.text : null,
+          lastMessageAt: last ? last.createdAt : null,
+          lastMessageMine: last ? last.senderId === userId : false
+        });
+      }
+    }
+  }
+
+  threads.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
+  res.json({ threads });
+});
+
+// ---- 1. orderer <-> runner (the normal thread) ----
+
 app.get("/api/orders/:id/messages", requireAuth, async (req, res) => {
   const order = await findOrderOr404(req, res);
   if (!order) return;
   if (!isParticipant(order, req.session.userId)) return res.status(403).json({ error: "Not your order." });
   if (!order.runnerId) return res.status(400).json({ error: "No one has claimed this order yet." });
 
-  const messages = await db.getMessagesByOrder(order.id);
+  const messages = await db.getMessagesByOrder(order.id, null);
   res.json({ messages: messages.map((m) => publicMessage(m, req.session.userId)) });
 });
 
@@ -519,6 +621,60 @@ app.post("/api/orders/:id/messages", requireAuth, async (req, res) => {
   if (text.length > 1000) return res.status(400).json({ error: "Message is too long." });
 
   const message = await db.createMessage({ orderId: order.id, senderId: req.session.userId, text });
+  res.json({ message: publicMessage(message, req.session.userId) });
+});
+
+// ---- 2. the orderer's or runner's own private thread with admin ----
+// Only reachable once the order's actually been reported — nothing to
+// discuss with admin before that.
+
+app.get("/api/orders/:id/admin-messages", requireAuth, async (req, res) => {
+  const order = await findOrderOr404(req, res);
+  if (!order) return;
+  if (!isParticipant(order, req.session.userId)) return res.status(403).json({ error: "Not your order." });
+  if (!order.disputedAt) return res.status(400).json({ error: "This order hasn't been reported." });
+
+  const messages = await db.getMessagesByOrder(order.id, req.session.userId);
+  res.json({ messages: messages.map((m) => publicMessage(m, req.session.userId)) });
+});
+
+app.post("/api/orders/:id/admin-messages", requireAuth, async (req, res) => {
+  const order = await findOrderOr404(req, res);
+  if (!order) return;
+  if (!isParticipant(order, req.session.userId)) return res.status(403).json({ error: "Not your order." });
+  if (!order.disputedAt) return res.status(400).json({ error: "This order hasn't been reported." });
+
+  const text = (req.body?.text || "").trim();
+  if (!text) return res.status(400).json({ error: "Message can't be empty." });
+  if (text.length > 1000) return res.status(400).json({ error: "Message is too long." });
+
+  const message = await db.createMessage({ orderId: order.id, senderId: req.session.userId, text, threadUserId: req.session.userId });
+  res.json({ message: publicMessage(message, req.session.userId) });
+});
+
+// ---- 3. admin's own private thread with a specific party ----
+
+app.get("/api/admin/orders/:id/messages/:role", requireAdmin, async (req, res) => {
+  const order = await findOrderOr404(req, res);
+  if (!order) return;
+  const partyId = req.params.role === "orderer" ? order.ordererId : req.params.role === "runner" ? order.runnerId : null;
+  if (!partyId) return res.status(400).json({ error: "Unknown party." });
+
+  const messages = await db.getMessagesByOrder(order.id, partyId);
+  res.json({ messages: messages.map((m) => publicMessage(m, req.session.userId)) });
+});
+
+app.post("/api/admin/orders/:id/messages/:role", requireAdmin, async (req, res) => {
+  const order = await findOrderOr404(req, res);
+  if (!order) return;
+  const partyId = req.params.role === "orderer" ? order.ordererId : req.params.role === "runner" ? order.runnerId : null;
+  if (!partyId) return res.status(400).json({ error: "Unknown party." });
+
+  const text = (req.body?.text || "").trim();
+  if (!text) return res.status(400).json({ error: "Message can't be empty." });
+  if (text.length > 1000) return res.status(400).json({ error: "Message is too long." });
+
+  const message = await db.createMessage({ orderId: order.id, senderId: req.session.userId, text, threadUserId: partyId });
   res.json({ message: publicMessage(message, req.session.userId) });
 });
 
@@ -568,6 +724,27 @@ app.post("/api/admin/orders/:id/refund", requireAdmin, async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// Dismisses a report with no refund — drops it off the open-reports queue
+// and lets the orderer know via a message in the order's thread (from the
+// admin, so it's clear a person looked at it and not a silent auto-reply).
+app.post("/api/admin/orders/:id/dismiss", requireAdmin, async (req, res) => {
+  const order = await findOrderOr404(req, res);
+  if (!order) return;
+  if (!order.disputedAt) return res.status(400).json({ error: "This order wasn't reported." });
+  if (order.refundedAt) return res.status(400).json({ error: "This order was already refunded." });
+  if (order.disputeDismissedAt) return res.status(400).json({ error: "This report was already dismissed." });
+
+  const note = (req.body?.note || "").trim();
+  const updated = await db.updateOrder(order.id, { disputeDismissedAt: Date.now() });
+
+  // Into the admin's private thread with the orderer specifically — they're
+  // the one who filed the report, not the runner.
+  const text = note || "We looked into your report for this order and won't be issuing a refund. Sorry about that.";
+  await db.createMessage({ orderId: order.id, senderId: req.session.userId, text, threadUserId: order.ordererId });
+
+  res.json({ order: publicOrder(updated) });
 });
 
 // Cancel an order (only the orderer, only while still open)

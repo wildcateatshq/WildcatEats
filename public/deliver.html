@@ -7,10 +7,16 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
+<div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading WildcatEats">
+  <div class="page-loader-mark">
+    <svg viewBox="0 0 100 100" fill="currentColor"><ellipse cx="50" cy="66" rx="20" ry="16"/><ellipse cx="26" cy="42" rx="9" ry="12" transform="rotate(-18 26 42)"/><ellipse cx="46" cy="30" rx="9" ry="12" transform="rotate(-6 46 30)"/><ellipse cx="66" cy="30" rx="9" ry="12" transform="rotate(6 66 30)"/><ellipse cx="86" cy="42" rx="9" ry="12" transform="rotate(18 86 42)"/></svg>
+  </div>
+  <div class="page-loader-bar"><div class="page-loader-bar-fill"></div></div>
+</div>
 <header class="nav" id="nav"></header>
 <main>
   <div class="tabs">
@@ -40,11 +46,16 @@ let paymentsEnabled = false;
 (async () => {
   user = await requireAuthOrRedirect();
   if (!user) return;
-  paymentsEnabled = (await api("/api/stripe/config")).enabled;
-  await handleStripeRedirect();
-  renderPayoutBanner();
-  await refreshOpen();
-  await refreshMine();
+  document.getElementById("openList").innerHTML = skeletonList(3);
+  try {
+    paymentsEnabled = (await api("/api/stripe/config")).enabled;
+    await handleStripeRedirect();
+    renderPayoutBanner();
+    await refreshOpen();
+    await refreshMine();
+  } finally {
+    hidePageLoader();
+  }
   setInterval(() => {
     if (document.getElementById("openSection").style.display !== "none") refreshOpen();
     else refreshMine();
@@ -104,20 +115,15 @@ function switchTab(which) {
   if (which === "open") refreshOpen(); else refreshMine();
 }
 
-const seenOpenIds = new Set();
-
 async function refreshOpen() {
   const { orders } = await api("/api/orders/open");
   const list = document.getElementById("openList");
   if (orders.length === 0) {
     list.innerHTML = `<div class="empty">No open orders right now. Check back soon!</div>`;
-    seenOpenIds.clear();
     return;
   }
-  list.innerHTML = orders.map((o, i) => {
-    const isNew = !seenOpenIds.has(o.id);
-    return `
-    <div class="order-item ${isNew ? "entering" : ""}" ${isNew ? `style="animation-delay:${Math.min(i, 8) * 0.06}s"` : ""}>
+  list.innerHTML = orders.map((o) => `
+    <div class="order-item">
       <div class="top-row">
         <div>
           <div class="store">${escapeHtml(o.store)}</div>
@@ -129,9 +135,7 @@ async function refreshOpen() {
       <div class="meta">Posted ${timeAgo(o.createdAt)} by ${escapeHtml(o.ordererName)} · You earn: <span class="tip">$${Number(o.runnerEarnings).toFixed(2)}</span></div>
       <button class="btn gold" style="margin-top:10px;" data-id="${o.id}">Claim this delivery</button>
     </div>
-  `;
-  }).join("");
-  orders.forEach(o => seenOpenIds.add(o.id));
+  `).join("");
 
   list.querySelectorAll("button[data-id]").forEach(btn => {
     btn.onclick = async () => {
@@ -148,8 +152,6 @@ async function refreshOpen() {
   });
 }
 
-const seenMineIds = new Set();
-
 async function refreshMine() {
   const { orders } = await api("/api/orders/delivering");
   updateLocationSharing(orders);
@@ -159,14 +161,14 @@ async function refreshMine() {
 
   if (orders.length === 0) {
     list.innerHTML = `<div class="empty">You haven't claimed any deliveries yet.</div>`;
-    seenMineIds.clear();
     return;
   }
 
-  list.innerHTML = active.map((o, i) => renderMine(o, i)).join("") +
-    (done.length ? `<h2 style="font-size:1rem; color:#6b7280; margin-top:24px;">Completed</h2>` + done.map((o, i) => renderMine(o, i)).join("") : "");
-  orders.forEach(o => seenMineIds.add(o.id));
+  const drafts = captureChatDrafts(list);
+  list.innerHTML = active.map((o) => renderMine(o)).join("") +
+    (done.length ? `<h2 style="font-size:1rem; color:#6b7280; margin-top:24px;">Completed</h2>` + done.map((o) => renderMine(o)).join("") : "");
   wireChatBlocks(list, user.id);
+  restoreChatDrafts(list, drafts);
 
   orders.forEach(o => {
     const pickedBtn = document.getElementById(`picked-${o.id}`);
@@ -230,24 +232,39 @@ async function act(orderId, action, btn) {
   }
 }
 
-function renderMine(o, i = 0) {
-  const isNew = !seenMineIds.has(o.id);
-  const entering = isNew ? "entering" : "";
-  const delay = isNew ? `style="animation-delay:${Math.min(i, 8) * 0.06}s"` : "";
+function renderMine(o) {
   let actionBtn = "";
   if (o.status === "claimed") {
     actionBtn = `<button class="btn" id="picked-${o.id}" style="margin-top:10px;">I picked it up</button>`;
   } else if (o.status === "picked_up" && !o.arrivedAt) {
-    actionBtn = `<button class="btn gold" id="arrived-${o.id}" style="margin-top:10px;">I'm here! 🔔</button>`;
+    actionBtn = `<button class="btn gold" id="arrived-${o.id}" style="margin-top:10px;">I'm here!</button>`;
   } else if (o.status === "picked_up" && o.arrivedAt) {
     actionBtn = `<button class="btn" id="delivered-${o.id}" style="margin-top:10px;">Mark delivered</button>`;
   }
 
   let arrivedNote = o.arrivedAt && o.status !== "delivered"
-    ? `<div class="banner">🔔 You notified them you've arrived</div>` : "";
+    ? `<div class="banner">You notified them you've arrived</div>` : "";
+
+  let disputeNote = "";
+  if (o.refundedAt) {
+    disputeNote = `<div class="banner warn">This order was reported and refunded</div>`;
+  } else if (o.disputeDismissedAt) {
+    disputeNote = `<div class="banner warn">This order was reported — no refund was issued</div>`;
+  } else if (o.disputedAt) {
+    disputeNote = `<div class="banner warn">This order was reported — under review</div>`;
+  }
+
+  // Admin's replies matter enough that this shouldn't hide behind a
+  // collapsed toggle someone has to know exists — auto-expand it.
+  let adminChatBlock = "";
+  if (o.disputedAt) {
+    const adminThreadKey = `admin-${o.id}`;
+    ensureThreadOpen(adminThreadKey);
+    adminChatBlock = chatSectionHtml(o, "WildcatEats Admin", { threadKey: adminThreadKey, endpoint: `/api/orders/${o.id}/admin-messages` });
+  }
 
   return `
-    <div class="order-item ${entering}" ${delay}>
+    <div class="order-item">
       <div class="top-row">
         <div>
           <div class="store">${escapeHtml(o.store)}</div>
@@ -257,8 +274,10 @@ function renderMine(o, i = 0) {
       </div>
       <div class="items">${escapeHtml(o.items)}</div>
       ${arrivedNote}
+      ${disputeNote}
       <div class="meta">For ${escapeHtml(o.ordererName)} · You earn: <span class="tip">$${Number(o.runnerEarnings).toFixed(2)}</span></div>
       ${chatSectionHtml(o, o.ordererName)}
+      ${adminChatBlock}
       ${actionBtn}
     </div>
   `;

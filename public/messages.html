@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Messages · WildcatEats</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+<div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading WildcatEats">
+  <div class="page-loader-mark">
+    <svg viewBox="0 0 100 100" fill="currentColor"><ellipse cx="50" cy="66" rx="20" ry="16"/><ellipse cx="26" cy="42" rx="9" ry="12" transform="rotate(-18 26 42)"/><ellipse cx="46" cy="30" rx="9" ry="12" transform="rotate(-6 46 30)"/><ellipse cx="66" cy="30" rx="9" ry="12" transform="rotate(6 66 30)"/><ellipse cx="86" cy="42" rx="9" ry="12" transform="rotate(18 86 42)"/></svg>
+  </div>
+  <div class="page-loader-bar"><div class="page-loader-bar-fill"></div></div>
+</div>
+<header class="nav" id="nav"></header>
+<main style="max-width: 980px;">
+  <h1>Messages</h1>
+  <p class="subtitle">Every conversation you've had with a runner or orderer, in one place.</p>
+
+  <div class="messages-shell" id="messagesShell">
+    <div class="thread-list" id="threadList"></div>
+    <div class="thread-view" id="threadView">
+      <div class="thread-empty" id="threadEmpty">Select a conversation to view it.</div>
+    </div>
+  </div>
+</main>
+
+<script src="/app.js"></script>
+<script>
+let user = null;
+let activeThreadKey = null;
+let threadsCache = [];
+
+(async () => {
+  user = await requireAuthOrRedirect();
+  if (!user) return;
+  document.getElementById("threadList").innerHTML = skeletonList(2);
+  try {
+    await loadThreads();
+  } finally {
+    hidePageLoader();
+  }
+  setInterval(() => {
+    loadThreads();
+    if (activeThreadKey) {
+      const t = threadsCache.find((x) => x.threadKey === activeThreadKey);
+      if (t) loadChatMessages(activeThreadKey, user.id, t.endpoint);
+    }
+  }, 4000);
+})();
+
+async function loadThreads() {
+  const { threads } = await api("/api/messages/threads");
+  threadsCache = threads;
+  const list = document.getElementById("threadList");
+
+  if (threads.length === 0) {
+    list.innerHTML = `<div class="empty">No conversations yet — once you claim or post an order, you can message the other person here.</div>`;
+    return;
+  }
+
+  list.innerHTML = threads.map(renderThreadItem).join("");
+  list.querySelectorAll("[data-thread-key]").forEach((el) => {
+    el.onclick = () => openThread(el.dataset.threadKey);
+  });
+
+  // Keep the header in sync if the order's status changed (e.g. delivered)
+  // since the list was last fetched.
+  if (activeThreadKey) {
+    const stillThere = threads.find((t) => t.threadKey === activeThreadKey);
+    if (stillThere) renderThreadHeader(stillThere);
+  }
+}
+
+function renderThreadItem(t) {
+  const preview = t.lastMessage
+    ? `${t.lastMessageMine ? "You: " : ""}${escapeHtml(t.lastMessage)}`
+    : "No messages yet — say hi!";
+  return `
+    <button type="button" class="thread-item ${t.threadKey === activeThreadKey ? "active" : ""}" data-thread-key="${t.threadKey}">
+      <div class="top-row">
+        <span class="name">${escapeHtml(t.otherName || "Unknown")}</span>
+        <span class="badge ${t.status}">${STATUS_LABEL[t.status] || t.status}</span>
+      </div>
+      <div class="order-ref">${escapeHtml(t.store)} → ${escapeHtml(t.hall)}</div>
+      <div class="preview">${preview}</div>
+    </button>
+  `;
+}
+
+function renderThreadHeader(t) {
+  const header = document.getElementById("threadViewHeader");
+  if (!header) return;
+  header.querySelector(".name").textContent = t.otherName || "Unknown";
+  const badge = header.querySelector(".badge");
+  badge.className = `badge ${t.status}`;
+  badge.textContent = STATUS_LABEL[t.status] || t.status;
+}
+
+function openThread(threadKey) {
+  activeThreadKey = threadKey;
+  document.getElementById("messagesShell").classList.add("thread-open");
+  document.querySelectorAll(".thread-item").forEach((el) => {
+    el.classList.toggle("active", el.dataset.threadKey === threadKey);
+  });
+
+  const t = threadsCache.find((x) => x.threadKey === threadKey);
+  const view = document.getElementById("threadView");
+  view.innerHTML = `
+    <div class="thread-view-header" id="threadViewHeader">
+      <button type="button" class="thread-back" id="threadBack">Back</button>
+      <div>
+        <div class="name">${escapeHtml(t ? t.otherName || "Unknown" : "")}</div>
+        <div class="order-ref">${t ? escapeHtml(t.store) + " → " + escapeHtml(t.hall) : ""}</div>
+      </div>
+      <span class="badge ${t ? t.status : ""}">${t ? (STATUS_LABEL[t.status] || t.status) : ""}</span>
+    </div>
+    <div class="chat-messages" id="chat-messages-${threadKey}"></div>
+    <form class="chat-form" data-thread-key="${threadKey}" data-endpoint="${t ? t.endpoint : ""}">
+      <input type="text" class="chat-input" placeholder="Type a message…" maxlength="1000" required />
+      <button class="btn" type="submit">Send</button>
+    </form>
+  `;
+  document.getElementById("threadBack").onclick = closeThread;
+  wireChatBlocks(view, user.id);
+  if (t) loadChatMessages(threadKey, user.id, t.endpoint);
+}
+
+function closeThread() {
+  activeThreadKey = null;
+  document.getElementById("messagesShell").classList.remove("thread-open");
+  document.querySelectorAll(".thread-item").forEach((el) => el.classList.remove("active"));
+  document.getElementById("threadView").innerHTML = `<div class="thread-empty" id="threadEmpty">Select a conversation to view it.</div>`;
+}
+</script>
+</body>
+</html>

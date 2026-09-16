@@ -170,15 +170,25 @@ function withMessageSender(m) {
   return { ...m, senderName: sender ? sender.name : "Unknown" };
 }
 
-async function getMessagesByOrder(orderId) {
+// threadUserId is null for the normal orderer<->runner thread on an order,
+// or a specific user id for a private admin<->that-user side channel on the
+// same order — keeps the two kinds of conversation from mixing.
+async function getMessagesByOrder(orderId, threadUserId = null) {
   return db.messages
-    .filter((m) => m.orderId === Number(orderId))
+    .filter((m) => m.orderId === Number(orderId) && (m.threadUserId || null) === (threadUserId || null))
     .sort((a, b) => a.createdAt - b.createdAt)
     .map(withMessageSender);
 }
 
-async function createMessage({ orderId, senderId, text }) {
-  const message = { id: db.nextMessageId++, orderId: Number(orderId), senderId, text, createdAt: Date.now() };
+async function createMessage({ orderId, senderId, text, threadUserId = null }) {
+  const message = {
+    id: db.nextMessageId++,
+    orderId: Number(orderId),
+    senderId,
+    text,
+    threadUserId: threadUserId || null,
+    createdAt: Date.now()
+  };
   db.messages.push(message);
   save();
   return withMessageSender(message);

@@ -35,6 +35,41 @@ const PAW_ICON = `<svg class="paw" viewBox="0 0 100 100" width="20" height="20" 
   <ellipse cx="86" cy="42" rx="9" ry="12" transform="rotate(18 86 42)"/>
 </svg>`;
 
+// ---------- page loader ----------
+// The overlay markup ships inline in each page's HTML (so it paints before
+// any script runs) with class "page-loader" and id "pageLoader". Every
+// page's init script should call this once it has real content to show.
+function hidePageLoader() {
+  const el = document.getElementById("pageLoader");
+  if (!el) return;
+  el.setAttribute("aria-hidden", "true");
+  el.classList.add("hidden");
+  setTimeout(() => el.remove(), 50);
+}
+// Belt-and-suspenders: if something throws before a page's init script
+// reaches hidePageLoader(), don't leave the user staring at this forever.
+setTimeout(hidePageLoader, 4000);
+
+// Renders `count` placeholder cards shaped like a real .order-item, styled
+// via CSS to shimmer — used for the very first fetch on a list so it never
+// pops from blank to content. Real renders overwrite this on the next poll.
+function skeletonList(count = 3) {
+  return Array.from({ length: count })
+    .map(
+      () => `
+    <div class="order-item skeleton" aria-hidden="true">
+      <div class="top-row">
+        <div><div class="store">Loading order</div><div class="hall">placeholder</div></div>
+        <span class="badge open">Open</span>
+      </div>
+      <div class="items">Placeholder item text so the card takes its real height</div>
+      <div class="meta">Placeholder</div>
+    </div>
+  `
+    )
+    .join("");
+}
+
 function renderNav(user) {
   const el = document.getElementById("nav");
   if (!el) return;
@@ -44,7 +79,9 @@ function renderNav(user) {
     <nav>
       <a class="navlink ${path === "/order.html" ? "active" : ""}" href="/order.html">Order Food</a>
       <a class="navlink ${path === "/deliver.html" ? "active" : ""}" href="/deliver.html">Deliver</a>
-      <span style="color:white; opacity:0.85; font-size:0.9rem; margin-left:6px;">Hi, ${escapeHtml(user.name.split(" ")[0])}</span>
+      <a class="navlink ${path === "/messages.html" ? "active" : ""}" href="/messages.html">Messages</a>
+      ${user.isAdmin ? `<a class="navlink ${path === "/admin.html" ? "active" : ""}" href="/admin.html">Reports</a>` : ""}
+      <span class="nav-user">Hi, ${escapeHtml(user.name.split(" ")[0])}</span>
       <button class="logout" id="logoutBtn">Log out</button>
     </nav>
   `;
@@ -95,32 +132,51 @@ function toast(message, type = "info") {
   el.className = `toast ${type}`;
   el.textContent = message;
   container.appendChild(el);
-  setTimeout(() => {
-    el.classList.add("leaving");
-    el.addEventListener("animationend", () => el.remove(), { once: true });
-  }, 3800);
+  setTimeout(() => el.remove(), 3800);
 }
 
 // ---------- in-order chat (orderer <-> runner, once claimed) ----------
 
 const openChatIds = new Set();
 
+// A conversation with admin is rare and important enough that it shouldn't
+// hide behind a collapsed toggle someone has to know to click — expand it
+// automatically the first time it's rendered. Tracked separately from
+// openChatIds so a deliberate manual collapse afterward is still respected
+// (this only forces it open once, not on every re-render).
+const autoOpenedThreads = new Set();
+function ensureThreadOpen(threadKey) {
+  if (autoOpenedThreads.has(threadKey)) return;
+  autoOpenedThreads.add(threadKey);
+  openChatIds.add(threadKey);
+}
+
 // otherName is the counterpart's display name — the runner's name on the
-// orderer's page, the orderer's name on the runner's page. No runner yet
-// means no one to message, so the block is omitted entirely.
-function chatSectionHtml(order, otherName) {
+// orderer's page, the orderer's name on the runner's page, or a specific
+// party's name for one of the admin's private investigation threads. No
+// otherName means no one to message, so the block is omitted entirely.
+//
+// An order can carry more than one distinct conversation (the orderer<->
+// runner thread, plus separate private admin<->orderer / admin<->runner
+// threads once reported) — threadKey tells them apart in the DOM and in
+// openChatIds; endpoint is where that thread's messages actually live.
+// Both default to the plain order-level thread so existing call sites don't
+// need to change.
+function chatSectionHtml(order, otherName, opts = {}) {
   if (!otherName) return "";
-  const isOpen = openChatIds.has(order.id);
+  const threadKey = opts.threadKey || `order-${order.id}`;
+  const endpoint = opts.endpoint || `/api/orders/${order.id}/messages`;
+  const isOpen = openChatIds.has(threadKey);
   return `
     <div class="chat-block">
-      <button type="button" class="chat-toggle" data-chat-id="${order.id}" data-other-name="${escapeHtml(otherName)}">
-        💬 ${isOpen ? "Hide messages" : `Message ${escapeHtml(otherName)}`}
+      <button type="button" class="chat-toggle" data-thread-key="${threadKey}" data-other-name="${escapeHtml(otherName)}">
+        ${isOpen ? "Hide messages" : `Message ${escapeHtml(otherName)}`}
       </button>
-      <div class="chat-thread-wrap ${isOpen ? "open" : ""}" id="chat-wrap-${order.id}">
+      <div class="chat-thread-wrap ${isOpen ? "open" : ""}" id="chat-wrap-${threadKey}">
         <div class="chat-thread-inner">
           <div class="chat-thread">
-            <div class="chat-messages" id="chat-messages-${order.id}"></div>
-            <form class="chat-form" data-order-id="${order.id}">
+            <div class="chat-messages" id="chat-messages-${threadKey}"></div>
+            <form class="chat-form" data-thread-key="${threadKey}" data-endpoint="${endpoint}">
               <input type="text" class="chat-input" placeholder="Type a message…" maxlength="1000" required />
               <button class="btn" type="submit">Send</button>
             </form>
@@ -134,36 +190,38 @@ function chatSectionHtml(order, otherName) {
 // Call after rendering any list containing chatSectionHtml() blocks — wires
 // up the toggle/send buttons and loads messages for threads already open.
 function wireChatBlocks(container, currentUserId) {
-  container.querySelectorAll("[data-chat-id]").forEach((btn) => {
-    const id = Number(btn.dataset.chatId);
+  container.querySelectorAll(".chat-toggle[data-thread-key]").forEach((btn) => {
+    const key = btn.dataset.threadKey;
+    const endpoint = container.querySelector(`form[data-thread-key="${key}"]`)?.dataset.endpoint;
     btn.onclick = () => {
-      const wrap = document.getElementById(`chat-wrap-${id}`);
-      if (openChatIds.has(id)) {
-        openChatIds.delete(id);
+      const wrap = document.getElementById(`chat-wrap-${key}`);
+      if (openChatIds.has(key)) {
+        openChatIds.delete(key);
         wrap.classList.remove("open");
-        btn.textContent = `💬 Message ${btn.dataset.otherName}`;
+        btn.textContent = `Message ${btn.dataset.otherName}`;
       } else {
-        openChatIds.add(id);
+        openChatIds.add(key);
         wrap.classList.add("open");
-        btn.textContent = "💬 Hide messages";
-        loadChatMessages(id, currentUserId);
+        btn.textContent = "Hide messages";
+        loadChatMessages(key, currentUserId, endpoint);
       }
     };
-    if (openChatIds.has(id)) loadChatMessages(id, currentUserId);
+    if (openChatIds.has(key)) loadChatMessages(key, currentUserId, endpoint);
   });
 
-  container.querySelectorAll("form[data-order-id]").forEach((form) => {
+  container.querySelectorAll("form[data-thread-key]").forEach((form) => {
+    const key = form.dataset.threadKey;
+    const endpoint = form.dataset.endpoint;
     form.onsubmit = async (e) => {
       e.preventDefault();
-      const id = Number(form.dataset.orderId);
       const input = form.querySelector("input");
       const text = input.value.trim();
       if (!text) return;
       input.disabled = true;
       try {
-        await api(`/api/orders/${id}/messages`, { method: "POST", body: { text } });
+        await api(endpoint, { method: "POST", body: { text } });
         input.value = "";
-        await loadChatMessages(id, currentUserId);
+        await loadChatMessages(key, currentUserId, endpoint);
       } catch (err) {
         toast(err.message, "error");
       } finally {
@@ -174,11 +232,45 @@ function wireChatBlocks(container, currentUserId) {
   });
 }
 
-async function loadChatMessages(orderId, currentUserId) {
-  const box = document.getElementById(`chat-messages-${orderId}`);
+// The order list's innerHTML gets rebuilt on every poll (same situation as
+// the Mapbox instances above), which would otherwise wipe out whatever
+// someone is mid-typing into an open chat reply — and their focus on it —
+// every few seconds. Call capture right before the rebuild and restore
+// right after re-wiring the new DOM; a message typed between two polls
+// survives instead of silently vanishing.
+function captureChatDrafts(container) {
+  const drafts = {};
+  container.querySelectorAll("form[data-thread-key] .chat-input").forEach((input) => {
+    const focused = document.activeElement === input;
+    if (!input.value && !focused) return;
+    drafts[input.closest("form").dataset.threadKey] = {
+      value: input.value,
+      focused,
+      selectionStart: input.selectionStart,
+      selectionEnd: input.selectionEnd
+    };
+  });
+  return drafts;
+}
+
+function restoreChatDrafts(container, drafts) {
+  Object.entries(drafts).forEach(([threadKey, draft]) => {
+    const input = container.querySelector(`form[data-thread-key="${threadKey}"] .chat-input`);
+    if (!input) return;
+    input.value = draft.value;
+    if (draft.focused) {
+      input.focus();
+      try { input.setSelectionRange(draft.selectionStart, draft.selectionEnd); } catch (e) {}
+    }
+  });
+}
+
+async function loadChatMessages(threadKey, currentUserId, endpoint) {
+  endpoint = endpoint || `/api/orders/${threadKey}/messages`;
+  const box = document.getElementById(`chat-messages-${threadKey}`);
   if (!box) return;
   try {
-    const { messages } = await api(`/api/orders/${orderId}/messages`);
+    const { messages } = await api(endpoint);
     box.innerHTML =
       messages
         .map(
