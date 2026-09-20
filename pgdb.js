@@ -74,6 +74,25 @@ async function init() {
   await pool.query(`alter table orders add column if not exists runner_lat double precision;`);
   await pool.query(`alter table orders add column if not exists runner_lng double precision;`);
   await pool.query(`alter table orders add column if not exists runner_location_at timestamptz;`);
+  await pool.query(`alter table orders add column if not exists order_number text not null default '';`);
+
+  await pool.query(`
+    create table if not exists message_reads (
+      user_id integer not null references users(id),
+      thread_key text not null,
+      last_read_at timestamptz not null,
+      primary key (user_id, thread_key)
+    );
+  `);
+  await pool.query(`
+    create table if not exists push_subscriptions (
+      endpoint text primary key,
+      user_id integer not null references users(id),
+      p256dh text not null,
+      auth text not null,
+      created_at timestamptz not null default now()
+    );
+  `);
 }
 
 function rowToUser(r) {
@@ -100,6 +119,7 @@ function rowToOrder(r) {
     hall: r.hall,
     dropoffDetails: r.dropoff_details,
     items: r.items,
+    orderNumber: r.order_number || "",
     tip: Number(r.tip),
     status: r.status,
     createdAt: r.created_at.getTime(),
@@ -200,11 +220,11 @@ async function deletePendingVerification(emailKey) {
   await pool.query("delete from pending_verifications where email = $1", [emailKey]);
 }
 
-async function createOrder({ ordererId, store, hall, dropoffDetails, items, tip, stripePaymentMethodId }) {
+async function createOrder({ ordererId, store, hall, dropoffDetails, items, orderNumber, tip, stripePaymentMethodId }) {
   const { rows } = await pool.query(
-    `insert into orders (orderer_id, store, hall, dropoff_details, items, tip, stripe_payment_method_id)
-     values ($1,$2,$3,$4,$5,$6,$7) returning id`,
-    [ordererId, store, hall, dropoffDetails || "", items, Number(tip) || 0, stripePaymentMethodId || null]
+    `insert into orders (orderer_id, store, hall, dropoff_details, items, order_number, tip, stripe_payment_method_id)
+     values ($1,$2,$3,$4,$5,$6,$7,$8) returning id`,
+    [ordererId, store, hall, dropoffDetails || "", items, orderNumber || "", Number(tip) || 0, stripePaymentMethodId || null]
   );
   return getOrderById(rows[0].id);
 }
@@ -399,6 +419,43 @@ async function createMessage({ orderId, senderId, text, threadUserId = null }) {
   return rowToMessage(full[0]);
 }
 
+// Drives the unread badge — one row per (user, thread) recording when that
+// user last actually opened it. No row yet means "never opened."
+async function getLastRead(userId, threadKey) {
+  const { rows } = await pool.query(
+    "select last_read_at from message_reads where user_id = $1 and thread_key = $2",
+    [userId, threadKey]
+  );
+  return rows[0] ? rows[0].last_read_at.getTime() : null;
+}
+
+async function markThreadRead(userId, threadKey) {
+  await pool.query(
+    `insert into message_reads (user_id, thread_key, last_read_at) values ($1,$2,now())
+     on conflict (user_id, thread_key) do update set last_read_at = now()`,
+    [userId, threadKey]
+  );
+}
+
+// A user can have several push subscriptions (one per browser/device) —
+// all of them get a push when they get a message.
+async function addPushSubscription(userId, subscription) {
+  await pool.query(
+    `insert into push_subscriptions (endpoint, user_id, p256dh, auth) values ($1,$2,$3,$4)
+     on conflict (endpoint) do update set user_id = excluded.user_id, p256dh = excluded.p256dh, auth = excluded.auth`,
+    [subscription.endpoint, userId, subscription.keys.p256dh, subscription.keys.auth]
+  );
+}
+
+async function removePushSubscription(endpoint) {
+  await pool.query("delete from push_subscriptions where endpoint = $1", [endpoint]);
+}
+
+async function getPushSubscriptionsForUser(userId) {
+  const { rows } = await pool.query("select * from push_subscriptions where user_id = $1", [userId]);
+  return rows.map((r) => ({ endpoint: r.endpoint, keys: { p256dh: r.p256dh, auth: r.auth } }));
+}
+
 module.exports = {
   backend: "postgres",
   init,
@@ -422,5 +479,10 @@ module.exports = {
   getActiveDeliveryOrders,
   countOrdersCreatedInRange,
   getAvgClaimTimeMinutes,
-  getPricingHistory
+  getPricingHistory,
+  getLastRead,
+  markThreadRead,
+  addPushSubscription,
+  removePushSubscription,
+  getPushSubscriptionsForUser
 };

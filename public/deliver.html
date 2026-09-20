@@ -321,6 +321,7 @@ function renderMine(o) {
         <span class="badge ${o.status}">${STATUS_LABEL[o.status]}</span>
       </div>
       <div class="items">${escapeHtml(o.items)}</div>
+      ${o.orderNumber ? `<div class="meta">Order #${escapeHtml(o.orderNumber)}</div>` : ""}
       ${arrivedNote}
       ${disputeNote}
       <div class="meta">For ${escapeHtml(o.ordererName)} · You earn: <span class="tip">$${Number(o.runnerEarnings).toFixed(2)}</span></div>

@@ -109,6 +109,9 @@
       <label for="storeVendor" id="storeVendorLabel" style="display:none;">Which Restaurant?</label>
       <select id="storeVendor" style="display:none;"></select>
 
+      <label for="orderNumber" id="orderNumberLabel">Order Number</label>
+      <input type="text" id="orderNumber" placeholder="Enter #" />
+
       <label for="hallSearch">Deliver to</label>
       <div class="combobox" id="hallCombobox">
         <input type="text" id="hallSearch" autocomplete="off" placeholder="Start typing a hall name (e.g. &quot;Kat&quot;)" />
@@ -364,6 +367,20 @@ function updateStoreVendorField() {
     vendorSel.required = false;
     vendorSel.innerHTML = "";
   }
+
+  // Late Night pickup has no per-order ticket number to track, so the
+  // field is irrelevant there — hide it and clear whatever was typed so a
+  // stale value can't accidentally get submitted.
+  const orderNumberLabel = document.getElementById("orderNumberLabel");
+  const orderNumberInput = document.getElementById("orderNumber");
+  if (store === "Late Night") {
+    orderNumberLabel.style.display = "none";
+    orderNumberInput.style.display = "none";
+    orderNumberInput.value = "";
+  } else {
+    orderNumberLabel.style.display = "block";
+    orderNumberInput.style.display = "block";
+  }
 }
 
 function storeValue() {
@@ -487,12 +504,14 @@ document.getElementById("pricingForm").onsubmit = async (e) => {
         hall: document.getElementById("hall").value,
         dropoffDetails: document.getElementById("dropoffDetails").value,
         items: document.getElementById("items").value,
+        orderNumber: document.getElementById("orderNumber").value,
         tip: document.getElementById("finalTip").value,
         stripePaymentMethodId
       }
     });
     document.getElementById("items").value = "";
     document.getElementById("dropoffDetails").value = "";
+    document.getElementById("orderNumber").value = "";
     if (cardElement) cardElement.clear();
     closePricingModal();
     switchTab("mine");
@@ -669,6 +688,7 @@ function renderOrder(o) {
         <span class="badge ${o.status}">${STATUS_LABEL[o.status]}</span>
       </div>
       <div class="items">${escapeHtml(o.items)}</div>
+      ${o.orderNumber ? `<div class="meta">Order #${escapeHtml(o.orderNumber)}</div>` : ""}
       ${banner}
       <div class="meta">Posted ${timeAgo(o.createdAt)} · Delivery fee: <span class="tip">$${Number(o.tip).toFixed(2)}</span> · ${o.paymentStatus === "paid" ? "Paid" : o.paymentStatus === "refunded" ? "Refunded" : "Not charged yet"}</div>
       ${runnerLine}

@@ -14,6 +14,8 @@ function load() {
       orders: [],
       messages: [],
       pendingVerifications: {},
+      messageReads: [],
+      pushSubscriptions: [],
       nextUserId: 1,
       nextOrderId: 1,
       nextMessageId: 1
@@ -23,6 +25,8 @@ function load() {
   if (!data.pendingVerifications) data.pendingVerifications = {};
   if (!data.messages) data.messages = [];
   if (!data.nextMessageId) data.nextMessageId = 1;
+  if (!data.messageReads) data.messageReads = [];
+  if (!data.pushSubscriptions) data.pushSubscriptions = [];
   return data;
 }
 
@@ -91,7 +95,7 @@ async function deletePendingVerification(emailKey) {
   save();
 }
 
-async function createOrder({ ordererId, store, hall, dropoffDetails, items, tip, stripePaymentMethodId }) {
+async function createOrder({ ordererId, store, hall, dropoffDetails, items, orderNumber, tip, stripePaymentMethodId }) {
   const order = {
     id: db.nextOrderId++,
     ordererId,
@@ -100,6 +104,7 @@ async function createOrder({ ordererId, store, hall, dropoffDetails, items, tip,
     hall,
     dropoffDetails: dropoffDetails || "",
     items,
+    orderNumber: orderNumber || "",
     tip: Number(tip) || 0,
     status: "open",
     createdAt: Date.now(),
@@ -249,6 +254,37 @@ async function createMessage({ orderId, senderId, text, threadUserId = null }) {
   return withMessageSender(message);
 }
 
+// Drives the unread badge — one row per (user, thread) recording when that
+// user last actually opened it. No row yet means "never opened."
+async function getLastRead(userId, threadKey) {
+  const row = db.messageReads.find((r) => r.userId === userId && r.threadKey === threadKey);
+  return row ? row.lastReadAt : null;
+}
+
+async function markThreadRead(userId, threadKey) {
+  const row = db.messageReads.find((r) => r.userId === userId && r.threadKey === threadKey);
+  if (row) row.lastReadAt = Date.now();
+  else db.messageReads.push({ userId, threadKey, lastReadAt: Date.now() });
+  save();
+}
+
+// A user can have several push subscriptions (one per browser/device) —
+// all of them get a push when they get a message.
+async function addPushSubscription(userId, subscription) {
+  db.pushSubscriptions = db.pushSubscriptions.filter((s) => s.endpoint !== subscription.endpoint);
+  db.pushSubscriptions.push({ userId, ...subscription, createdAt: Date.now() });
+  save();
+}
+
+async function removePushSubscription(endpoint) {
+  db.pushSubscriptions = db.pushSubscriptions.filter((s) => s.endpoint !== endpoint);
+  save();
+}
+
+async function getPushSubscriptionsForUser(userId) {
+  return db.pushSubscriptions.filter((s) => s.userId === userId);
+}
+
 module.exports = {
   backend: "json-file",
   init,
@@ -272,5 +308,10 @@ module.exports = {
   getActiveDeliveryOrders,
   countOrdersCreatedInRange,
   getAvgClaimTimeMinutes,
-  getPricingHistory
+  getPricingHistory,
+  getLastRead,
+  markThreadRead,
+  addPushSubscription,
+  removePushSubscription,
+  getPushSubscriptionsForUser
 };

@@ -28,6 +28,7 @@ async function requireAuthOrRedirect() {
     return null;
   }
   renderNav(user);
+  startUnreadBadgePolling();
   return user;
 }
 
@@ -88,7 +89,7 @@ function renderNav(user) {
     <nav>
       <a class="navlink ${path === "/order.html" ? "active" : ""}" href="/order.html">Order Food</a>
       <a class="navlink ${path === "/deliver.html" ? "active" : ""}" href="/deliver.html">Deliver</a>
-      <a class="navlink ${path === "/messages.html" ? "active" : ""}" href="/messages.html">Messages</a>
+      <a class="navlink ${path === "/messages.html" ? "active" : ""}" href="/messages.html">Messages<span class="unread-badge" id="messagesUnreadBadge" style="display:none;"></span></a>
       ${user.isAdmin ? `<a class="navlink ${path === "/admin.html" ? "active" : ""}" href="/admin.html">Reports</a>` : ""}
     </nav>
   `;
@@ -96,6 +97,99 @@ function renderNav(user) {
     await api("/api/logout", { method: "POST" });
     window.location.href = "/";
   };
+}
+
+// ---------- unread badge ----------
+// One poller per page (guarded so a page that calls requireAuthOrRedirect
+// more than once doesn't stack intervals), refreshing at the same 4s cadence
+// everything else in the app already polls at.
+let unreadPollStarted = false;
+function startUnreadBadgePolling() {
+  if (unreadPollStarted) return;
+  unreadPollStarted = true;
+  refreshUnreadBadge();
+  setInterval(refreshUnreadBadge, 4000);
+}
+
+async function refreshUnreadBadge() {
+  const badge = document.getElementById("messagesUnreadBadge");
+  if (!badge) return;
+  try {
+    const { unreadCount } = await api("/api/messages/threads");
+    if (unreadCount > 0) {
+      badge.textContent = unreadCount > 9 ? "9+" : String(unreadCount);
+      badge.style.display = "flex";
+    } else {
+      badge.style.display = "none";
+    }
+  } catch (err) {
+    // Non-critical — just leave the last known badge state showing.
+  }
+}
+
+// Called once a thread's messages have actually been loaded (i.e. the user
+// is looking at them) — clears that thread's unread state, then refreshes
+// the badge right away instead of waiting up to 4s for the next poll.
+async function markThreadRead(threadKey) {
+  try {
+    await api(`/api/messages/threads/${encodeURIComponent(threadKey)}/read`, { method: "POST" });
+    refreshUnreadBadge();
+  } catch (err) {
+    // Non-critical.
+  }
+}
+
+// ---------- push notifications ----------
+// Subscribes this browser to Web Push and sends the subscription to the
+// server. Safe to call repeatedly — re-subscribing just refreshes the same
+// endpoint. Returns true/false so callers (the Settings toggle) can show
+// whether it actually worked.
+async function enablePushNotifications() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+    throw new Error("Push notifications aren't supported in this browser.");
+  }
+  const { enabled, publicKey } = await api("/api/push/config");
+  if (!enabled) {
+    throw new Error("Push notifications aren't configured on this server yet.");
+  }
+  const permission = await Notification.requestPermission();
+  if (permission !== "granted") {
+    throw new Error("Notification permission was denied.");
+  }
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(publicKey)
+  });
+  await api("/api/push/subscribe", { method: "POST", body: subscription.toJSON() });
+  return true;
+}
+
+async function disablePushNotifications() {
+  if (!("serviceWorker" in navigator)) return;
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.getSubscription();
+  if (subscription) {
+    await api("/api/push/unsubscribe", { method: "POST", body: { endpoint: subscription.endpoint } });
+    await subscription.unsubscribe();
+  }
+}
+
+async function getPushSubscriptionStatus() {
+  if (!("serviceWorker" in navigator) || !("PushManager" in window)) return "unsupported";
+  if (Notification.permission === "denied") return "denied";
+  const registration = await navigator.serviceWorker.ready;
+  const subscription = await registration.pushManager.getSubscription();
+  return subscription ? "subscribed" : "unsubscribed";
+}
+
+// PushManager wants the VAPID key as a raw Uint8Array, not the base64url
+// string the server hands back.
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
 }
 
 function escapeHtml(str) {
@@ -290,6 +384,7 @@ async function loadChatMessages(threadKey, currentUserId, endpoint) {
         )
         .join("") || `<div class="chat-empty">No messages yet — say hi!</div>`;
     box.scrollTop = box.scrollHeight;
+    markThreadRead(threadKey);
   } catch (err) {
     // transient poll failure — leave the box as-is, next poll will retry
   }

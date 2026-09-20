@@ -2,7 +2,7 @@
 // shell available offline. Deliberately never caches /api/* — this app
 // leans on live polling for order/runner state, so a cached API response
 // would be actively misleading, not just stale.
-const CACHE_NAME = "novadash-v1";
+const CACHE_NAME = "novadash-v2";
 const APP_SHELL = [
   "/",
   "/index.html",
@@ -47,5 +47,38 @@ self.addEventListener("fetch", (event) => {
         return response;
       })
       .catch(() => caches.match(event.request))
+  );
+});
+
+// Shows the actual OS-level notification a push payload asks for — this is
+// what fires even when the app's closed or the phone's locked. The server
+// sends {title, body, url} as JSON (see sendPushToUser in server.js).
+self.addEventListener("push", (event) => {
+  let data = { title: "NovaDash", body: "You have a new message.", url: "/messages.html" };
+  if (event.data) {
+    try { data = { ...data, ...event.data.json() }; } catch (e) {}
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      data: { url: data.url }
+    })
+  );
+});
+
+// Focuses an already-open tab on that URL if one exists, otherwise opens a
+// new one — the standard "click a notification" behavior.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = event.notification.data?.url || "/messages.html";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (new URL(client.url).pathname === url && "focus" in client) return client.focus();
+      }
+      if (self.clients.openWindow) return self.clients.openWindow(url);
+    })
   );
 });

@@ -11,6 +11,19 @@ const payments = require("./payments");
 const aiPricing = require("./aiPricing");
 const weather = require("./weather");
 const locations = require("./locations");
+const webpush = require("web-push");
+
+// Push notifications are fully optional — with no VAPID keys set, the
+// in-app unread badge still works fine, sendPushToUser() below just quietly
+// no-ops instead of throwing.
+const pushEnabled = Boolean(process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY);
+if (pushEnabled) {
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || "mailto:admin@example.com",
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+}
 
 const VERIFICATION_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const RESEND_COOLDOWN_MS = 30 * 1000;
@@ -77,6 +90,15 @@ async function isUserAdmin(userId) {
   return Boolean(user) && user.email.toLowerCase() === adminEmail;
 }
 
+// For pushing a notification to "the admin" — there's exactly one, the
+// account matching ADMIN_EMAIL, if that account exists yet.
+async function getAdminUserId() {
+  const adminEmail = process.env.ADMIN_EMAIL;
+  if (!adminEmail) return null;
+  const user = await db.getUserByEmail(adminEmail);
+  return user ? user.id : null;
+}
+
 async function requireAdmin(req, res, next) {
   if (!req.session.userId) return res.status(401).json({ error: "Not logged in" });
   if (!process.env.ADMIN_EMAIL) return res.status(403).json({ error: "Admin tools aren't configured on this server." });
@@ -101,6 +123,7 @@ function publicOrder(o, { forRunner = false } = {}) {
     hall: o.hall,
     dropoffDetails: o.dropoffDetails,
     items: o.items,
+    orderNumber: o.orderNumber || "",
     ...(forRunner ? { runnerEarnings: Math.round(o.tip * (1 - payments.PLATFORM_CUT) * 100) / 100 } : { tip: o.tip }),
     status: o.status,
     createdAt: o.createdAt,
@@ -123,6 +146,27 @@ function publicOrder(o, { forRunner = false } = {}) {
 
 function isParticipant(order, userId) {
   return order.ordererId === userId || order.runnerId === userId;
+}
+
+// Pushes to every device that user has subscribed on. A dead subscription
+// (410 Gone — the user uninstalled, cleared data, etc.) gets cleaned up
+// automatically instead of failing loudly on every future message.
+async function sendPushToUser(userId, payload) {
+  if (!pushEnabled || !userId) return;
+  const subs = await db.getPushSubscriptionsForUser(userId);
+  await Promise.all(
+    subs.map(async (sub) => {
+      try {
+        await webpush.sendNotification(sub, JSON.stringify(payload));
+      } catch (err) {
+        if (err.statusCode === 404 || err.statusCode === 410) {
+          await db.removePushSubscription(sub.endpoint);
+        } else {
+          console.error("push send failed:", err.message);
+        }
+      }
+    })
+  );
 }
 
 function publicMessage(m, viewerId) {
@@ -300,6 +344,29 @@ app.get("/api/mapbox/config", (req, res) => {
   res.json({ enabled: Boolean(token), token });
 });
 
+app.get("/api/push/config", (req, res) => {
+  res.json({ enabled: pushEnabled, publicKey: pushEnabled ? process.env.VAPID_PUBLIC_KEY : "" });
+});
+
+// subscription is the PushSubscription object the browser's PushManager
+// hands back (endpoint + keys.p256dh/keys.auth) — stored as-is, one row
+// per device, so someone with the app open on two phones gets pushes on
+// both.
+app.post("/api/push/subscribe", requireAuth, async (req, res) => {
+  const subscription = req.body || {};
+  if (!subscription.endpoint || !subscription.keys) {
+    return res.status(400).json({ error: "Invalid push subscription." });
+  }
+  await db.addPushSubscription(req.session.userId, subscription);
+  res.json({ ok: true });
+});
+
+app.post("/api/push/unsubscribe", requireAuth, async (req, res) => {
+  const { endpoint } = req.body || {};
+  if (endpoint) await db.removePushSubscription(endpoint);
+  res.json({ ok: true });
+});
+
 // Distinct runners currently out on a delivery, who finished one within the
 // last 2 minutes, or who've been browsing "Available deliveries" for at
 // least 5 seconds — powers the live "Active Runners" counter and the
@@ -449,7 +516,7 @@ app.post("/api/pricing/recommend", requireAuth, async (req, res) => {
 // via /api/orders/setup-intent — the resulting payment method is what gets
 // charged once someone claims it.
 app.post("/api/orders", requireAuth, async (req, res) => {
-  const { store: storeName, hall, dropoffDetails, items, tip, stripePaymentMethodId } = req.body || {};
+  const { store: storeName, hall, dropoffDetails, items, orderNumber, tip, stripePaymentMethodId } = req.body || {};
   if (!storeName || !hall || !items) {
     return res.status(400).json({ error: "Store, hall, and items are required." });
   }
@@ -469,6 +536,9 @@ app.post("/api/orders", requireAuth, async (req, res) => {
     hall,
     dropoffDetails: dropoffDetails || "",
     items,
+    // Late Night has no per-order ticket number to track — ignore
+    // whatever's sent rather than trusting the client to have hidden it.
+    orderNumber: storeName === "Late Night" ? "" : (orderNumber || ""),
     tip: feeAmount,
     stripePaymentMethodId: stripePaymentMethodId || null
   });
@@ -683,6 +753,15 @@ function roleFor(order, userId) {
 // Every conversation the current user is part of — across all their orders,
 // newest activity first. Powers the Messages inbox page, so people don't
 // have to hunt through each order card to find a chat thread.
+// unread = there's a message from someone else, newer than the last time
+// this user actually opened this specific thread (or they've never opened
+// it at all).
+async function isUnread(userId, threadKey, last) {
+  if (!last || last.senderId === userId) return false;
+  const lastReadAt = await db.getLastRead(userId, threadKey);
+  return !lastReadAt || last.createdAt > lastReadAt;
+}
+
 app.get("/api/messages/threads", requireAuth, async (req, res) => {
   const userId = req.session.userId;
   const admin = await isUserAdmin(userId);
@@ -702,8 +781,9 @@ app.get("/api/messages/threads", requireAuth, async (req, res) => {
     const messages = await db.getMessagesByOrder(o.id, null);
     const last = messages[messages.length - 1] || null;
     const role = roleFor(o, userId);
+    const threadKey = `order-${o.id}`;
     threads.push({
-      threadKey: `order-${o.id}`,
+      threadKey,
       endpoint: `/api/orders/${o.id}/messages`,
       orderId: o.id,
       store: o.store,
@@ -712,14 +792,16 @@ app.get("/api/messages/threads", requireAuth, async (req, res) => {
       otherName: role === "orderer" ? o.runnerName : o.ordererName,
       lastMessage: last ? last.text : null,
       lastMessageAt: last ? last.createdAt : null,
-      lastMessageMine: last ? last.senderId === userId : false
+      lastMessageMine: last ? last.senderId === userId : false,
+      unread: await isUnread(userId, threadKey, last)
     });
 
     if (!admin && o.disputedAt) {
       const adminMessages = await db.getMessagesByOrder(o.id, userId);
       const adminLast = adminMessages[adminMessages.length - 1] || null;
+      const adminThreadKey = `admin-${o.id}`;
       threads.push({
-        threadKey: `admin-${o.id}`,
+        threadKey: adminThreadKey,
         endpoint: `/api/orders/${o.id}/admin-messages`,
         orderId: o.id,
         store: o.store,
@@ -728,7 +810,8 @@ app.get("/api/messages/threads", requireAuth, async (req, res) => {
         otherName: "NovaDash Admin",
         lastMessage: adminLast ? adminLast.text : null,
         lastMessageAt: adminLast ? adminLast.createdAt : null,
-        lastMessageMine: adminLast ? adminLast.senderId === userId : false
+        lastMessageMine: adminLast ? adminLast.senderId === userId : false,
+        unread: await isUnread(userId, adminThreadKey, adminLast)
       });
     }
   }
@@ -740,8 +823,9 @@ app.get("/api/messages/threads", requireAuth, async (req, res) => {
         const partyName = role === "orderer" ? o.ordererName : o.runnerName;
         const messages = await db.getMessagesByOrder(o.id, partyId);
         const last = messages[messages.length - 1] || null;
+        const threadKey = `admin-${o.id}-${role}`;
         threads.push({
-          threadKey: `admin-${o.id}-${role}`,
+          threadKey,
           endpoint: `/api/admin/orders/${o.id}/messages/${role}`,
           orderId: o.id,
           store: o.store,
@@ -750,14 +834,20 @@ app.get("/api/messages/threads", requireAuth, async (req, res) => {
           otherName: partyName,
           lastMessage: last ? last.text : null,
           lastMessageAt: last ? last.createdAt : null,
-          lastMessageMine: last ? last.senderId === userId : false
+          lastMessageMine: last ? last.senderId === userId : false,
+          unread: await isUnread(userId, threadKey, last)
         });
       }
     }
   }
 
   threads.sort((a, b) => (b.lastMessageAt || 0) - (a.lastMessageAt || 0));
-  res.json({ threads });
+  res.json({ threads, unreadCount: threads.filter((t) => t.unread).length });
+});
+
+app.post("/api/messages/threads/:threadKey/read", requireAuth, async (req, res) => {
+  await db.markThreadRead(req.session.userId, req.params.threadKey);
+  res.json({ ok: true });
 });
 
 // ---- 1. orderer <-> runner (the normal thread) ----
@@ -783,6 +873,12 @@ app.post("/api/orders/:id/messages", requireAuth, async (req, res) => {
   if (text.length > 1000) return res.status(400).json({ error: "Message is too long." });
 
   const message = await db.createMessage({ orderId: order.id, senderId: req.session.userId, text });
+  const recipientId = order.ordererId === req.session.userId ? order.runnerId : order.ordererId;
+  sendPushToUser(recipientId, {
+    title: `New message from ${message.senderName}`,
+    body: text,
+    url: "/messages.html"
+  }).catch(() => {});
   res.json({ message: publicMessage(message, req.session.userId) });
 });
 
@@ -811,6 +907,12 @@ app.post("/api/orders/:id/admin-messages", requireAuth, async (req, res) => {
   if (text.length > 1000) return res.status(400).json({ error: "Message is too long." });
 
   const message = await db.createMessage({ orderId: order.id, senderId: req.session.userId, text, threadUserId: req.session.userId });
+  const adminId = await getAdminUserId();
+  sendPushToUser(adminId, {
+    title: `New message from ${message.senderName}`,
+    body: text,
+    url: "/messages.html"
+  }).catch(() => {});
   res.json({ message: publicMessage(message, req.session.userId) });
 });
 
@@ -837,6 +939,11 @@ app.post("/api/admin/orders/:id/messages/:role", requireAdmin, async (req, res) 
   if (text.length > 1000) return res.status(400).json({ error: "Message is too long." });
 
   const message = await db.createMessage({ orderId: order.id, senderId: req.session.userId, text, threadUserId: partyId });
+  sendPushToUser(partyId, {
+    title: `New message from ${message.senderName}`,
+    body: text,
+    url: "/messages.html"
+  }).catch(() => {});
   res.json({ message: publicMessage(message, req.session.userId) });
 });
 

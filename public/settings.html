@@ -36,6 +36,13 @@
     <label for="settingsPhone">Phone</label>
     <input type="text" id="settingsPhone" disabled />
   </div>
+
+  <div class="card">
+    <label style="margin-top:0;">Notifications</label>
+    <p class="subtitle" style="margin-bottom:14px;">Get a real notification — even with the app closed — when someone messages you.</p>
+    <div id="pushErrorBox"></div>
+    <button class="btn" id="pushToggleBtn" type="button">Loading…</button>
+  </div>
 </main>
 
 <script src="/app.js"></script>
@@ -46,8 +53,47 @@
   document.getElementById("settingsName").value = user.name;
   document.getElementById("settingsEmail").value = user.email;
   document.getElementById("settingsPhone").value = user.phone;
+  await refreshPushButton();
   hidePageLoader();
 })();
+
+const pushBtn = document.getElementById("pushToggleBtn");
+const pushErrorBox = document.getElementById("pushErrorBox");
+
+async function refreshPushButton() {
+  const status = await getPushSubscriptionStatus();
+  if (status === "unsupported") {
+    pushBtn.textContent = "Not supported on this browser";
+    pushBtn.disabled = true;
+  } else if (status === "denied") {
+    pushBtn.textContent = "Blocked — enable in browser settings";
+    pushBtn.disabled = true;
+  } else if (status === "subscribed") {
+    pushBtn.textContent = "Turn off notifications";
+    pushBtn.disabled = false;
+    pushBtn.dataset.state = "subscribed";
+  } else {
+    pushBtn.textContent = "Enable notifications";
+    pushBtn.disabled = false;
+    pushBtn.dataset.state = "unsubscribed";
+  }
+}
+
+pushBtn.onclick = async () => {
+  pushErrorBox.innerHTML = "";
+  pushBtn.disabled = true;
+  try {
+    if (pushBtn.dataset.state === "subscribed") {
+      await disablePushNotifications();
+    } else {
+      await enablePushNotifications();
+    }
+  } catch (err) {
+    pushErrorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+  } finally {
+    await refreshPushButton();
+  }
+};
 </script>
 </body>
 </html>
