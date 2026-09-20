@@ -169,6 +169,50 @@ async function getActiveDeliveryOrders() {
   );
 }
 
+// Powers the pricing engine's real-time demand signal — counts orders
+// created in [fromMs, toMs), e.g. "the past hour" or "this same hour a
+// week ago".
+async function countOrdersCreatedInRange(fromMs, toMs) {
+  return db.orders.filter((o) => o.createdAt >= fromMs && o.createdAt < toMs).length;
+}
+
+// Average minutes-to-claim for orders claimed within [fromMs, toMs) —
+// how fast runners are actually picking up work right now.
+async function getAvgClaimTimeMinutes(fromMs, toMs) {
+  const claimed = db.orders.filter((o) => o.claimedAt && o.claimedAt >= fromMs && o.claimedAt < toMs);
+  if (claimed.length === 0) return null;
+  const totalMinutes = claimed.reduce((sum, o) => sum + (o.claimedAt - o.createdAt) / 60000, 0);
+  return totalMinutes / claimed.length;
+}
+
+// Buckets recent orders by delivery fee (nearest $0.50) to approximate the
+// spec's historicalData.pricing_by_point — real claim-rate-by-price signal
+// drawn from actual order history, not fabricated numbers. Buckets with too
+// few orders to be meaningful are left out.
+async function getPricingHistory(sinceMs, minSampleSize = 3) {
+  const recent = db.orders.filter((o) => o.createdAt >= sinceMs);
+  const buckets = new Map();
+  for (const o of recent) {
+    const key = (Math.round(o.tip * 2) / 2).toFixed(2);
+    if (!buckets.has(key)) buckets.set(key, { total: 0, claimed: 0, claimMinutesSum: 0 });
+    const bucket = buckets.get(key);
+    bucket.total++;
+    if (o.claimedAt) {
+      bucket.claimed++;
+      bucket.claimMinutesSum += (o.claimedAt - o.createdAt) / 60000;
+    }
+  }
+  const result = {};
+  for (const [price, bucket] of buckets) {
+    if (bucket.total < minSampleSize) continue;
+    result[price] = {
+      claim_rate: Math.round((bucket.claimed / bucket.total) * 100) / 100,
+      avg_claim_time_minutes: bucket.claimed > 0 ? Math.round((bucket.claimMinutesSum / bucket.claimed) * 10) / 10 : null
+    };
+  }
+  return result;
+}
+
 async function getDisputedOrders() {
   return db.orders
     .filter((o) => o.disputedAt)
@@ -225,5 +269,8 @@ module.exports = {
   createMessage,
   updateUser,
   getDisputedOrders,
-  getActiveDeliveryOrders
+  getActiveDeliveryOrders,
+  countOrdersCreatedInRange,
+  getAvgClaimTimeMinutes,
+  getPricingHistory
 };

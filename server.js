@@ -8,6 +8,9 @@ const db = require("./db");
 const mailer = require("./mailer");
 const notifications = require("./notifications");
 const payments = require("./payments");
+const aiPricing = require("./aiPricing");
+const weather = require("./weather");
+const locations = require("./locations");
 
 const VERIFICATION_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const RESEND_COOLDOWN_MS = 30 * 1000;
@@ -272,8 +275,20 @@ app.get("/api/me", async (req, res) => {
   res.json({ user: publicUser(user) });
 });
 
+// "Late Night" is a pickup spot that only exists 9 PM – midnight, Eastern,
+// every day — computed off the server clock (not the client's) so it's
+// consistent no matter where someone's browser thinks it is.
+function isLateNightWindowActive(date = new Date()) {
+  const etHour = Number(
+    new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", hour12: false }).format(date)
+  );
+  return etHour >= 21 && etHour <= 23;
+}
+
 app.get("/api/config", (req, res) => {
-  res.json(config);
+  const stores = [...config.stores];
+  if (isLateNightWindowActive()) stores.push("Late Night");
+  res.json({ ...config, stores });
 });
 
 app.get("/api/stripe/config", (req, res) => {
@@ -287,12 +302,17 @@ app.get("/api/mapbox/config", (req, res) => {
 
 // Distinct runners currently out on a delivery, who finished one within the
 // last 2 minutes, or who've been browsing "Available deliveries" for at
-// least 5 seconds — powers the live "Active Runners" counter.
-app.get("/api/stats/active-deliverers", requireAuth, async (req, res) => {
+// least 5 seconds — powers the live "Active Runners" counter and the
+// pricing engine's runner-supply signal.
+async function countRunnersOnlineNow() {
   const orders = await db.getActiveDeliveryOrders();
   const runnerIds = new Set(orders.filter((o) => o.runnerId != null).map((o) => o.runnerId));
   getPresentRunnerIds().forEach((id) => runnerIds.add(id));
-  res.json({ count: runnerIds.size });
+  return runnerIds.size;
+}
+
+app.get("/api/stats/active-deliverers", requireAuth, async (req, res) => {
+  res.json({ count: await countRunnersOnlineNow() });
 });
 
 app.post("/api/runner-presence/heartbeat", requireAuth, (req, res) => {
@@ -324,6 +344,107 @@ app.post("/api/orders/setup-intent", requireAuth, async (req, res) => {
   }
 });
 
+const HOUR_MS = 60 * 60 * 1000;
+const WEEK_MS = 7 * 24 * HOUR_MS;
+
+// Rough item-count estimate from the free-text "what did you order?" field,
+// used only as a fallback when the caller doesn't supply total_items/
+// order_complexity directly.
+function estimateItemCount(itemsText) {
+  if (!itemsText) return 3; // "standard" default — no order details to go on
+  const segments = String(itemsText)
+    .split(/[,\n]/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return segments.length || 1;
+}
+
+// Assembles a pricing.recommendPrice() input from real signals we track
+// today (order volume, open-order backlog, claim speed, runners online,
+// live weather, and actual claim-rate-by-price history) plus the
+// order-specific details the caller provides.
+//
+// Known gap: runner presence isn't logged historically (only live, in
+// runnerPresence above), so runners_online_avg_this_hour/last_week fall
+// back to the current count — i.e. supply reads as NORMAL until a presence
+// history table gets added.
+async function buildPricingInput({ travel, total_items, order_complexity, prep_time_estimate, items, store, hall }) {
+  const now = Date.now();
+  const [ordersPastHour, ordersSameHourLastWeek, openOrders, avgClaimMinutes, runnersOnlineNow, currentWeather, pricingHistory] =
+    await Promise.all([
+      db.countOrdersCreatedInRange(now - HOUR_MS, now),
+      db.countOrdersCreatedInRange(now - WEEK_MS - HOUR_MS, now - WEEK_MS),
+      db.getOpenOrders(),
+      db.getAvgClaimTimeMinutes(now - HOUR_MS, now),
+      countRunnersOnlineNow(),
+      weather.getCurrentWeather(),
+      db.getPricingHistory(now - 30 * 24 * HOUR_MS)
+    ]);
+
+  return {
+    orderData: {
+      orders_past_hour: ordersPastHour,
+      orders_past_hour_same_day_last_week: ordersSameHourLastWeek,
+      current_unclaimed_orders: openOrders.length,
+      avg_claim_time_past_hour_minutes: avgClaimMinutes
+    },
+    runnerData: {
+      runners_online_now: runnersOnlineNow,
+      runners_online_avg_this_hour: runnersOnlineNow,
+      runners_online_avg_same_time_last_week: runnersOnlineNow
+    },
+    weatherData: currentWeather,
+    orderDetails: {
+      source_location: store || "",
+      destination_location: hall || "",
+      ...travel,
+      total_items: total_items ?? estimateItemCount(items),
+      order_complexity: order_complexity || undefined,
+      prep_time_estimate: prep_time_estimate ?? 5,
+      is_late_night: isLateNightWindowActive()
+    },
+    historicalData: { pricing_by_point: pricingHistory }
+  };
+}
+
+// Suggests a dynamic delivery price for an order before it's posted. `store`
+// must be the plain store name (no vendor prefix — e.g. "COVA", not "The
+// Italian Kitchen (COVA)") and `hall` an exact entry from /api/config's
+// halls list; travel between them (distance, or the Cabrini shuttle
+// crossing) is resolved server-side. Everything else (demand, supply,
+// weather, historical claim rates) is pulled from real, current data.
+// The actual price comes from aiPricing.js — a real Claude call reasoning
+// within pricing.js's fixed rules when ANTHROPIC_API_KEY is set, otherwise
+// the deterministic formula alone (see `ai_used` in the response).
+app.post("/api/pricing/recommend", requireAuth, async (req, res) => {
+  const { store, hall, items, total_items, order_complexity, prep_time_estimate } = req.body || {};
+  if (!store || !hall) {
+    return res.status(400).json({ error: "store and hall are required." });
+  }
+  const travel = locations.resolveTravel(store, hall);
+  if (!travel) {
+    return res.status(400).json({ error: "Couldn't figure out the distance for that store/hall combination." });
+  }
+  if (order_complexity && !["simple", "standard", "complex"].includes(order_complexity)) {
+    return res.status(400).json({ error: "order_complexity must be simple, standard, or complex." });
+  }
+
+  try {
+    const input = await buildPricingInput({
+      travel,
+      total_items: total_items != null ? Number(total_items) : undefined,
+      order_complexity,
+      prep_time_estimate: prep_time_estimate != null ? Number(prep_time_estimate) : undefined,
+      items,
+      store,
+      hall
+    });
+    res.json(await aiPricing.recommendPriceWithAI(input));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Create a new order (place a food request). Requires a card already saved
 // via /api/orders/setup-intent — the resulting payment method is what gets
 // charged once someone claims it.
@@ -331,6 +452,9 @@ app.post("/api/orders", requireAuth, async (req, res) => {
   const { store: storeName, hall, dropoffDetails, items, tip, stripePaymentMethodId } = req.body || {};
   if (!storeName || !hall || !items) {
     return res.status(400).json({ error: "Store, hall, and items are required." });
+  }
+  if (storeName === "Late Night" && !isLateNightWindowActive()) {
+    return res.status(400).json({ error: "Late Night pickup is only available 9 PM–midnight ET." });
   }
   const feeAmount = Number(tip);
   if (!feeAmount || feeAmount < payments.MIN_FEE_DOLLARS) {
@@ -463,7 +587,7 @@ app.post("/api/orders/:id/claim", requireAuth, async (req, res) => {
   if (orderer) {
     notifications.sendSms(
       orderer.phone,
-      `WildcatEats: ${runner.name} claimed your order from ${order.store} and is heading over to grab it!`
+      `NovaDash: ${runner.name} claimed your order from ${order.store} and is heading over to grab it!`
     );
   }
 
@@ -511,10 +635,10 @@ app.post("/api/orders/:id/arrived", requireAuth, async (req, res) => {
 
   const orderer = await db.getUserById(order.ordererId);
   if (orderer) {
-    notifications.sendSms(orderer.phone, `WildcatEats: Your runner is here with your order from ${order.store}!`);
+    notifications.sendSms(orderer.phone, `NovaDash: Your runner is here with your order from ${order.store}!`);
     notifications.makeCall(
       orderer.phone,
-      `Hi, this is Wildcat Eats. Your delivery from ${order.store} has arrived. Go grab your food!`
+      `Hi, this is NovaDash. Your delivery from ${order.store} has arrived. Go grab your food!`
     );
   }
 
@@ -601,7 +725,7 @@ app.get("/api/messages/threads", requireAuth, async (req, res) => {
         store: o.store,
         hall: o.hall,
         status: o.status,
-        otherName: "WildcatEats Admin",
+        otherName: "NovaDash Admin",
         lastMessage: adminLast ? adminLast.text : null,
         lastMessageAt: adminLast ? adminLast.createdAt : null,
         lastMessageMine: adminLast ? adminLast.senderId === userId : false
@@ -833,7 +957,7 @@ app.use((err, req, res, next) => {
 db.init()
   .then(() => {
     app.listen(PORT, () => {
-      console.log(`WildcatEats running at http://localhost:${PORT} (storage: ${db.backend})`);
+      console.log(`NovaDash running at http://localhost:${PORT} (storage: ${db.backend})`);
     });
   })
   .catch((err) => {

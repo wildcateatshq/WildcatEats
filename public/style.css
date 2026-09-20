@@ -74,6 +74,14 @@ header.nav .brand {
   gap: 8px;
 }
 
+/* The wordmark leans forward like it's mid-sprint — only the text shears,
+   never the paw icon next to it, so it reads as motion, not a typo. */
+.dash-text {
+  display: inline-block;
+  transform: skewX(-12deg);
+  letter-spacing: -0.01em;
+}
+
 header.nav .brand .paw {
   color: #ffffff;
   display: inline-block;

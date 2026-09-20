@@ -1,10 +1,11 @@
 {
-  "name": "wildcat-eats",
+  "name": "nova-dash",
   "version": "1.0.0",
   "description": "",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "compare-pricing": "node compare-pricing.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "engines": {

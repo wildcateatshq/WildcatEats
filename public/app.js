@@ -71,7 +71,7 @@ function renderNav(user) {
   if (!el) return;
   const path = window.location.pathname;
   el.innerHTML = `
-    <a class="brand" href="/order.html">${PAW_ICON} WildcatEats</a>
+    <a class="brand" href="/order.html">${PAW_ICON} <span class="dash-text">NovaDash</span></a>
     <nav>
       <a class="navlink ${path === "/order.html" ? "active" : ""}" href="/order.html">Order Food</a>
       <a class="navlink ${path === "/deliver.html" ? "active" : ""}" href="/deliver.html">Deliver</a>

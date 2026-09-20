@@ -31,9 +31,9 @@ async function sendVerificationEmail(toEmail, code) {
   await transporter.sendMail({
     from: process.env.SMTP_FROM || process.env.SMTP_USER,
     to: toEmail,
-    subject: "Your WildcatEats verification code",
-    text: `Your WildcatEats verification code is ${code}. It expires in 10 minutes.`,
-    html: `<p>Your WildcatEats verification code is <b style="font-size:1.2em;">${code}</b>.</p><p>It expires in 10 minutes.</p>`
+    subject: "Your NovaDash verification code",
+    text: `Your NovaDash verification code is ${code}. It expires in 10 minutes.`,
+    html: `<p>Your NovaDash verification code is <b style="font-size:1.2em;">${code}</b>.</p><p>It expires in 10 minutes.</p>`
   });
   return { sent: true };
 }

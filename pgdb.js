@@ -303,6 +303,58 @@ async function getActiveDeliveryOrders() {
   }));
 }
 
+// Powers the pricing engine's real-time demand signal — counts orders
+// created in [fromMs, toMs), e.g. "the past hour" or "this same hour a
+// week ago".
+async function countOrdersCreatedInRange(fromMs, toMs) {
+  const { rows } = await pool.query(
+    `select count(*)::int as count from orders where created_at >= to_timestamp($1 / 1000.0) and created_at < to_timestamp($2 / 1000.0)`,
+    [fromMs, toMs]
+  );
+  return rows[0].count;
+}
+
+// Average minutes-to-claim for orders claimed within [fromMs, toMs) —
+// how fast runners are actually picking up work right now.
+async function getAvgClaimTimeMinutes(fromMs, toMs) {
+  const { rows } = await pool.query(
+    `select avg(extract(epoch from (claimed_at - created_at)) / 60) as avg_minutes
+     from orders
+     where claimed_at is not null and claimed_at >= to_timestamp($1 / 1000.0) and claimed_at < to_timestamp($2 / 1000.0)`,
+    [fromMs, toMs]
+  );
+  const avg = rows[0].avg_minutes;
+  return avg != null ? Number(avg) : null;
+}
+
+// Buckets recent orders by delivery fee (nearest $0.50) to approximate the
+// spec's historicalData.pricing_by_point — real claim-rate-by-price signal
+// drawn from actual order history, not fabricated numbers. Buckets with too
+// few orders to be meaningful are left out.
+async function getPricingHistory(sinceMs, minSampleSize = 3) {
+  const { rows } = await pool.query(
+    `select
+       round(tip * 2) / 2 as bucket,
+       count(*)::int as total,
+       count(claimed_at)::int as claimed,
+       avg(extract(epoch from (claimed_at - created_at)) / 60) filter (where claimed_at is not null) as avg_claim_minutes
+     from orders
+     where created_at >= to_timestamp($1 / 1000.0)
+     group by bucket
+     having count(*) >= $2`,
+    [sinceMs, minSampleSize]
+  );
+  const result = {};
+  for (const r of rows) {
+    const price = Number(r.bucket).toFixed(2);
+    result[price] = {
+      claim_rate: Math.round((r.claimed / r.total) * 100) / 100,
+      avg_claim_time_minutes: r.avg_claim_minutes != null ? Math.round(Number(r.avg_claim_minutes) * 10) / 10 : null
+    };
+  }
+  return result;
+}
+
 async function getDisputedOrders() {
   const { rows } = await pool.query(`${ORDER_SELECT} where o.disputed_at is not null order by o.disputed_at desc`);
   return rows.map(rowToOrder);
@@ -367,5 +419,8 @@ module.exports = {
   createMessage,
   updateUser,
   getDisputedOrders,
-  getActiveDeliveryOrders
+  getActiveDeliveryOrders,
+  countOrdersCreatedInRange,
+  getAvgClaimTimeMinutes,
+  getPricingHistory
 };

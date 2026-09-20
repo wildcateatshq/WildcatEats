@@ -1,4 +1,4 @@
-# WildcatEats
+# NovaDash
 
 A DoorDash-style app for Villanova students: post a food order (where to pick up, where to
 drop it off), and any other student can browse open orders, claim one, and deliver it —

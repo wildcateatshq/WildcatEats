@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Order Food · WildcatEats</title>
+<title>Order Food · NovaDash</title>
 <link rel="icon" href="/wildcat-eats-logo.png" type="image/png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -43,10 +43,40 @@
   overflow-y: auto;
   box-shadow: var(--shadow-lg);
 }
+.combobox {
+  position: relative;
+}
+.combobox-list {
+  display: none;
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-md);
+  z-index: 30;
+}
+.combobox-option {
+  padding: 9px 12px;
+  cursor: pointer;
+  font-size: 0.95rem;
+}
+.combobox-option:hover, .combobox-option.highlighted {
+  background: #eef1f8;
+}
+.combobox-empty {
+  padding: 9px 12px;
+  font-size: 0.9rem;
+  color: var(--muted);
+}
 </style>
 </head>
 <body>
-<div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading WildcatEats">
+<div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading NovaDash">
   <div class="page-loader-mark">
     <img src="/wildcat-eats-logo.png" alt="" style="width:34px; height:34px; object-fit:contain;" />
   </div>
@@ -74,8 +104,12 @@
       <label for="storeVendor" id="storeVendorLabel" style="display:none;">Which Restaurant?</label>
       <select id="storeVendor" style="display:none;"></select>
 
-      <label for="hall">Deliver to</label>
-      <select id="hall" required></select>
+      <label for="hallSearch">Deliver to</label>
+      <div class="combobox" id="hallCombobox">
+        <input type="text" id="hallSearch" autocomplete="off" placeholder="Start typing a hall name (e.g. &quot;Kat&quot;)..." />
+        <input type="hidden" id="hall" />
+        <div class="combobox-list" id="hallList"></div>
+      </div>
 
       <label for="dropoffDetails">Room / meeting spot details</label>
       <input type="text" id="dropoffDetails" placeholder="e.g. Room 214, or lobby by the front desk" />
@@ -83,13 +117,7 @@
       <label for="items">What did you order? (items, sizes, notes)</label>
       <textarea id="items" placeholder="e.g. Large pepperoni pizza, extra ranch." required></textarea>
 
-      <label for="tip">Delivery fee ($)</label>
-      <input type="number" id="tip" min="1" step="0.5" value="5" />
-
-      <label for="card-element">Payment method (charged once someone claims your order)</label>
-      <div id="card-element" class="card-element"></div>
-
-      <button class="btn" type="submit" style="margin-top:18px;">Post order</button>
+      <button class="btn" type="submit" style="margin-top:18px;">Next</button>
     </form>
   </section>
 
@@ -105,8 +133,12 @@
     <h1 style="font-size:1.5rem;">Edit order</h1>
     <div id="editErrorBox"></div>
     <form id="editOrderForm">
-      <label for="editHall">Deliver to</label>
-      <select id="editHall" required></select>
+      <label for="editHallSearch">Deliver to</label>
+      <div class="combobox" id="editHallCombobox">
+        <input type="text" id="editHallSearch" autocomplete="off" placeholder="Start typing a hall name..." />
+        <input type="hidden" id="editHall" />
+        <div class="combobox-list" id="editHallList"></div>
+      </div>
 
       <label for="editDropoffDetails">Room / meeting spot details</label>
       <input type="text" id="editDropoffDetails" placeholder="e.g. Room 214, or lobby by the front desk" />
@@ -120,6 +152,29 @@
       <div class="row" style="margin-top:18px;">
         <button class="btn" type="submit">Save changes</button>
         <button class="btn secondary" type="button" id="editCancelBtn">Cancel</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="pricingOverlay" class="modal-overlay" style="display:none;">
+  <div class="card modal-card">
+    <h1 style="font-size:1.5rem;">Delivery fee & payment</h1>
+    <div id="pricingErrorBox"></div>
+
+    <div id="pricingLoading" class="empty" style="padding:14px 0;">Calculating a recommended price...</div>
+
+    <form id="pricingForm">
+      <label for="finalTip">Delivery fee ($)</label>
+      <input type="number" id="finalTip" min="1" step="0.5" value="5" required />
+      <div id="pricingRecommendedCaption" style="font-style:italic; font-size:0.85rem; color:var(--muted); margin-top:4px;"></div>
+
+      <label for="card-element">Payment method (charged once someone claims your order)</label>
+      <div id="card-element" class="card-element"></div>
+
+      <div class="row" style="margin-top:18px;">
+        <button class="btn" type="submit">Post order</button>
+        <button class="btn secondary" type="button" id="pricingBackBtn">Back</button>
       </div>
     </form>
   </div>
@@ -170,19 +225,119 @@ async function initMapbox() {
 }
 
 let vendorsByBuilding = {};
+let allHalls = [];
 
 async function loadConfig() {
   const cfg = await api("/api/config");
   vendorsByBuilding = cfg.vendorsByBuilding || {};
+  allHalls = cfg.halls || [];
   const storeSel = document.getElementById("store");
-  const hallSel = document.getElementById("hall");
-  const editHallSel = document.getElementById("editHall");
   storeSel.innerHTML = cfg.stores.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
-  hallSel.innerHTML = cfg.halls.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join("");
-  editHallSel.innerHTML = cfg.halls.map(h => `<option value="${escapeHtml(h)}">${escapeHtml(h)}</option>`).join("");
   updateStoreVendorField();
   storeSel.onchange = updateStoreVendorField;
 }
+
+// Typeahead for "Deliver to": matches anywhere in the hall name OR any of
+// its aliases (not just the start), so "Kat" finds "St. Katharine Hall" and
+// "don" (Donahue) finds "Spit". Only searches once 2+ characters are typed
+// — below that, showing all ~60 places isn't useful. The alias never shows
+// up as the picked value — only the primary `name` ever gets stored.
+function hallMatchesQuery(hall, query) {
+  if (hall.name.toLowerCase().includes(query)) return true;
+  return (hall.aliases || []).some((a) => a.toLowerCase().includes(query));
+}
+
+function createHallCombobox({ searchInputId, hiddenInputId, listId, comboboxId }) {
+  const searchInput = document.getElementById(searchInputId);
+  const hiddenInput = document.getElementById(hiddenInputId);
+  const list = document.getElementById(listId);
+  const container = document.getElementById(comboboxId);
+  let matches = [];
+  let highlighted = -1;
+
+  function render() {
+    if (matches.length === 0) {
+      list.style.display = "none";
+      list.innerHTML = "";
+      return;
+    }
+    list.innerHTML = matches
+      .map((h, i) => `<div class="combobox-option${i === highlighted ? " highlighted" : ""}" data-index="${i}">${escapeHtml(h.name)}</div>`)
+      .join("");
+    list.style.display = "block";
+  }
+
+  function select(name) {
+    hiddenInput.value = name;
+    searchInput.value = name;
+    matches = [];
+    highlighted = -1;
+    render();
+  }
+
+  function updateMatches() {
+    // Typing invalidates whatever was previously picked, until a new match is chosen.
+    hiddenInput.value = "";
+    const query = searchInput.value.trim().toLowerCase();
+    matches = query.length < 2 ? [] : allHalls.filter((h) => hallMatchesQuery(h, query));
+    highlighted = -1;
+    render();
+  }
+
+  searchInput.addEventListener("input", updateMatches);
+  searchInput.addEventListener("focus", updateMatches);
+
+  searchInput.addEventListener("keydown", (e) => {
+    if (!matches.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      highlighted = Math.min(highlighted + 1, matches.length - 1);
+      render();
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      highlighted = Math.max(highlighted - 1, 0);
+      render();
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      select(matches[highlighted >= 0 ? highlighted : 0].name);
+    } else if (e.key === "Escape") {
+      matches = [];
+      highlighted = -1;
+      render();
+    }
+  });
+
+  // mousedown (not click) fires before the input's blur, so the pick
+  // registers before the list-closing blur handler would otherwise wipe it.
+  list.addEventListener("mousedown", (e) => {
+    const option = e.target.closest(".combobox-option");
+    if (!option) return;
+    e.preventDefault();
+    select(matches[Number(option.dataset.index)].name);
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!container.contains(e.target)) {
+      matches = [];
+      highlighted = -1;
+      render();
+    }
+  });
+
+  return {
+    setValue(hall) {
+      select(hall || "");
+      if (!hall) hiddenInput.value = "";
+    }
+  };
+}
+
+const hallCombobox = createHallCombobox({
+  searchInputId: "hallSearch", hiddenInputId: "hall", listId: "hallList", comboboxId: "hallCombobox"
+});
+const editHallCombobox = createHallCombobox({
+  searchInputId: "editHallSearch", hiddenInputId: "editHall", listId: "editHallList", comboboxId: "editHallCombobox"
+});
 
 function updateStoreVendorField() {
   const store = document.getElementById("store").value;
@@ -217,7 +372,18 @@ async function initStripe() {
   }
   stripeClient = Stripe(publishableKey);
   cardElement = stripeClient.elements().create("card");
-  cardElement.mount("#card-element");
+  // Not mounted yet — the card element lives in the pricing popup, which
+  // starts hidden. Stripe Elements can size wrong if mounted while its
+  // container is display:none, so it's mounted the first time that popup
+  // actually opens instead (see ensureCardMounted()).
+}
+
+let cardMounted = false;
+function ensureCardMounted() {
+  if (cardElement && !cardMounted) {
+    cardElement.mount("#card-element");
+    cardMounted = true;
+  }
 }
 
 document.getElementById("tabNew").onclick = () => switchTab("new");
@@ -233,9 +399,65 @@ function switchTab(which) {
 
 const errorBox = document.getElementById("errorBox");
 
-document.getElementById("orderForm").onsubmit = async (e) => {
+// Step 1: "Next" on the main form just validates what's been filled in so
+// far and opens the pricing popup — it doesn't post the order.
+document.getElementById("orderForm").onsubmit = (e) => {
   e.preventDefault();
   errorBox.innerHTML = "";
+  if (!document.getElementById("hall").value) {
+    errorBox.innerHTML = `<div class="error">Please pick a hall from the list.</div>`;
+    return;
+  }
+  openPricingModal();
+};
+
+// ---------- pricing popup ----------
+// Step 2: shows the pricing agent's recommendation (fetched fresh from
+// /api/pricing/recommend using whatever's currently in the main form),
+// lets the customer adjust the fee, collects payment, and is what actually
+// posts the order.
+
+const pricingOverlay = document.getElementById("pricingOverlay");
+const pricingErrorBox = document.getElementById("pricingErrorBox");
+
+async function openPricingModal() {
+  pricingErrorBox.innerHTML = "";
+  document.getElementById("pricingLoading").style.display = "block";
+  document.getElementById("pricingRecommendedCaption").textContent = "";
+  document.getElementById("finalTip").value = 5;
+  pricingOverlay.style.display = "flex";
+  ensureCardMounted();
+
+  try {
+    const rec = await api("/api/pricing/recommend", {
+      method: "POST",
+      body: {
+        store: document.getElementById("store").value,
+        hall: document.getElementById("hall").value,
+        items: document.getElementById("items").value
+      }
+    });
+    document.getElementById("pricingRecommendedCaption").textContent = `Recommended delivery fee: ${rec.recommended_price}`;
+    document.getElementById("finalTip").value = Number(String(rec.recommended_price).replace("$", ""));
+  } catch (err) {
+    pricingErrorBox.innerHTML = `<div class="error">Couldn't get a price recommendation (${escapeHtml(err.message)}) — you can still set a fee manually below.</div>`;
+  } finally {
+    document.getElementById("pricingLoading").style.display = "none";
+  }
+}
+
+function closePricingModal() {
+  pricingOverlay.style.display = "none";
+}
+
+document.getElementById("pricingBackBtn").onclick = closePricingModal;
+pricingOverlay.onclick = (e) => {
+  if (e.target === pricingOverlay) closePricingModal();
+};
+
+document.getElementById("pricingForm").onsubmit = async (e) => {
+  e.preventDefault();
+  pricingErrorBox.innerHTML = "";
   const submitBtn = e.target.querySelector("button[type=submit]");
   submitBtn.disabled = true;
   try {
@@ -256,16 +478,17 @@ document.getElementById("orderForm").onsubmit = async (e) => {
         hall: document.getElementById("hall").value,
         dropoffDetails: document.getElementById("dropoffDetails").value,
         items: document.getElementById("items").value,
-        tip: document.getElementById("tip").value,
+        tip: document.getElementById("finalTip").value,
         stripePaymentMethodId
       }
     });
     document.getElementById("items").value = "";
     document.getElementById("dropoffDetails").value = "";
     if (cardElement) cardElement.clear();
+    closePricingModal();
     switchTab("mine");
   } catch (err) {
-    errorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+    pricingErrorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
   } finally {
     submitBtn.disabled = false;
   }
@@ -334,7 +557,7 @@ const editErrorBox = document.getElementById("editErrorBox");
 function openEditModal(o) {
   editingOrder = o;
   editErrorBox.innerHTML = "";
-  document.getElementById("editHall").value = o.hall;
+  editHallCombobox.setValue(o.hall);
   document.getElementById("editDropoffDetails").value = o.dropoffDetails || "";
   document.getElementById("editItems").value = o.items;
   document.getElementById("editTip").value = o.tip;
@@ -355,6 +578,10 @@ document.getElementById("editOrderForm").onsubmit = async (e) => {
   e.preventDefault();
   if (!editingOrder) return;
   editErrorBox.innerHTML = "";
+  if (!document.getElementById("editHall").value) {
+    editErrorBox.innerHTML = `<div class="error">Please pick a hall from the list.</div>`;
+    return;
+  }
   const submitBtn = e.target.querySelector("button[type=submit]");
   submitBtn.disabled = true;
   try {
@@ -398,7 +625,7 @@ function renderOrder(o) {
   if (o.disputedAt) {
     const adminThreadKey = `admin-${o.id}`;
     ensureThreadOpen(adminThreadKey);
-    adminChatBlock = chatSectionHtml(o, "WildcatEats Admin", { threadKey: adminThreadKey, endpoint: `/api/orders/${o.id}/admin-messages` });
+    adminChatBlock = chatSectionHtml(o, "NovaDash Admin", { threadKey: adminThreadKey, endpoint: `/api/orders/${o.id}/admin-messages` });
   }
 
   let cancelBtn = "";

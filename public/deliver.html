@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Deliver · WildcatEats</title>
+<title>Deliver · NovaDash</title>
 <link rel="icon" href="/wildcat-eats-logo.png" type="image/png" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-<div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading WildcatEats">
+<div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading NovaDash">
   <div class="page-loader-mark">
     <img src="/wildcat-eats-logo.png" alt="" style="width:34px; height:34px; object-fit:contain;" />
   </div>
@@ -303,7 +303,7 @@ function renderMine(o) {
   if (o.disputedAt) {
     const adminThreadKey = `admin-${o.id}`;
     ensureThreadOpen(adminThreadKey);
-    adminChatBlock = chatSectionHtml(o, "WildcatEats Admin", { threadKey: adminThreadKey, endpoint: `/api/orders/${o.id}/admin-messages` });
+    adminChatBlock = chatSectionHtml(o, "NovaDash Admin", { threadKey: adminThreadKey, endpoint: `/api/orders/${o.id}/admin-messages` });
   }
 
   return `
