@@ -22,6 +22,44 @@
 
 * { box-sizing: border-box; }
 
+/* Cross-document View Transitions — Order Food/Deliver/Messages are real
+   separate page navigations, not an SPA, but this makes the browser
+   animate between them instead of the usual hard flash-to-blank reload.
+   Unsupported browsers (older Safari, etc.) just get the normal instant
+   navigation — this is purely additive, nothing to feature-detect. */
+@view-transition {
+  navigation: auto;
+}
+
+/* The nav bar looks the same page to page (just the active tab/badge
+   differ), so it gets its own transition group with a quick crossfade
+   instead of sliding with the content — sliding an identical header would
+   just look like visual noise. main is the one that actually slides. */
+header.nav { view-transition-name: site-nav; }
+main { view-transition-name: main-content; }
+
+::view-transition-old(site-nav),
+::view-transition-new(site-nav) {
+  animation-duration: 0.12s;
+}
+
+@keyframes slide-out-to-left {
+  to { transform: translateX(-16%); opacity: 0; }
+}
+@keyframes slide-in-from-right {
+  from { transform: translateX(16%); opacity: 0; }
+}
+::view-transition-old(main-content) {
+  animation: 0.28s cubic-bezier(0.4, 0, 0.2, 1) both slide-out-to-left;
+}
+::view-transition-new(main-content) {
+  animation: 0.32s cubic-bezier(0.4, 0, 0.2, 1) both slide-in-from-right;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*) { animation: none !important; }
+}
+
 body {
   margin: 0;
   font-family: var(--font-body);
