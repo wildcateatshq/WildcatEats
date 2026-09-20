@@ -111,7 +111,7 @@
 
       <label for="hallSearch">Deliver to</label>
       <div class="combobox" id="hallCombobox">
-        <input type="text" id="hallSearch" autocomplete="off" placeholder="Start typing a hall name (e.g. &quot;Kat&quot;)..." />
+        <input type="text" id="hallSearch" autocomplete="off" placeholder="Start typing a hall name (e.g. &quot;Kat&quot;)" />
         <input type="hidden" id="hall" />
         <div class="combobox-list" id="hallList"></div>
       </div>
@@ -140,7 +140,7 @@
     <form id="editOrderForm">
       <label for="editHallSearch">Deliver to</label>
       <div class="combobox" id="editHallCombobox">
-        <input type="text" id="editHallSearch" autocomplete="off" placeholder="Start typing a hall name..." />
+        <input type="text" id="editHallSearch" autocomplete="off" placeholder="Start typing a hall name" />
         <input type="hidden" id="editHall" />
         <div class="combobox-list" id="editHallList"></div>
       </div>
@@ -237,7 +237,9 @@ async function loadConfig() {
   vendorsByBuilding = cfg.vendorsByBuilding || {};
   allHalls = cfg.halls || [];
   const storeSel = document.getElementById("store");
-  storeSel.innerHTML = cfg.stores.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
+  storeSel.innerHTML =
+    `<option value="" disabled selected>Select a pickup spot</option>` +
+    cfg.stores.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("");
   updateStoreVendorField();
   storeSel.onchange = updateStoreVendorField;
 }
@@ -353,7 +355,9 @@ function updateStoreVendorField() {
     label.style.display = "block";
     vendorSel.style.display = "block";
     vendorSel.required = true;
-    vendorSel.innerHTML = vendors.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+    vendorSel.innerHTML =
+      `<option value="" disabled selected>Select a restaurant</option>` +
+      vendors.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
   } else {
     label.style.display = "none";
     vendorSel.style.display = "none";

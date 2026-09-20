@@ -57,14 +57,29 @@ header.nav {
   padding-left: max(20px, env(safe-area-inset-left));
   padding-right: max(20px, env(safe-area-inset-right));
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 10px;
   position: sticky;
   top: 0;
   z-index: 20;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+}
+
+/* Row 1: brand on the left, settings/greeting/logout grouped on the right —
+   kept off the primary-links row so that row never has to fight them for
+   space or wrap. */
+header.nav .nav-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+header.nav .nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
 }
 
 header.nav .brand {
@@ -91,11 +106,15 @@ header.nav .brand .paw {
   display: inline-block;
 }
 
+/* Row 2: Order Food / Deliver / Messages (/ Reports for admins), spaced
+   evenly across the full width — never wraps, so this row's height never
+   changes and never needs a scrollbar. */
 header.nav nav {
   display: flex;
   gap: 6px;
   align-items: center;
-  flex-wrap: wrap;
+  justify-content: space-evenly;
+  flex-wrap: nowrap;
 }
 
 header.nav a.navlink {
@@ -106,6 +125,7 @@ header.nav a.navlink {
   font-weight: 600;
   font-size: 0.92rem;
   opacity: 0.85;
+  white-space: nowrap;
   transition: background 0.2s var(--ease), opacity 0.2s var(--ease);
 }
 
@@ -194,6 +214,16 @@ input:focus, select:focus, textarea:focus {
   box-shadow: 0 0 0 3px rgba(16, 58, 134, 0.12);
 }
 textarea { resize: vertical; min-height: 70px; }
+
+/* A <select> has no real ::placeholder — its "Select a ..." hint is just a
+   disabled first <option>. Style it to match real input placeholders: gray
+   while nothing's chosen yet (:invalid, since these are required with an
+   empty placeholder value), back to normal text color once a real option
+   is picked. */
+::placeholder { color: var(--muted); opacity: 1; }
+select:invalid { color: var(--muted); }
+select option { color: var(--text); }
+select option[value=""] { color: var(--muted); }
 
 button.btn {
   background: var(--navy);
@@ -572,29 +602,20 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
   .toast-container { left: 12px; right: 12px; align-items: stretch; }
   .toast { max-width: none; }
 
-  /* The nav's links/gear/greeting/logout used to just wrap onto their own
-     rows when they ran out of width, eating a third of the screen before
-     any page content showed. Force them onto one scrollable row instead —
-     the greeting is dropped since it's not essential wayfinding, everything
-     else stays reachable, just via a horizontal swipe like a normal mobile
-     nav strip. */
-  header.nav nav {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    max-width: 100%;
-  }
-  header.nav nav::-webkit-scrollbar { display: none; }
+  /* Settings/greeting/logout live in their own compact row now (see
+     .nav-actions), so the links row never has to compete with them for
+     space — just trim padding/font a bit so it stays comfortable at phone
+     width, no scrolling needed. */
   header.nav a.navlink { flex: none; padding: 8px 10px; font-size: 0.88rem; }
   header.nav .nav-user { display: none; }
-  header.nav button.logout { flex: none; }
+  header.nav button.logout { flex: none; padding: 6px 10px; font-size: 0.85rem; }
 
-  /* Same fix as the nav: keep each tab's label on one line instead of
-     letting it wrap mid-word when the row runs out of space, and let the
-     live-runner count drop to its own line rather than squeezing the tabs. */
-  .tabs { flex-wrap: wrap; }
-  .tabs button { white-space: nowrap; flex: none; }
+  /* Keep "Place an order" / "My orders" / the live-runner count on one row
+     — no wrap, no vertical scroll from it — by tightening each piece just
+     enough to fit phone width. */
+  .tabs { flex-wrap: nowrap; }
+  .tabs button { white-space: nowrap; flex: none; padding: 8px 10px; font-size: 0.85rem; }
+  #liveDeliverers { white-space: nowrap; flex: none; font-size: 9pt !important; }
 }
 
 /* ---------- page loader ---------- */

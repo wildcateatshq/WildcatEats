@@ -77,15 +77,19 @@ function renderNav(user) {
   if (!el) return;
   const path = window.location.pathname;
   el.innerHTML = `
-    <a class="brand" href="/order.html">${PAW_ICON} <span class="dash-text">NovaDash</span></a>
+    <div class="nav-top">
+      <a class="brand" href="/order.html">${PAW_ICON} <span class="dash-text">NovaDash</span></a>
+      <div class="nav-actions">
+        <span class="nav-user">Hi, ${escapeHtml(user.name.split(" ")[0])}</span>
+        <a class="navlink ${path === "/settings.html" ? "active" : ""}" href="/settings.html" aria-label="Settings" title="Settings">${GEAR_ICON}</a>
+        <button class="logout" id="logoutBtn">Log out</button>
+      </div>
+    </div>
     <nav>
       <a class="navlink ${path === "/order.html" ? "active" : ""}" href="/order.html">Order Food</a>
       <a class="navlink ${path === "/deliver.html" ? "active" : ""}" href="/deliver.html">Deliver</a>
       <a class="navlink ${path === "/messages.html" ? "active" : ""}" href="/messages.html">Messages</a>
       ${user.isAdmin ? `<a class="navlink ${path === "/admin.html" ? "active" : ""}" href="/admin.html">Reports</a>` : ""}
-      <a class="navlink ${path === "/settings.html" ? "active" : ""}" href="/settings.html" aria-label="Settings" title="Settings">${GEAR_ICON}</a>
-      <span class="nav-user">Hi, ${escapeHtml(user.name.split(" ")[0])}</span>
-      <button class="logout" id="logoutBtn">Log out</button>
     </nav>
   `;
   document.getElementById("logoutBtn").onclick = async () => {
