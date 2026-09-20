@@ -31,6 +31,7 @@ body {
   color: var(--text);
   -webkit-font-smoothing: antialiased;
   min-height: 100vh;
+  min-height: 100dvh; /* accounts for mobile browser chrome instead of jumping when it shows/hides */
 }
 
 /* Condensed display face for headlines/brand marks — gives the collegiate
@@ -52,6 +53,9 @@ header.nav {
   background: var(--navy);
   color: white;
   padding: 14px 20px;
+  padding-top: max(14px, env(safe-area-inset-top));
+  padding-left: max(20px, env(safe-area-inset-left));
+  padding-right: max(20px, env(safe-area-inset-right));
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -175,7 +179,10 @@ input[type=text], input[type=email], input[type=password], input[type=number], s
   padding: 10px 12px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 0.95rem;
+  /* 16px, not 0.95rem (15.2px) — iOS Safari auto-zooms the whole page on
+     focus for any input under 16px, which feels like a bug to the user
+     every single time they tap a field. */
+  font-size: 16px;
   background: #fff;
   color: var(--text);
   font-family: inherit;
@@ -537,7 +544,7 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
 
 .toast-container {
   position: fixed;
-  bottom: 20px;
+  bottom: max(20px, env(safe-area-inset-bottom));
   right: 20px;
   left: 20px;
   z-index: 100;
@@ -564,6 +571,30 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
 @media (max-width: 480px) {
   .toast-container { left: 12px; right: 12px; align-items: stretch; }
   .toast { max-width: none; }
+
+  /* The nav's links/gear/greeting/logout used to just wrap onto their own
+     rows when they ran out of width, eating a third of the screen before
+     any page content showed. Force them onto one scrollable row instead —
+     the greeting is dropped since it's not essential wayfinding, everything
+     else stays reachable, just via a horizontal swipe like a normal mobile
+     nav strip. */
+  header.nav nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    max-width: 100%;
+  }
+  header.nav nav::-webkit-scrollbar { display: none; }
+  header.nav a.navlink { flex: none; padding: 8px 10px; font-size: 0.88rem; }
+  header.nav .nav-user { display: none; }
+  header.nav button.logout { flex: none; }
+
+  /* Same fix as the nav: keep each tab's label on one line instead of
+     letting it wrap mid-word when the row runs out of space, and let the
+     live-runner count drop to its own line rather than squeezing the tabs. */
+  .tabs { flex-wrap: wrap; }
+  .tabs button { white-space: nowrap; flex: none; }
 }
 
 /* ---------- page loader ---------- */
@@ -643,6 +674,7 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
 .landing-shell {
   position: relative;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
 }
 
@@ -738,6 +770,10 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
   align-items: center;
   justify-content: center;
   padding: 24px;
+  padding-top: max(24px, env(safe-area-inset-top));
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  padding-left: max(24px, env(safe-area-inset-left));
+  padding-right: max(24px, env(safe-area-inset-right));
   pointer-events: none;
 }
 
