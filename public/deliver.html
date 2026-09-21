@@ -53,11 +53,12 @@ let paymentsEnabled = false;
   if (!user) return;
   document.getElementById("openList").innerHTML = skeletonList(3);
   try {
-    paymentsEnabled = (await api("/api/stripe/config")).enabled;
-    await handleStripeRedirect();
+    // handleStripeRedirect() doesn't depend on the stripe config fetch, and
+    // the two order lists don't depend on any of this — run everything
+    // independent in parallel instead of five round trips back to back.
+    const [config] = await Promise.all([api("/api/stripe/config"), handleStripeRedirect(), refreshOpen(), refreshMine()]);
+    paymentsEnabled = config.enabled;
     renderPayoutBanner();
-    await refreshOpen();
-    await refreshMine();
   } finally {
     hidePageLoader();
   }

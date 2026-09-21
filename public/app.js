@@ -5,8 +5,13 @@ if ("serviceWorker" in navigator) {
 }
 
 async function api(path, opts = {}) {
+  const method = opts.method || "GET";
+  if (method === "GET") {
+    const cached = consumePrefetch(path);
+    if (cached) return cached;
+  }
   const res = await fetch(path, {
-    method: opts.method || "GET",
+    method,
     headers: { "Content-Type": "application/json" },
     body: opts.body ? JSON.stringify(opts.body) : undefined
   });
@@ -14,6 +19,68 @@ async function api(path, opts = {}) {
   try { data = await res.json(); } catch (e) {}
   if (!res.ok) throw new Error(data.error || "Something went wrong.");
   return data;
+}
+
+// ---------- nav prefetch (hover/touch warm-up) ----------
+// Warms up the exact GET requests a destination page will make as soon as
+// the user shows intent to go there — hover on desktop, touchstart on
+// mobile — so that by the time the click actually lands, the response is
+// often already back and the destination page's first paint can show real
+// content instead of a skeleton. Cached in sessionStorage, since plain JS
+// state doesn't survive the full-page navigation a nav link triggers.
+// Consumed (deleted) on first read so a page's own live polling never
+// serves a stale prefetch snapshot on its second call, and the short TTL
+// keeps a missed/late prefetch from ever answering with genuinely stale
+// data — this app leans on frequent live polling elsewhere for the same
+// reason (see sw.js's deliberate refusal to cache /api/*).
+const PREFETCH_TTL_MS = 6000;
+const PREFETCH_ROUTES = {
+  "/deliver.html": ["/api/stripe/config", "/api/orders/open", "/api/orders/delivering"],
+  "/order.html": ["/api/config", "/api/stripe/config", "/api/mapbox/config", "/api/orders/mine", "/api/stats/active-deliverers"],
+  "/messages.html": ["/api/messages/threads"]
+};
+
+function consumePrefetch(path) {
+  const key = `prefetch:${path}`;
+  try {
+    const raw = sessionStorage.getItem(key);
+    if (!raw) return null;
+    sessionStorage.removeItem(key);
+    const { data, ts } = JSON.parse(raw);
+    return Date.now() - ts <= PREFETCH_TTL_MS ? data : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+function warmPrefetch(pathname) {
+  const routes = PREFETCH_ROUTES[pathname];
+  if (!routes) return;
+  routes.forEach((path) => {
+    const key = `prefetch:${path}`;
+    try {
+      const raw = sessionStorage.getItem(key);
+      if (raw && Date.now() - JSON.parse(raw).ts <= PREFETCH_TTL_MS) return; // already warm
+    } catch (e) {}
+    fetch(path, { headers: { "Content-Type": "application/json" } })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (data == null) return;
+        try { sessionStorage.setItem(key, JSON.stringify({ data, ts: Date.now() })); } catch (e) {}
+      })
+      .catch(() => {});
+  });
+}
+
+function wireNavPrefetch() {
+  document.querySelectorAll("a.navlink[href]").forEach((link) => {
+    const href = link.getAttribute("href");
+    if (!PREFETCH_ROUTES[href]) return;
+    const start = () => warmPrefetch(href);
+    link.addEventListener("mouseenter", start, { passive: true });
+    link.addEventListener("touchstart", start, { passive: true });
+    link.addEventListener("focus", start, { passive: true });
+  });
 }
 
 async function getMe() {
@@ -43,6 +110,11 @@ const GEAR_ICON = `<svg viewBox="0 0 24 24" width="18" height="18" fill="current
 // any script runs) with class "page-loader" and id "pageLoader". Every
 // page's init script should call this once it has real content to show.
 function hidePageLoader() {
+  // Also the "content is ready" signal page-reveal.js waits on to delay a
+  // View Transition's reveal until real content — not a skeleton — is
+  // what actually slides in. Unconditional (ahead of the element check
+  // below) so it still fires even if the loader element is already gone.
+  window.__resolvePageReady?.();
   const el = document.getElementById("pageLoader");
   if (!el) return;
   el.setAttribute("aria-hidden", "true");
@@ -97,6 +169,7 @@ function renderNav(user) {
     await api("/api/logout", { method: "POST" });
     window.location.href = "/";
   };
+  wireNavPrefetch();
 }
 
 // ---------- unread badge ----------

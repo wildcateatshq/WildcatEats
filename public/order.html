@@ -203,11 +203,10 @@ let mapboxEnabled = false;
   if (!user) return;
   document.getElementById("myOrdersList").innerHTML = skeletonList(2);
   try {
-    await loadConfig();
-    await initStripe();
-    await initMapbox();
-    await refreshMine();
-    await refreshLiveDeliverers();
+    // Independent of each other — run in parallel instead of one after
+    // another so the page's real content lands in one round trip's worth
+    // of time instead of five.
+    await Promise.all([loadConfig(), initStripe(), initMapbox(), refreshMine(), refreshLiveDeliverers()]);
   } finally {
     hidePageLoader();
   }
