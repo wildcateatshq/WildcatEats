@@ -9,16 +9,21 @@ const ARCHIVE_DAYS = 30;
 function createPuzzleRouter(store, options = {}) {
   const router = express.Router();
   const today = options.today || (() => easternDate());
-  const publishToken = () => options.publishToken ?? process.env.PERCENTLE_PUBLISH_TOKEN;
+  // Pasted secrets often pick up invisible spaces, line breaks, or quotes; ignore those.
+  const cleanToken = value => (value || "").trim().replace(/^(["'])(.*)\1$/, "$2").trim();
+  const publishToken = () => cleanToken(options.publishToken ?? process.env.PERCENTLE_PUBLISH_TOKEN);
 
   // Only the daily agent holds this token; it can publish and read unreleased puzzles.
   function isPublisher(req) {
     const expected = publishToken();
     const match = /^Bearer (.+)$/.exec(req.get("authorization") || "");
     if (!expected || !match) return false;
-    const given = Buffer.from(match[1]);
+    const given = Buffer.from(cleanToken(match[1]));
     const wanted = Buffer.from(expected);
-    return given.length === wanted.length && crypto.timingSafeEqual(given, wanted);
+    if (given.length === wanted.length && crypto.timingSafeEqual(given, wanted)) return true;
+    // Lengths only, never the tokens, so a mismatch can be diagnosed from the server log.
+    console.warn(`Percentle publish token rejected: received ${given.length} characters, expected ${wanted.length}.`);
+    return false;
   }
 
   function requirePublisher(req, res, next) {

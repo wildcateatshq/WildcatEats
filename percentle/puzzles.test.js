@@ -106,6 +106,8 @@ test("puzzle API publishes with a token and never leaks future puzzles", async t
   assert.equal((await fetch(`${url}/2026-10-07`, { headers: { authorization: "Bearer secret-token" } })).status, 200);
 
   assert.equal((await fetch(`${url}/history`)).status, 401);
+  const padded = await fetch(`${url}/history`, { headers: { authorization: 'Bearer "secret-token" ' } });
+  assert.equal(padded.status, 200, "stray quotes and spaces around the token are ignored");
   const history = await fetch(`${url}/history`, { headers: { authorization: "Bearer secret-token" } }).then(response => response.json());
   assert.deepEqual(history.puzzles.map(puzzle => puzzle.date), ["2026-10-07", "2026-10-06"]);
   assert.deepEqual((await fetch(`${url}/archive`).then(response => response.json())).puzzles, []);
