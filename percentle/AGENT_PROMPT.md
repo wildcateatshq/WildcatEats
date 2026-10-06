@@ -8,7 +8,7 @@ sports, music, and movies. A new puzzle goes live at **midnight Eastern time** (
 You have web search and browsing, and you can run shell commands (`curl`). These environment
 variables are set:
 
-- `PERCENTLE_SITE_URL`: the site's base URL, for example `https://wildcat-eats.onrender.com`
+- `PERCENTLE_SITE_URL`: the site's base URL, for example `https://percentle.onrender.com`
 - `PERCENTLE_PUBLISH_TOKEN`: the secret used to publish. Never print it or put it in your output.
 
 ## Step 1: Pick the target date
@@ -30,7 +30,8 @@ The response lists recent and already-scheduled puzzles. If the target date alre
 **stop**: report that it already exists and do nothing else. Otherwise:
 
 - Don't reuse a question, or a near-duplicate, from the history.
-- Don't feature the same team, artist, movie, or actor as any puzzle in the last 14 days.
+- Don't feature the same team, artist, movie, or actor as any puzzle dated within 14 days of the
+  target date, before or after it. That includes puzzles already scheduled for later dates.
 
 ## Step 3: Choose the topics
 
@@ -64,14 +65,19 @@ Every question must have one correct, checkable percentage answer.
   film's share of a franchise's total box office, and so on.
 
 **Rules**
-1. Start with "What percentage of …" or "In [year], what percentage of …", and end with "?".
-   Keep it under 220 characters.
-2. Always say the time frame: a season, year, ceremony, or "as of [Month Year]". Use **completed**
-   seasons, ceremonies, and years only, never a season or event that's still in progress.
+1. Ask for a single percentage and end with "?". Keep it under 220 characters and phrase it
+   naturally. Good openings: "What percentage of …", "In [year], what percentage of …", or
+   "As of [Month Year], what percentage of …". For quarterly or monthly figures, name the period
+   plainly ("in the second quarter of 2026").
+2. Always say the time frame: a season, year, ceremony, period, or "as of [Month Year]". Use
+   **completed** seasons, ceremonies, and periods only, never a season or event that's still in
+   progress.
 3. The answer is a number **strictly between 0 and 100**, rounded to **one decimal place**. If you
    work it out, do the arithmetic carefully and double-check it, for example 11 ÷ 14 = 0.7857 → 78.6.
-4. Vary the answers: include at least one answer below 35 and at least one above 60. Avoid answers
-   below 2 or above 98, and avoid round "gimme" numbers like exactly 50 unless the fact really is 50.
+   A whole number like 65.0 is fine; it's stored as 65.
+4. Vary the answers: include at least one answer below 35 and at least one above 60, and avoid
+   answers below 2 or above 98. A real statistic that happens to be a whole number is fine. Just
+   don't pick a question *because* its answer is an easy round number like 25, 50, or 75.
 5. The question must not give away the answer, and it needs exactly one reasonable reading.
    Define terms ("regular-season", "men's Division I", "domestic box office").
 6. Keep it fun and family-friendly. No tragedies, deaths, crimes, partisan politics, religion,
@@ -85,6 +91,12 @@ Every question must have one correct, checkable percentage answer.
   (college football and basketball), NCAA.com, official league sites, Billboard, RIAA, the Recording
   Academy, Oscars.org, Box Office Mojo, The Numbers, U.S. Census Bureau, BLS, CDC, USDA, NOAA, Pew
   Research Center, and Gallup.
+- Some sites block automated access (Oscars.org may return 403 to `curl`; Billboard may redirect
+  web fetches to a paywall). If a page is blocked, try the other method: a web fetch, or `curl`
+  with a browser user agent (`-A "Mozilla/5.0"`). If it's still blocked, confirm the numbers on
+  another reliable page that states them, and use that page as the source. Never rely on a search
+  snippet or summary alone: when a tool summarizes a page, check that its counts add up, and
+  list items one by one when you're counting.
 - `sourceUrl` must be an `https://` link to the page that supports the answer. Players don't see
   it; it's there so a human can check your work.
 - If sources disagree, or you can't confirm a number, **drop the question and write a different
