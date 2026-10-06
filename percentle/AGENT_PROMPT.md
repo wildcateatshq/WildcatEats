@@ -54,7 +54,9 @@ two world questions and no music. Over many days, every category should still co
 
 Every question must have one correct, checkable percentage answer.
 
-**Good question shapes**
+**Good question shapes.** These examples show the format only. Never use them, or their teams,
+people, albums, or films, as real questions; come up with your own fresh topics. Mix eras: at
+least two of the five questions should be about the last 10 years.
 - A ratio from a finished, fixed record: "What percentage of their 82 regular-season games did the
   2015–16 Golden State Warriors win?" (73 ÷ 82 = 89.0)
 - A published statistic with a clear time frame: "In 2023, what percentage of U.S. adults said they
