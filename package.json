@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "percentle": "node percentle/server.js",
     "compare-pricing": "node compare-pricing.js",
     "test": "node --test percentle/*.test.*"
   },

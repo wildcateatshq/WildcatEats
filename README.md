@@ -82,6 +82,10 @@ Percentle is a separate, account-free game at `/percentle.html`, served by the e
 Express app; it does not change Wildcat Eats pages, accounts, or storage. Start the app with
 `npm start` and visit http://localhost:3000/percentle.html.
 
+Percentle can also run on its own with `npm run percentle` (`node percentle/server.js`).
+That server makes the game the home page and loads none of the Wildcat Eats pages, APIs,
+or database tables. Use it as the Render start command for a Percentle-only service.
+
 ### Daily puzzles come from an AI agent
 
 There is no fixed question bank. Every day a scheduled AI agent researches five new
