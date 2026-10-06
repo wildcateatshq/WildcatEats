@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f6f6f0">
+  <meta name="description" content="Five questions. Five percentages. How close can you get?">
+  <title>Percentle — a little game of big percentages</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/percentle.css">
+  <script type="module" src="/percentle.mjs"></script>
+</head>
+<body>
+  <div class="site-shell">
+    <header class="topbar">
+      <a class="wordmark" href="/percentle.html" aria-label="Percentle home"><span class="brand-mark" aria-hidden="true">%</span>percentle<span class="brand-period">.</span></a>
+      <nav class="top-actions" aria-label="Game menu">
+        <button class="icon-button" id="howButton" aria-label="How to play" title="How to play">?</button>
+        <button class="icon-button" id="statsButton" aria-label="Your stats" title="Your stats">↗</button>
+        <button class="icon-button" id="themeButton" aria-label="Switch color theme" title="Switch theme">◐</button>
+      </nav>
+    </header>
+
+    <main>
+      <section class="intro">
+        <div class="date-line"><span class="live-dot"></span><span id="puzzleDate">TODAY'S EDITION</span><span class="date-rule"></span><span id="puzzleNumber">NO. 1</span></div>
+        <h1>A little game of<br><em>big percentages.</em></h1>
+        <p class="intro-copy">Five real-world facts. Five educated guesses.<br>Get as close as you can — lower is better.</p>
+      </section>
+
+      <section class="game-card" id="gameCard" aria-live="polite">
+        <div class="progress-row">
+          <div class="progress-label"><span id="questionCounter">QUESTION 01</span><span id="categoryTag" class="category-tag">LOADING</span></div>
+          <div class="progress-dots" id="progressDots" aria-label="Question progress"></div>
+        </div>
+        <div id="questionStage"></div>
+      </section>
+
+      <section class="below-card">
+        <span class="stamp">NEW PUZZLE EVERY DAY AT MIDNIGHT ET</span>
+        <span>Five facts. Zero pressure. <span aria-hidden="true">✳</span></span>
+      </section>
+    </main>
+
+    <footer><span>Made for the incurably curious.</span><span>FACTS, NOT GUESSES <b>✳</b></span></footer>
+  </div>
+
+  <dialog id="infoDialog" aria-labelledby="dialogTitle">
+    <div class="dialog-head"><span class="dialog-kicker">THE SHORT VERSION</span><button class="icon-button close-button" data-close aria-label="Close">×</button></div>
+    <h2 id="dialogTitle">How to play</h2>
+    <div id="dialogContent"></div>
+  </dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+</body>
+</html>

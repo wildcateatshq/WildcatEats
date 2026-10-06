@@ -12,6 +12,10 @@ const aiPricing = require("./aiPricing");
 const weather = require("./weather");
 const locations = require("./locations");
 const webpush = require("web-push");
+const percentleCrowd = require("./percentle/crowd").createCrowdStore();
+const { createCrowdRouter } = require("./percentle/crowd-router");
+const percentlePuzzles = require("./percentle/puzzles").createPuzzleStore();
+const { createPuzzleRouter } = require("./percentle/puzzle-router");
 
 // Push notifications are fully optional — with no VAPID keys set, the
 // in-app unread badge still works fine, sendPushToUser() below just quietly
@@ -318,6 +322,13 @@ app.get("/api/me", async (req, res) => {
   const user = req.session.userId ? await db.getUserById(req.session.userId) : null;
   res.json({ user: publicUser(user) });
 });
+
+// Percentle crowd comparisons store only anonymous daily totals under random,
+// per-day browser IDs; no account or guess-level data is collected.
+app.use("/api/percentle/crowd", createCrowdRouter(percentleCrowd));
+// Daily Percentle puzzles are written by a scheduled AI agent (see percentle/AGENT_PROMPT.md)
+// using PERCENTLE_PUBLISH_TOKEN; players can only read today's and earlier puzzles.
+app.use("/api/percentle/puzzles", createPuzzleRouter(percentlePuzzles));
 
 // "Late Night" is a pickup spot that only exists 9 PM – midnight, Eastern,
 // every day — computed off the server clock (not the client's) so it's
@@ -1063,9 +1074,10 @@ app.use((err, req, res, next) => {
 
 db.init()
   .then(() => {
-    app.listen(PORT, () => {
-      console.log(`NovaDash running at http://localhost:${PORT} (storage: ${db.backend})`);
-    });
+    return Promise.all([percentleCrowd.init(), percentlePuzzles.init()]);
+  })
+  .then(() => {
+    app.listen(PORT, () => console.log(`NovaDash running at http://localhost:${PORT} (storage: ${db.backend})`));
   })
   .catch((err) => {
     console.error("Failed to set up the database:", err.message);

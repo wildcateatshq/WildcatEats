@@ -34,3 +34,5 @@ services:
         sync: false
       - key: MAPBOX_TOKEN
         sync: false
+      - key: PERCENTLE_PUBLISH_TOKEN
+        sync: false

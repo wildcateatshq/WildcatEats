@@ -2,3 +2,7 @@ node_modules/
 db.json
 .env
 server.log
+/data/percentle-crowd.json
+/data/percentle-crowd.json.*.tmp
+/data/percentle-puzzles.json
+/data/percentle-puzzles.json.*.tmp

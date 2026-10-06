@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "compare-pricing": "node compare-pricing.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test percentle/*.test.*"
   },
   "engines": {
     "node": ">=18"

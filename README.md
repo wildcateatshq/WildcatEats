@@ -75,3 +75,87 @@ Deliberately minimal so it's easy to read and extend:
 
 1. Real payments (Stripe) instead of the "put your Venmo in the notes" workaround.
 2. Ratings/history so orderers can see a runner's track record.
+
+## Percentle daily guessing game
+
+Percentle is a separate, account-free game at `/percentle.html`, served by the existing
+Express app; it does not change Wildcat Eats pages, accounts, or storage. Start the app with
+`npm start` and visit http://localhost:3000/percentle.html.
+
+### Daily puzzles come from an AI agent
+
+There is no fixed question bank. Every day a scheduled AI agent researches five new
+percentage questions on a random mix of U.S. life, sports, music, movies, and world topics,
+checks each answer against a source, and publishes them through the puzzle API. The agent's
+full instructions are in [percentle/AGENT_PROMPT.md](percentle/AGENT_PROMPT.md); paste that
+file in as the prompt of whatever scheduler runs the agent.
+
+- **Rollover:** the day changes at midnight Eastern time (America/New_York, so EST or EDT).
+  Puzzle #1 is October 6, 2026; numbers count calendar days from there. An open tab reloads
+  onto the new puzzle after midnight. If a day's puzzle hasn't been published yet, players see
+  "Today's puzzle is on its way" and the page checks again every minute.
+- **When to run the agent:** schedule it daily at about **11:30 PM Eastern**. Run after 6 PM, it
+  targets the next day, so the puzzle is waiting when midnight arrives. (Run after midnight,
+  it targets the current day, which also works but leaves a short gap.) In Claude Code, `/schedule`
+  can create this as a daily cloud routine.
+- **What the agent needs:** web search, `curl`, and two environment variables:
+  `PERCENTLE_SITE_URL` (the public site URL) and `PERCENTLE_PUBLISH_TOKEN`.
+- **Server setup:** set `PERCENTLE_PUBLISH_TOKEN` on the server to a long random secret (for
+  example the output of `node -e "console.log(crypto.randomBytes(32).toString('hex'))"`) and
+  give the same value to the agent. Without it, publishing is turned off.
+
+### Puzzle API
+
+All routes are under `/api/percentle/puzzles`. Publishing and history need the header
+`Authorization: Bearer <PERCENTLE_PUBLISH_TOKEN>`.
+
+| Route | Who | What it does |
+|---|---|---|
+| `GET /today` | Players | Today's puzzle, or 404 if it isn't published yet |
+| `GET /archive` | Players | Dates and numbers of puzzles from the last 30 days, before today |
+| `GET /:date` | Players | A past or current puzzle. Future dates are hidden unless the token is sent |
+| `GET /history?days=90` | Agent | Recent and scheduled puzzles, so the agent can avoid repeats |
+| `PUT /:date` | Agent | Publish `{ "questions": [...] }` for today (if it isn't live yet) or up to 7 days ahead |
+
+Each question has `text` (ending in "?"), `answer` (strictly between 0 and 100, at most one
+decimal), `category`, `funFact` (shown after the answer), `sourceName`, and an `https://`
+`sourceUrl` (kept for checking, not shown). Categories are `U.S. life`, `Sports`, `Music`,
+`Movies`, and `World`, in any mix: a day can have several questions from one category and
+none from another. The server rejects a puzzle that breaks these rules and lists every
+problem so the agent can fix them in one retry. A day's puzzle can't be changed once that day has started, because players' guesses
+and crowd scores depend on it; unreleased days can be replaced.
+
+Puzzles are stored in a `percentle_puzzles` table when `DATABASE_URL` is set. Without
+Postgres they go to `data/percentle-puzzles.json` (override with `PERCENTLE_PUZZLES_FILE`).
+On hosts with ephemeral disks, use Postgres so puzzles survive restarts.
+
+To publish a puzzle by hand (for example, locally), save it as `puzzle.json` and run:
+
+```sh
+curl -X PUT -H "Authorization: Bearer $PERCENTLE_PUBLISH_TOKEN" \
+  -H "Content-Type: application/json" --data @puzzle.json \
+  http://localhost:3000/api/percentle/puzzles/2026-10-06
+```
+
+### Tests
+
+Run the scoring, Eastern-date, puzzle-validation, puzzle API, and crowd tests with `npm test`.
+No additional packages or build step are needed.
+
+### Crowd comparison
+
+Player progress, streaks, and personal scores stay in the browser. When a player finishes
+today's puzzle, the page automatically sends their daily total to the crowd API anonymously
+(practice replays of past puzzles are never sent). Percentle never submits individual
+guesses, names, or account details. Random per-day IDs let the crowd module update a
+browser's score without linking scores across days. Your position appears only after at
+least five other players have contributed. The crowd line shows your ranked position from
+the best score to the worst, alongside the percent of players you scored better than. Tied
+scores share the midpoint of their rank.
+
+The crowd module stores scores in a separate `percentle_daily_scores` table when
+`DATABASE_URL` is configured. Without Postgres, it writes to `data/percentle-crowd.json`;
+set `PERCENTLE_CROWD_FILE` to place this file on persistent storage. Crowd collection is
+independent of the rest of Percentle: if the API is unavailable, the daily puzzle still works.
+
+Possible follow-ups: a friends leaderboard, a timed hard mode, and themed weekend puzzles.
