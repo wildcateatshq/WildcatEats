@@ -13,7 +13,7 @@
   <link rel="stylesheet" href="/percentle.css">
   <script type="module" src="/percentle.mjs"></script>
 </head>
-<body>
+<body class="starting">
   <div class="site-shell">
     <header class="topbar">
       <a class="wordmark" href="/percentle.html" aria-label="Percentle home"><span class="brand-mark" aria-hidden="true">%</span>percentle<span class="brand-period">.</span></a>
@@ -26,6 +26,19 @@
     </header>
 
     <main>
+      <section class="start-screen" id="startScreen" aria-labelledby="startTitle">
+        <span class="start-mark" aria-hidden="true">%</span>
+        <h1 class="start-title" id="startTitle">Percentle</h1>
+        <p class="start-goal">Five questions, each answered with a percentage. Get as close as you can.</p>
+        <ul class="rules start-rules">
+          <li>Guess the percentage for each of 5 questions.</li>
+          <li>Your score is how far off you were, added up. <strong>Lower is better.</strong></li>
+          <li>A new puzzle arrives every day at midnight Eastern.</li>
+        </ul>
+        <button class="lock-button start-button" id="startButton">Play today's game <span aria-hidden="true">→</span></button>
+        <p class="start-edition" id="startEdition"></p>
+      </section>
+
       <section class="intro">
         <div class="date-line"><span class="live-dot"></span><span id="puzzleDate">TODAY'S EDITION</span><span class="date-rule"></span><span id="puzzleNumber">NO. 1</span></div>
         <div class="score-box" id="scoreBox" aria-live="polite">

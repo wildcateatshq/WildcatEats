@@ -28,6 +28,7 @@ try {
   todayPuzzle = { ...body, questions: withRoundedAnswers(body.questions) };
 } catch (error) {
   console.error("Could not load today's Percentle puzzle.", error);
+  document.body.classList.remove("starting");
   if (!stage.innerHTML.trim()) {
     stage.innerHTML = `<p role="alert">Today's puzzle couldn't load. Check your connection and <button id="retryLoad">try again</button>.</p>`;
     document.querySelector("#retryLoad").addEventListener("click", () => location.reload());
@@ -46,6 +47,11 @@ let justLocked = false;
 // What the score box above the card is showing, so the next update can count up from it.
 let shownScore = null;
 let countUpRun = 0;
+// The revealed answer finishes fading in about this long after a guess is locked...
+const ANSWER_SHOWN_MS = 1450;
+// ...and the Next button fades in this long after that.
+const NEXT_BUTTON_DELAY_MS = 1000;
+let nextButtonTimer;
 
 // Answers always have exactly one decimal place, even if a puzzle was stored with more.
 function withRoundedAnswers(questions) {
@@ -126,6 +132,7 @@ function render() {
   const index = view.index;
   // Only shown while replaying an archived puzzle, so players can leave it at any time.
   document.querySelector("#returnButton").hidden = !practiceMode;
+  if (practiceMode) leaveStartScreen();
   document.querySelector("#puzzleNumber").textContent = `NO. ${currentNumber}`;
   document.querySelector("#puzzleDate").textContent = currentDate === today ? "TODAY'S EDITION" : `${currentDate} · PRACTICE`;
   renderDots(Math.min(index, 4));
@@ -209,13 +216,18 @@ function playReveal(animate) {
   const row = document.querySelector("#revealRow");
   const comparison = document.querySelector(".comparison");
   const card = document.querySelector("#gameCard");
+  const next = document.querySelector("#nextButton");
   card.classList.remove("thud");
   document.querySelector(".reaction")?.classList.add(animate ? "pop" : "shown");
+  clearTimeout(nextButtonTimer);
   if (!animate) {
     row.classList.add("instant", "go");
     comparison.classList.add("instant", "answered");
+    next.classList.add("shown");
     return;
   }
+  const delay = matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : ANSWER_SHOWN_MS + NEXT_BUTTON_DELAY_MS;
+  nextButtonTimer = setTimeout(() => next.classList.add("shown"), delay);
   const guessEl = row.querySelector(".reveal-guess");
   const rowBox = row.getBoundingClientRect();
   const guessBox = guessEl.getBoundingClientRect();
@@ -560,6 +572,20 @@ async function loadArchive() {
   }));
 }
 
+// Every visit opens on the rules and a button into today's game, rather than straight onto question 1.
+function showStartScreen() {
+  const label = isTodayFinished() ? "See today's results"
+    : (state.progress[today]?.guesses.length ?? 0) > 0 ? "Continue today's game" : "Play today's game";
+  document.querySelector("#startButton").innerHTML = `${label} <span aria-hidden="true">→</span>`;
+  const day = new Date(`${today}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
+  document.querySelector("#startEdition").textContent = `No. ${todayPuzzle.number} · ${day}`;
+  document.body.classList.add("starting");
+}
+
+function leaveStartScreen() {
+  document.body.classList.remove("starting");
+}
+
 function showHowToPlay() {
   openDialog("How to play", `<ul class="rules">
       <li>Guess the percentage for each of 5 questions.</li>
@@ -584,6 +610,10 @@ function escapeHtml(value) {
 function escapeAttr(value) { return escapeHtml(value); }
 
 document.querySelector("#howButton").addEventListener("click", showHowToPlay);
+document.querySelector("#startButton").addEventListener("click", () => {
+  leaveStartScreen();
+  window.scrollTo({ top: 0 });
+});
 document.querySelector("#statsButton").addEventListener("click", showStats);
 document.querySelector("#returnButton").addEventListener("click", () => {
   returnToToday();
@@ -621,11 +651,4 @@ if (state.progress[today]) {
   save();
 }
 render();
-if (!readPreference("percentle.seenHow")) {
-  showHowToPlay();
-  try {
-    localStorage.setItem("percentle.seenHow", "1");
-  } catch (error) {
-    console.error("Could not save the first-visit preference.", error);
-  }
-}
+showStartScreen();
