@@ -67,7 +67,8 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(-
 .reveal-row.lower{flex-direction:row-reverse}
 .reveal-num{font:500 44px/1.1 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
 .reveal-num small{font:400 24px var(--mono);color:var(--muted);margin-left:2px}
-.reveal-answer,.reveal-answer small{color:var(--green)}
+.reveal-answer,.reveal-answer small{color:var(--ink)}
+.reveal-answer{border-bottom:3px solid currentColor;padding-bottom:3px}
 .reveal-arrow{font:400 30px var(--mono);color:var(--muted)}
 .reveal-arrow,.reveal-answer{opacity:0;transition:opacity .6s ease .6s,transform .7s ease .6s}
 .reveal-answer{transform:translateX(-10px);transition-delay:.84s}
