@@ -121,33 +121,50 @@ rejects anything else.
 | Category    | What it covers |
 |-------------|----------------|
 | `Sports`    | NBA, NFL, MLB, college football, college basketball (men's or women's) |
-| `Music`     | Artists, albums, charts, Grammys, tours, streaming, instruments, music history |
-| `Movies`    | Films, actors and actresses, the Oscars, box office, franchises, directors |
-| `U.S. life` | American life, money, and business: brands, companies, apps, prices, jobs, college, polls, states |
-| `World`     | Countries, global events, and global business and brands |
+| `Music`     | Artists, songs, streaming, Spotify, tours, fans, the music business, music history |
+| `Movies`    | Films, actors and actresses, TV and streaming shows, box office, behind-the-scenes |
+| `U.S. life` | American life, money, and business: habits, apps, brands, companies, prices, jobs, college, polls |
+| `World`     | Mostly population and geography (people, cities, countries, land, oceans), plus global business |
 
 Business and money questions use `U.S. life` for American companies and habits, and `World` for
 global ones.
 
-**The mix is random, but tilted toward sports and music.** There are no required or maximum counts
-per category, so any day can look different. On most days, though, at least two of the five
-questions should be sports or music. Over many days, every category should still come up.
+**The mix flows freely.** There are no set themes, no required categories, and no fixed order.
+You don't need a movie question every day, and no category owns a particular slot, so shuffle
+the order every day. Lean toward sports and music overall. Over many days every category should
+still come up.
 
 ## Step 5: Write the questions
 
 Every question must have one correct, checkable percentage answer.
 
-**Good question shapes.** These examples show the format only. Never use them, or their teams,
-people, albums, or films, as real questions; come up with your own fresh topics. Mix eras: at
-least three of the five questions should be about the last 10 years.
-- A ratio from a finished, fixed record: "What percentage of their 82 regular-season games did the
-  2015–16 Golden State Warriors win?" (73 ÷ 82 = 89.0)
-- A published statistic with a clear time frame: "In 2023, what percentage of U.S. adults said they
-  drink coffee every day?"
-- A count from a closed list: "What percentage of the 45 people who have served as U.S. president
-  were born in Virginia?" (8 ÷ 45 = 17.8)
-- Movies and music: share of Oscar nominations won, share of an album's tracks that charted, a
-  film's share of a franchise's total box office, and so on.
+**Make every question feel unique.** The best questions zoom in on a specific, surprising stat
+about something people care about. They should make a fan say "ooh, I think I know this." Mix
+eras: at least three of the five questions should be about the last 10 years.
+
+The editor gave these as **references for the style, not questions to copy**. Never use these
+exact questions:
+- Sports: "What was Barry Bonds' on-base percentage in his best season?" "What percentage of
+  Saquon Barkley's rushing yards came after first contact?" "What was Steph Curry's 3-point
+  percentage in the Warriors' 73–9 season?" Individual players' stats and splits beat team
+  records.
+- Music: "What percentage of artists with over 1 million monthly Spotify listeners are from the
+  U.S.?" "What percentage of Drake's songs on Spotify have over 1 billion streams?"
+- Movies: "What percentage of the Barbie movie's runtime is Ken on screen?" "What percentage of
+  Americans say they've seen Titanic?"
+- U.S. life: survey-style questions about everyday habits, like the share of U.S. adults who use
+  TikTok. The editor liked these.
+- World: population and geography, for example the share of the world's people living in one
+  country, or the share of a continent covered by desert.
+
+**Avoid these overused formats.** The editor has seen them too often:
+- a team's regular-season win percentage;
+- the share of its Oscar or award nominations a film won;
+- the share of an album's tracks that reached the Billboard top 10 or charted;
+- UN membership counts.
+
+More generally, don't repeat a question **format** used in the last 14 days, even with a
+different team, artist, or film.
 
 **Rules**
 1. Ask for a single percentage and end with "?". Keep it under 220 characters and phrase it
