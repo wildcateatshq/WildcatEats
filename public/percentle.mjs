@@ -125,7 +125,6 @@ function render() {
   }
   const question = currentQuestions[index];
   document.querySelector("#questionCounter").textContent = `QUESTION ${String(index + 1).padStart(2, "0")}`;
-  document.querySelector("#categoryTag").textContent = question.category.toUpperCase();
   const guess = progress.draft ?? 50;
   stage.innerHTML = `
     <div class="question-body">
@@ -215,7 +214,6 @@ function playReveal(animate) {
 function guessForm(guess) {
   return `<div class="guess-display"><input class="guess-input" id="guessInput" type="number" inputmode="decimal" min="0" max="100" step="0.1" value="${Number(guess).toFixed(1)}" aria-label="Your percentage guess, from 0 to 100"><span class="percent-sign">%</span></div>
     <div class="range-wrap"><input id="guessRange" type="range" min="0" max="100" step="0.1" value="${guess}" aria-label="Adjust your percentage guess from 0 to 100"><div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div></div>
-    <div class="guess-scale"><span class="scale-tick" style="left:0">0</span><span class="scale-tick" style="left:25%">25</span><span class="scale-tick" style="left:50%">50</span><span class="scale-tick" style="left:75%">75</span><span class="scale-tick" style="left:100%">100</span></div>
     <button class="lock-button" id="lockButton">Lock in my guess <span aria-hidden="true">→</span></button>`;
 }
 
@@ -303,7 +301,6 @@ function renderResults() {
     ${practiceMode ? '<button class="next-button" id="replayButton" style="margin-top:9px;background:var(--paper);color:var(--ink)">Play this puzzle again</button><button class="next-button" id="todayButton" style="margin-top:9px;background:var(--paper);color:var(--ink)">Back to today\'s puzzle</button>' : ""}
     <button class="next-button" id="statsInline" style="margin-top:9px;background:var(--paper);color:var(--ink)">Your stats <span aria-hidden="true">→</span></button>`;
   document.querySelector("#questionCounter").textContent = "PUZZLE COMPLETE";
-  document.querySelector("#categoryTag").textContent = "NICE WORK";
   renderDots(5);
   document.querySelector("#shareButton").addEventListener("click", () => shareResult(score, progress));
   document.querySelector("#replayButton")?.addEventListener("click", () => {
