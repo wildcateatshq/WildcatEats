@@ -36,6 +36,11 @@ let currentNumber = todayPuzzle.number;
 let currentQuestions = todayPuzzle.questions;
 let practiceMode = false;
 let toastTimer;
+// Set just before rendering a freshly locked guess, so only that reveal (not a reload) animates.
+let justLocked = false;
+// What the score box above the card is showing, so the next update can count up from it.
+let shownScore = null;
+let countUpRun = 0;
 
 function readState() {
   try {
@@ -111,6 +116,9 @@ function render() {
   document.querySelector("#puzzleNumber").textContent = `NO. ${currentNumber}`;
   document.querySelector("#puzzleDate").textContent = currentDate === today ? "TODAY'S EDITION" : `${currentDate} · PRACTICE`;
   renderDots(Math.min(index, 4));
+  const animate = justLocked;
+  justLocked = false;
+  renderScoreBox(progress, view, animate);
   if (view.phase === "results") {
     renderResults();
     return;
@@ -127,9 +135,75 @@ function render() {
     </div>`;
   if (view.phase === "guess") bindGuessControls(guess, index);
   else {
-    requestAnimationFrame(() => document.querySelector(".comparison")?.classList.add("answered"));
+    playReveal(animate);
     bindNext(index);
   }
+}
+
+// The box above the card shows the running total (points off so far). It stays empty until the
+// first answer, then counts up to the new total each time a guess is revealed.
+function renderScoreBox(progress, view, animate) {
+  const box = document.querySelector("#scoreBox");
+  const value = document.querySelector("#scoreValue");
+  const note = document.querySelector("#scoreNote");
+  const key = `${practiceMode ? "practice" : "daily"}:${currentDate}`;
+  const locked = progress.guesses.length;
+  if (!locked) {
+    box.classList.remove("active");
+    shownScore = { key, value: 0 };
+    value.textContent = "0.0";
+    note.textContent = "";
+    return;
+  }
+  const total = Number(dailyTotal(progress.guesses, currentQuestions.slice(0, locked)).toFixed(1));
+  const lastOff = pointsOff(progress.guesses[locked - 1], currentQuestions[locked - 1].answer);
+  box.classList.add("active");
+  note.textContent = view.phase === "reveal"
+    ? `You were ${lastOff.toFixed(1)} pts off`
+    : view.phase === "results" ? "Final score · lower is better" : `After ${locked} of ${currentQuestions.length}`;
+  const from = shownScore?.key === key ? shownScore.value : animate ? total - lastOff : total;
+  shownScore = { key, value: total };
+  countUp(value, from, total);
+}
+
+function countUp(element, from, to) {
+  const run = ++countUpRun;
+  if (from === to || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    element.textContent = to.toFixed(1);
+    return;
+  }
+  const start = performance.now();
+  function tick(now) {
+    if (run !== countUpRun) return;
+    const ratio = Math.min(1, (now - start) / 700);
+    element.textContent = (from + (to - from) * (1 - Math.pow(1 - ratio, 3))).toFixed(1);
+    if (ratio < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+// Slides the guess sideways away from the answer, then fades in the arrow and the real answer,
+// while the line on the track grows from the guess dot to the answer dot.
+function playReveal(animate) {
+  const row = document.querySelector("#revealRow");
+  const comparison = document.querySelector(".comparison");
+  if (!animate) {
+    row.classList.add("instant", "go");
+    comparison.classList.add("instant", "answered");
+    return;
+  }
+  const guessEl = row.querySelector(".reveal-guess");
+  const rowBox = row.getBoundingClientRect();
+  const guessBox = guessEl.getBoundingClientRect();
+  const fromCenter = rowBox.left + rowBox.width / 2 - (guessBox.left + guessBox.width / 2);
+  guessEl.style.transform = `translateX(${fromCenter}px)`;
+  guessEl.getBoundingClientRect();
+  requestAnimationFrame(() => {
+    guessEl.style.transition = "transform .45s cubic-bezier(.2,.8,.2,1)";
+    guessEl.style.transform = "translateX(0)";
+    row.classList.add("go");
+    comparison.classList.add("answered");
+  });
 }
 
 function guessForm(guess) {
@@ -173,6 +247,7 @@ function bindGuessControls(initial, index) {
     progress.draft = null;
     recordTodayIfComplete(progress);
     save();
+    justLocked = true;
     render();
   });
   input.addEventListener("keydown", event => {
@@ -187,28 +262,24 @@ function reveal(question, guess, index) {
   const answerX = Math.max(0, Math.min(100, question.answer));
   const left = Math.min(guessX, answerX);
   const width = Math.abs(guessX - answerX);
-  return `<div class="guess-display"><span class="guess-input" aria-label="Your locked guess">${Number(guess).toFixed(1)}</span><span class="percent-sign">%</span></div>
-    <div class="comparison answered" aria-label="Your guess ${Number(guess).toFixed(1)} percent, answer ${question.answer} percent">
-      <div class="compare-track"><div class="compare-gap" style="left:${left}%;width:${width}%"></div>
+  const answerHigher = question.answer >= guess;
+  const arrow = off === 0 ? "=" : answerHigher ? "→" : "←";
+  return `<div class="reveal-row ${answerHigher ? "" : "lower"}" id="revealRow" aria-label="You guessed ${Number(guess).toFixed(1)} percent. The answer is ${question.answer} percent, ${off.toFixed(1)} points off.">
+      <span class="reveal-num reveal-guess">${Number(guess).toFixed(1)}<small>%</small></span>
+      <span class="reveal-arrow" aria-hidden="true">${arrow}</span>
+      <span class="reveal-num reveal-answer">${question.answer}<small>%</small></span>
+    </div>
+    <div class="comparison" aria-hidden="true">
+      <div class="compare-track"><div class="compare-gap" style="left:${left}%;width:${width}%;transform-origin:${answerHigher ? "left" : "right"}"></div>
         <span class="marker guess" style="left:${guessX}%"><span class="marker-caption">YOU</span></span>
         <span class="marker answer" style="left:${answerX}%"><span class="marker-caption">ANSWER</span></span></div>
       <div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div>
     </div>
-    <div class="answer-row reveal"><div><span class="answer-label">THE REAL ANSWER</span><strong class="true-answer">${question.answer}%</strong></div><div class="off-score"><span class="answer-label">YOU WERE</span><strong class="off-value" data-score="${off.toFixed(1)}">0.0</strong> <span class="off-unit">pts off</span></div></div>
     <p class="source-note">${escapeHtml(question.funFact)}</p>
     <button class="next-button" id="nextButton">${index === 4 ? "See my score" : "Next question"} <span aria-hidden="true">→</span></button>`;
 }
 
 function bindNext(index) {
-  const score = document.querySelector("[data-score]");
-  const final = Number(score.dataset.score);
-  const start = performance.now();
-  function tick(now) {
-    const ratio = Math.min(1, (now - start) / 500);
-    score.textContent = (final * (1 - Math.pow(1 - ratio, 3))).toFixed(1);
-    if (ratio < 1) requestAnimationFrame(tick);
-  }
-  requestAnimationFrame(tick);
   document.querySelector("#nextButton").addEventListener("click", () => {
     const progress = progressFor();
     progress.revealed = index + 1;

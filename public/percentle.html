@@ -26,8 +26,11 @@
     <main>
       <section class="intro">
         <div class="date-line"><span class="live-dot"></span><span id="puzzleDate">TODAY'S EDITION</span><span class="date-rule"></span><span id="puzzleNumber">NO. 1</span></div>
-        <h1>A little game of<br><em>big percentages.</em></h1>
-        <p class="intro-copy">Five real-world facts. Five educated guesses.<br>Get as close as you can — lower is better.</p>
+        <div class="score-box" id="scoreBox" aria-live="polite">
+          <span class="score-box-label">YOUR SCORE</span>
+          <strong class="score-box-value" id="scoreValue">0.0</strong>
+          <span class="score-box-note" id="scoreNote"></span>
+        </div>
       </section>
 
       <section class="game-card" id="gameCard" aria-live="polite">
