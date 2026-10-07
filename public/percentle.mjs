@@ -360,7 +360,7 @@ function renderResults() {
     ${practiceMode ? "" : `<section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">Today's score line</h3><p class="crowd-copy">Your total is added anonymously. Never your guesses, name, or account.</p><p class="crowd-status">Placing you on today's score line…</p></section>`}
     <button class="share-button" id="shareButton">Share ${currentDate === today ? "today's" : "this"} result <span aria-hidden="true">↗</span></button>
     ${practiceMode ? '<button class="next-button" id="replayButton" style="margin-top:9px;background:var(--paper);color:var(--ink)">Play this puzzle again</button><button class="next-button" id="todayButton" style="margin-top:9px;background:var(--paper);color:var(--ink)">Back to today\'s puzzle</button>' : ""}
-    <button class="next-button" id="statsInline" style="margin-top:9px;background:var(--paper);color:var(--ink)">Your stats <span aria-hidden="true">→</span></button>`;
+    <button class="next-button" id="statsInline" style="margin-top:9px;background:var(--paper);color:var(--ink)">Your stats &amp; archives <span aria-hidden="true">→</span></button>`;
   document.querySelector("#questionCounter").textContent = "PUZZLE COMPLETE";
   renderDots(5);
   renderRecap(progress);
