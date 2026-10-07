@@ -1,10 +1,15 @@
 export const PUZZLES_PER_DAY = 5;
 
+// Guesses within this many points of the answer (either side, inclusive) score a perfect 0.
+export const PERFECT_MARGIN = 0.5;
+
 export function pointsOff(guess, answer) {
   if (!Number.isFinite(guess) || !Number.isFinite(answer) || guess < 0 || guess > 100 || answer < 0 || answer > 100) {
     throw new RangeError("Guess and answer must be numbers between 0 and 100.");
   }
-  return Math.abs(guess - answer);
+  // Rounded to tenths so floating-point noise (16.5 - 16 = 0.5000000001) can't push a guess outside the margin.
+  const difference = Math.round(Math.abs(guess - answer) * 10) / 10;
+  return difference <= PERFECT_MARGIN ? 0 : difference;
 }
 
 export function dailyTotal(guesses, questions) {

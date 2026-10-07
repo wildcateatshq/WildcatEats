@@ -16,6 +16,14 @@ test("points off is absolute percentage point difference", () => {
   assert.equal(pointsOff(100, 0), 100);
 });
 
+test("guesses within 0.5 points of the answer score a perfect 0", () => {
+  assert.equal(pointsOff(16.4, 16), 0);
+  assert.equal(pointsOff(15.6, 16), 0);
+  assert.equal(pointsOff(16.5, 16), 0, "exactly 0.5 counts");
+  assert.equal(pointsOff(16.6, 16), 0.6, "just outside scores the full difference");
+  assert.equal(pointsOff(0.3, 0.8), 0);
+});
+
 test("points off rejects guesses outside the percentage range", () => {
   assert.throws(() => pointsOff(-0.1, 20), RangeError);
   assert.throws(() => pointsOff(101, 20), RangeError);
@@ -23,7 +31,8 @@ test("points off rejects guesses outside the percentage range", () => {
 
 test("daily total sums the five absolute differences", () => {
   const questions = [10, 20, 30, 40, 50].map(answer => ({ answer }));
-  assert.equal(dailyTotal([11, 18, 30.5, 42, 45], questions), 10.5);
+  // 1 + 2 + 0 (30.5 is within 0.5 of 30) + 2 + 5
+  assert.equal(dailyTotal([11, 18, 30.5, 42, 45], questions), 10);
   assert.throws(() => dailyTotal([10], questions), RangeError);
 });
 
