@@ -507,11 +507,11 @@ async function loadArchive() {
 }
 
 function showHowToPlay() {
-  openDialog("How to play", `<p><strong>Five questions, one daily puzzle.</strong> Everyone gets the same five fresh questions, with a new set every day at midnight Eastern.</p>
-    <p>Guess the percentage using the slider or type a number. Lock it in to see the real answer, your distance in percentage points, and where both land on the 0–100 line.</p>
-    <p><strong>Lower is better.</strong> Your daily score adds up all five misses, from 0 (nailed it) to 500. Landing within 0.5 of the answer counts as a perfect 0. No accounts: your progress and stats stay in this browser.</p>
-    <p>When you finish, your daily total is added anonymously to today's score line so you can see where you sit between the day's best and worst. Your guesses and identity are never sent.</p>
-    <p>Play today's puzzle first, then use Your stats to revisit earlier puzzles on this device.</p>
+  openDialog("How to play", `<ul class="rules">
+      <li>Guess the percentage for each of 5 questions.</li>
+      <li>Your score is how far off you were, added up. <strong>Lower is better</strong>, and within 0.5 counts as perfect.</li>
+      <li>A new puzzle arrives every day at midnight Eastern.</li>
+    </ul>
     <button class="share-button" data-close>Let's play</button>`);
   dialog.querySelector("[data-close]")?.addEventListener("click", () => dialog.close());
 }
