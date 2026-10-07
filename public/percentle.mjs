@@ -1,4 +1,4 @@
-import { applyGuessKey, closeness, dailyTotal, easternDate, guessEntryFrom, guessEntryText, pointsOff, scoreColor, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { applyGuessKey, closeness, dailyTotal, reactionFor, easternDate, guessEntryFrom, guessEntryText, pointsOff, scoreColor, utcDate, viewForProgress } from "/percentle/game.mjs";
 
 const PUZZLES_URL = "/api/percentle/puzzles";
 // v2: puzzles now come from the daily agent, so v1 progress (from the old bank) no longer matches.
@@ -139,7 +139,7 @@ function render() {
   stage.innerHTML = `
     <div class="question-body">
       <h2 class="question-text">${escapeHtml(question.text)}</h2>
-      <p class="question-hint">0-100%</p>
+      <div class="hint-row"><p class="question-hint">0-100%</p>${view.phase === "reveal" ? reactionLine(question, progress.guesses[index]) : ""}</div>
       ${view.phase === "reveal" ? reveal(question, progress.guesses[index], index) : guessForm(guess)}
     </div>`;
   if (view.phase === "guess") bindGuessControls(guess, index);
@@ -204,6 +204,7 @@ function playReveal(animate) {
   const comparison = document.querySelector(".comparison");
   const card = document.querySelector("#gameCard");
   card.classList.remove("thud");
+  document.querySelector(".reaction")?.classList.add(animate ? "pop" : "shown");
   if (!animate) {
     row.classList.add("instant", "go");
     comparison.classList.add("instant", "answered");
@@ -285,6 +286,11 @@ function bindGuessControls(initial, index) {
     if (event.key === "Enter") document.querySelector("#lockButton").click();
   });
   input.value = Number(initial).toFixed(1);
+}
+
+function reactionLine(question, guess) {
+  const reaction = reactionFor(pointsOff(guess, question.answer), `${currentDate}:${question.text}`);
+  return reaction ? `<span class="reaction">${escapeHtml(reaction)}</span>` : "";
 }
 
 function reveal(question, guess, index) {

@@ -37,6 +37,26 @@ export function closeness(off) {
   return { tone: "bad", strength: Math.min(1, (off - NEUTRAL_OFF) / (WORST_OFF - NEUTRAL_OFF)) };
 }
 
+// Short reactions shown after each reveal, from closest to farthest. A perfect answer gets the
+// "Perfect Answer!" stamp instead, so it has no entry here.
+export const REACTIONS = [
+  { upTo: 3, lines: ["Fantastic!", "So close!", "Incredible!", "What a guess!", "Razor sharp!"] },
+  { upTo: 8, lines: ["Great guess!", "Really close!", "Nice one!", "Sharp instincts!", "Well played!"] },
+  { upTo: 15, lines: ["Not bad!", "Solid guess!", "In the ballpark!", "Pretty close!", "Good read!"] },
+  { upTo: 30, lines: ["Good try!", "Not too far off!", "Decent guess!", "Close-ish!", "Keep it up!"] },
+  { upTo: Infinity, lines: ["You'll get it next time!", "Tough one!", "That one was sneaky!", "Shake it off!", "Bounce back!"] }
+];
+
+// Picks a reaction for how far off a guess was. The same seed (e.g. the question text) always
+// gives the same reaction, so reloading the page doesn't change it.
+export function reactionFor(off, seed = "") {
+  if (off === 0) return "";
+  const { lines } = REACTIONS.find(tier => off <= tier.upTo);
+  let hash = 0;
+  for (const character of seed) hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  return lines[hash % lines.length];
+}
+
 export function scoreColor(points) {
   if (points <= 5) return "green";
   if (points <= 15) return "yellow";

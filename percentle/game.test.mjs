@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import {
   applyGuessKey,
   closeness,
+  REACTIONS,
+  reactionFor,
   dailyTotal,
   guessEntryFrom,
   guessEntryText,
@@ -79,6 +81,15 @@ test("the closeness colour scale slides from deep green through neutral to deep 
   assert.equal(closeness(30).tone, "bad");
   assert.ok(closeness(30.1).strength > closeness(30).strength, "each tenth further away is a little more red");
   assert.deepEqual(closeness(80), { tone: "bad", strength: 1 });
+});
+
+test("reactions match how close the guess was and stay the same on reload", () => {
+  const tierOf = line => REACTIONS.findIndex(tier => tier.lines.includes(line));
+  assert.equal(reactionFor(0, "q"), "", "perfect answers get the stamp instead");
+  assert.equal(tierOf(reactionFor(2, "q")), 0);
+  assert.equal(tierOf(reactionFor(10, "q")), 2);
+  assert.equal(tierOf(reactionFor(45, "q")), 4);
+  assert.equal(reactionFor(10, "same question"), reactionFor(10, "same question"));
 });
 
 test("result colors respect their point-off thresholds", () => {

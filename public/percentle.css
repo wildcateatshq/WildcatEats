@@ -34,6 +34,10 @@ main{padding:47px 0 34px}
 .question-body{padding:32px 0 8px}
 .question-text{font:700 clamp(22px,4.8vw,30px)/1.27 var(--serif);letter-spacing:-.5px;margin:0 0 12px;max-width:550px}
 .question-hint{color:var(--muted);font-size:12px;margin:0;line-height:1.55}
+.hint-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:baseline;gap:8px}
+.reaction{color:var(--muted);font-size:13px;font-weight:600;white-space:nowrap;opacity:0}
+.reaction.pop{animation:pop .84s cubic-bezier(.2,.8,.2,1) 1.3s both}
+.reaction.shown{opacity:1}
 .guess-display{display:flex;justify-content:center;align-items:baseline;gap:5px;margin:24px 0 3px}
 .guess-input{width:138px;border:0;border-bottom:2px solid var(--line);border-radius:0;background:transparent;color:var(--ink);text-align:center;font:500 49px/1.1 var(--mono);outline:none;padding:0 2px 7px;font-variant-numeric:tabular-nums}
 .guess-input:focus{border-color:var(--green)}
