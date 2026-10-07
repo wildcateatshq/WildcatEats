@@ -309,7 +309,7 @@ function reveal(question, guess, index) {
       <span class="reveal-num reveal-answer">${question.answer.toFixed(1)}<small>%</small></span>
       ${off === 0 ? '<span class="perfect-stamp" role="status">Perfect Answer!</span>' : ""}
     </div>
-    <div class="comparison${width < 12 ? " near" : ""}" aria-hidden="true">
+    <div class="comparison" aria-hidden="true">
       <div class="compare-track"><div class="compare-gap" style="left:${left}%;width:${width}%;transform-origin:${answerHigher ? "left" : "right"}"></div>
         <span class="marker guess" style="left:${guessX}%;--closeness:${guessColor}"><span class="marker-caption">YOU</span></span>
         <span class="marker answer" style="left:${answerX}%"><span class="marker-caption">ANSWER</span></span></div>

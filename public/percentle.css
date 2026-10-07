@@ -85,7 +85,8 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(-
 .marker.answer{background:var(--green);color:var(--green);opacity:0;transition:opacity .5s 1.2s}
 .comparison.answered .marker.answer{opacity:1}
 .marker-caption{position:absolute;top:17px;white-space:nowrap;transform:translateX(-50%);font:9px var(--mono);color:var(--muted)}
-.comparison.near .marker.guess .marker-caption{top:auto;bottom:17px}
+/* YOU always sits above the track and ANSWER below, so they never collide. */
+.marker.guess .marker-caption{top:auto;bottom:17px}
 .source-note{background:var(--paper);padding:12px 14px;border-radius:7px;color:var(--muted);font-size:11px;line-height:1.55}
 .source-note a{color:var(--green);font-weight:700;text-underline-offset:2px}
 .next-button{margin-top:17px}
