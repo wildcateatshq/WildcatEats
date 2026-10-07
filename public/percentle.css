@@ -46,7 +46,6 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(-
 .lock-button,.next-button,.share-button{width:100%;border:0;border-radius:7px;background:var(--green);color:#fff;font-weight:700;font-size:14px;padding:15px 18px;cursor:pointer;transition:transform .18s,filter .18s}
 .lock-button:hover,.next-button:hover,.share-button:hover{filter:brightness(1.08);transform:translateY(-1px)}
 .lock-button:focus-visible,.next-button:focus-visible,.share-button:focus-visible,button:focus-visible{outline:3px solid var(--orange);outline-offset:3px}
-.button-note{text-align:center;color:var(--muted);font-size:10px;margin:11px 0 0}
 .reveal{animation:rise .42s cubic-bezier(.2,.8,.2,1) both}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 .answer-row{display:flex;justify-content:space-between;gap:12px;align-items:end;padding:20px 0 13px}
@@ -64,12 +63,6 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(-
 .source-note{background:var(--paper);padding:12px 14px;border-radius:7px;color:var(--muted);font-size:11px;line-height:1.55}
 .source-note a{color:var(--green);font-weight:700;text-underline-offset:2px}
 .next-button{margin-top:17px}
-.below-card{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:11px;padding:17px 3px}
-.below-card>span:last-child span{color:var(--orange)}
-.stamp{font:9px var(--mono);letter-spacing:.5px}
-footer{height:58px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;color:var(--muted);font-size:10px}
-footer span:last-child{font:9px var(--mono);letter-spacing:.7px}
-footer b{color:var(--orange)}
 .archive-list{display:flex;gap:7px;flex-wrap:wrap}.archive-chip{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:8px 12px;font:10px var(--mono);cursor:pointer}.archive-chip:hover{border-color:var(--green)}
 .final-score{text-align:center;padding:40px 0 22px}.final-score .score-number{font:500 clamp(56px,13vw,88px)/1 var(--mono);letter-spacing:-6px;color:var(--green);font-variant-numeric:tabular-nums}.final-score h2{font:700 27px var(--serif);margin:12px 0 6px}.final-score p{color:var(--muted);font-size:12px;margin:0}
 .share-button{background:var(--ink);color:var(--card)}
@@ -79,5 +72,5 @@ footer b{color:var(--orange)}
 dialog{width:min(440px,calc(100% - 32px));border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--ink);padding:25px 27px 29px;box-shadow:0 24px 80px #0002}dialog::backdrop{background:#121a15a6;backdrop-filter:blur(3px)}.dialog-head{display:flex;justify-content:space-between;align-items:center}.dialog-kicker{font:9px var(--mono);letter-spacing:1px;color:var(--muted)}.close-button{font-size:21px}.dialog-title{font:700 29px var(--serif);margin:17px 0 12px}dialog h2{font:700 29px var(--serif);margin:17px 0 12px}dialog p,dialog li{font-size:13px;line-height:1.7;color:var(--muted)}dialog p strong{color:var(--ink)}.dialog-actions{display:flex;gap:9px}.dialog-actions button{flex:1}
 .toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,15px);opacity:0;pointer-events:none;border-radius:99px;background:var(--ink);color:var(--card);padding:11px 16px;font-size:12px;transition:.2s;z-index:5}.toast.visible{opacity:1;transform:translate(-50%,0)}
 [hidden]{display:none!important}
-@media(max-width:520px){.site-shell{width:min(100% - 28px,720px)}.topbar{height:64px}main{padding:36px 0 20px}.intro{margin-bottom:25px}.game-card{padding:17px 19px 24px;border-radius:13px;min-height:380px}.question-body{padding-top:25px}.guess-input{font-size:44px}.below-card{gap:8px;font-size:10px}.stamp{font-size:8px}.dialog-actions{flex-direction:column}footer{font-size:9px}footer span:last-child{font-size:8px}}
+@media(max-width:520px){.site-shell{width:min(100% - 28px,720px)}.topbar{height:64px}main{padding:36px 0 20px}.intro{margin-bottom:25px}.game-card{padding:17px 19px 24px;border-radius:13px;min-height:380px}.question-body{padding-top:25px}.guess-input{font-size:44px}.dialog-actions{flex-direction:column}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
