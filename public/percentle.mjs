@@ -6,6 +6,11 @@ const STORAGE_KEY = "percentle.v2";
 const stage = document.querySelector("#questionStage");
 const dialog = document.querySelector("#infoDialog");
 const toast = document.querySelector("#toast");
+// Local testing only: http://localhost:3000/percentle.html?reset clears saved progress and stats.
+if (location.hostname === "localhost" && new URLSearchParams(location.search).has("reset")) {
+  try { localStorage.removeItem(STORAGE_KEY); } catch {}
+  history.replaceState(null, "", location.pathname);
+}
 const savedTheme = readPreference("percentle.theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 document.documentElement.dataset.theme = savedTheme;
 
