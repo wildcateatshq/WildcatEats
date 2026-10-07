@@ -124,6 +124,8 @@ function render() {
   const progress = progressFor();
   const view = viewForProgress(progress, currentQuestions.length);
   const index = view.index;
+  // Only shown while replaying an archived puzzle, so players can leave it at any time.
+  document.querySelector("#returnButton").hidden = !practiceMode;
   document.querySelector("#puzzleNumber").textContent = `NO. ${currentNumber}`;
   document.querySelector("#puzzleDate").textContent = currentDate === today ? "TODAY'S EDITION" : `${currentDate} · PRACTICE`;
   renderDots(Math.min(index, 4));
@@ -554,6 +556,10 @@ function escapeAttr(value) { return escapeHtml(value); }
 
 document.querySelector("#howButton").addEventListener("click", showHowToPlay);
 document.querySelector("#statsButton").addEventListener("click", showStats);
+document.querySelector("#returnButton").addEventListener("click", () => {
+  returnToToday();
+  showStats();
+});
 document.querySelector("#themeButton").addEventListener("click", () => {
   const root = document.documentElement;
   const theme = root.dataset.theme === "dark" ? "light" : "dark";
