@@ -130,7 +130,7 @@ function render() {
   stage.innerHTML = `
     <div class="question-body">
       <h2 class="question-text">${escapeHtml(question.text)}</h2>
-      <p class="question-hint">Percentage 0-100</p>
+      <p class="question-hint">0-100%</p>
       ${view.phase === "reveal" ? reveal(question, progress.guesses[index], index) : guessForm(guess)}
     </div>`;
   if (view.phase === "guess") bindGuessControls(guess, index);
@@ -158,9 +158,15 @@ function renderScoreBox(progress, view, animate) {
   const total = Number(dailyTotal(progress.guesses, currentQuestions.slice(0, locked)).toFixed(1));
   const lastOff = pointsOff(progress.guesses[locked - 1], currentQuestions[locked - 1].answer);
   box.classList.add("active");
+  // Blank while answering; "You were X pts off" pops in with each reveal.
   note.textContent = view.phase === "reveal"
     ? `You were ${lastOff.toFixed(1)} pts off`
-    : view.phase === "results" ? "Final score · lower is better" : `After ${locked} of ${currentQuestions.length}`;
+    : view.phase === "results" ? "Final score · lower is better" : "";
+  note.classList.remove("pop");
+  if (animate && view.phase === "reveal") {
+    note.getBoundingClientRect();
+    note.classList.add("pop");
+  }
   const from = shownScore?.key === key ? shownScore.value : animate ? total - lastOff : total;
   shownScore = { key, value: total };
   countUp(value, from, total);

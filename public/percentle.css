@@ -19,6 +19,8 @@ main{padding:47px 0 34px}
 .score-box-label{color:var(--muted);font:9px var(--mono);letter-spacing:1.2px}
 .score-box-value{font:500 clamp(52px,12vw,76px)/1 var(--mono);letter-spacing:-3px;color:var(--ink);font-variant-numeric:tabular-nums;margin:6px 0 8px}
 .score-box-note{color:var(--muted);font-size:12px;min-height:16px}
+.score-box-note.pop{animation:pop .84s cubic-bezier(.2,.8,.2,1) .3s both}
+@keyframes pop{from{opacity:0;transform:translateY(6px) scale(.96)}to{opacity:1;transform:none}}
 .date-line{display:flex;justify-content:center;align-items:center;gap:9px;color:var(--muted);font:10px var(--mono);letter-spacing:1.2px}
 .live-dot{width:6px;height:6px;background:#76a780;border-radius:50%;box-shadow:0 0 0 3px #76a78021}
 .date-rule{width:24px;height:1px;background:var(--line)}
