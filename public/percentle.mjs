@@ -311,7 +311,7 @@ function reveal(question, guess, index) {
     </div>
     <div class="comparison${width < 12 ? " near" : ""}" aria-hidden="true">
       <div class="compare-track"><div class="compare-gap" style="left:${left}%;width:${width}%;transform-origin:${answerHigher ? "left" : "right"}"></div>
-        <span class="marker guess" style="left:${guessX}%"><span class="marker-caption">YOU</span></span>
+        <span class="marker guess" style="left:${guessX}%;--closeness:${guessColor}"><span class="marker-caption">YOU</span></span>
         <span class="marker answer" style="left:${answerX}%"><span class="marker-caption">ANSWER</span></span></div>
       <div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div>
     </div>

@@ -80,7 +80,8 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(-
 .reveal-row.go .reveal-arrow,.reveal-row.go .reveal-answer{opacity:1;transform:none}
 .instant,.instant *{transition:none!important}
 .marker{position:absolute;top:50%;width:13px;height:13px;border:3px solid var(--card);border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 1.5px currentColor;z-index:2}
-.marker.guess{background:var(--ink);color:var(--ink)}
+.marker.guess{background:var(--ink);color:var(--ink);transition:background-color .9s ease,color .9s ease}
+.comparison.answered .marker.guess{background:var(--closeness);color:var(--closeness)}
 .marker.answer{background:var(--green);color:var(--green);opacity:0;transition:opacity .5s 1.2s}
 .comparison.answered .marker.answer{opacity:1}
 .marker-caption{position:absolute;top:17px;white-space:nowrap;transform:translateX(-50%);font:9px var(--mono);color:var(--muted)}
