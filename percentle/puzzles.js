@@ -113,6 +113,13 @@ function createPuzzleStore(options = {}) {
           published_at timestamptz not null default now()
         )
       `);
+      await pool.query(`
+        create table if not exists percentle_agent_notes (
+          id smallint primary key default 1 check (id = 1),
+          notes text not null,
+          updated_at timestamptz not null default now()
+        )
+      `);
       return;
     }
     try {
@@ -163,7 +170,37 @@ function createPuzzleStore(options = {}) {
     return operation;
   }
 
-  return { init, get, dates, put };
+  // The agent's running notes on what the editor likes and dislikes, carried between nightly runs.
+  const notesPath = filePath.replace(/\.json$/, "") + "-agent-notes.md";
+
+  async function getNotes() {
+    if (pool) {
+      const { rows } = await pool.query("select notes, updated_at from percentle_agent_notes where id = 1");
+      return rows[0] ? { notes: rows[0].notes, updatedAt: rows[0].updated_at } : { notes: "", updatedAt: null };
+    }
+    try {
+      const [notes, stats] = await Promise.all([fs.readFile(notesPath, "utf8"), fs.stat(notesPath)]);
+      return { notes, updatedAt: stats.mtime };
+    } catch (error) {
+      if (error.code === "ENOENT") return { notes: "", updatedAt: null };
+      throw error;
+    }
+  }
+
+  async function putNotes(notes) {
+    if (pool) {
+      await pool.query(
+        `insert into percentle_agent_notes (id, notes) values (1, $1)
+         on conflict (id) do update set notes = excluded.notes, updated_at = now()`,
+        [notes]
+      );
+      return;
+    }
+    await fs.mkdir(path.dirname(notesPath), { recursive: true });
+    await fs.writeFile(notesPath, notes, "utf8");
+  }
+
+  return { init, get, dates, put, getNotes, putNotes };
 }
 
 module.exports = {

@@ -111,4 +111,12 @@ test("puzzle API publishes with a token and never leaks future puzzles", async t
   const history = await fetch(`${url}/history`, { headers: { authorization: "Bearer secret-token" } }).then(response => response.json());
   assert.deepEqual(history.puzzles.map(puzzle => puzzle.date), ["2026-10-07", "2026-10-06"]);
   assert.deepEqual((await fetch(`${url}/archive`).then(response => response.json())).puzzles, []);
+
+  const auth = { authorization: "Bearer secret-token", "content-type": "application/json" };
+  assert.equal((await fetch(`${url}/agent-notes`)).status, 401);
+  assert.equal((await fetch(`${url}/agent-notes`, { headers: auth }).then(response => response.json())).notes, "");
+  const saved = await fetch(`${url}/agent-notes`, { method: "PUT", headers: auth, body: JSON.stringify({ notes: "Likes NBA; dislikes census stats." }) });
+  assert.equal(saved.status, 200);
+  assert.equal((await fetch(`${url}/agent-notes`, { headers: auth }).then(response => response.json())).notes, "Likes NBA; dislikes census stats.");
+  assert.equal((await fetch(`${url}/agent-notes`, { method: "PUT", headers: auth, body: JSON.stringify({ notes: "x".repeat(20_001) }) })).status, 400);
 });

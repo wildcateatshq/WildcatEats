@@ -5,6 +5,7 @@ const express = require("express");
 const { MAX_DAYS_AHEAD, addDays, daysBetween, easternDate, isCalendarDate, puzzleNumber, validatePuzzle } = require("./puzzles");
 
 const ARCHIVE_DAYS = 30;
+const MAX_NOTES_LENGTH = 20_000;
 
 function createPuzzleRouter(store, options = {}) {
   const router = express.Router();
@@ -64,6 +65,28 @@ function createPuzzleRouter(store, options = {}) {
       const puzzles = [];
       for (const day of dates) puzzles.push({ date: day, questions: await store.get(day) });
       res.json({ today: date, puzzles });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // The agent's notes on the editor's likes and dislikes, read and rewritten on each run.
+  router.get("/agent-notes", requirePublisher, async (req, res, next) => {
+    try {
+      res.json(await store.getNotes());
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  router.put("/agent-notes", requirePublisher, async (req, res, next) => {
+    try {
+      const notes = req.body?.notes;
+      if (typeof notes !== "string" || notes.length > MAX_NOTES_LENGTH) {
+        return res.status(400).json({ error: `notes must be a string of at most ${MAX_NOTES_LENGTH} characters.` });
+      }
+      await store.putNotes(notes);
+      res.json({ notes, updatedAt: new Date().toISOString() });
     } catch (error) {
       next(error);
     }
