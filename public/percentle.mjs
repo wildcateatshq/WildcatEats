@@ -175,7 +175,7 @@ function countUp(element, from, to) {
   const start = performance.now();
   function tick(now) {
     if (run !== countUpRun) return;
-    const ratio = Math.min(1, (now - start) / 700);
+    const ratio = Math.min(1, (now - start) / 1400);
     element.textContent = (from + (to - from) * (1 - Math.pow(1 - ratio, 3))).toFixed(1);
     if (ratio < 1) requestAnimationFrame(tick);
   }
@@ -199,7 +199,7 @@ function playReveal(animate) {
   guessEl.style.transform = `translateX(${fromCenter}px)`;
   guessEl.getBoundingClientRect();
   requestAnimationFrame(() => {
-    guessEl.style.transition = "transform .45s cubic-bezier(.2,.8,.2,1)";
+    guessEl.style.transition = "transform .9s cubic-bezier(.2,.8,.2,1)";
     guessEl.style.transform = "translateX(0)";
     row.classList.add("go");
     comparison.classList.add("answered");
