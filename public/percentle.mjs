@@ -195,7 +195,7 @@ function reveal(question, guess, index) {
       <div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div>
     </div>
     <div class="answer-row reveal"><div><span class="answer-label">THE REAL ANSWER</span><strong class="true-answer">${question.answer}%</strong></div><div class="off-score"><span class="answer-label">YOU WERE</span><strong class="off-value" data-score="${off.toFixed(1)}">0.0</strong> <span class="off-unit">pts off</span></div></div>
-    <p class="source-note"><span class="answer-label">FUN FACT</span>${escapeHtml(question.funFact)}</p>
+    <p class="source-note">${escapeHtml(question.funFact)}</p>
     <button class="next-button" id="nextButton">${index === 4 ? "See my score" : "Next question"} <span aria-hidden="true">→</span></button>`;
 }
 
