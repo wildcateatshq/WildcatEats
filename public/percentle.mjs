@@ -169,7 +169,7 @@ function renderScoreBox(progress, view, animate) {
   box.classList.add("active");
   // Blank while answering; "You were X pts off" pops in with each reveal.
   note.textContent = view.phase === "reveal"
-    ? lastOff === 0 ? "Within 0.5, so 0 pts off!" : `You were ${lastOff.toFixed(1)} pts off`
+    ? lastOff === 0 ? "Perfect!" : `You were ${lastOff.toFixed(1)} pts off`
     : view.phase === "results" ? "Final score · lower is better" : "";
   note.classList.remove("pop");
   if (animate && view.phase === "reveal") {
