@@ -1,4 +1,4 @@
-import { applyGuessKey, dailyTotal, easternDate, guessEntryFrom, guessEntryText, pointsOff, scoreColor, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { applyGuessKey, closeness, dailyTotal, easternDate, guessEntryFrom, guessEntryText, pointsOff, scoreColor, utcDate, viewForProgress } from "/percentle/game.mjs";
 
 const PUZZLES_URL = "/api/percentle/puzzles";
 // v2: puzzles now come from the daily agent, so v1 progress (from the old bank) no longer matches.
@@ -197,6 +197,8 @@ function countUp(element, from, to) {
 function playReveal(animate) {
   const row = document.querySelector("#revealRow");
   const comparison = document.querySelector(".comparison");
+  const card = document.querySelector("#gameCard");
+  card.classList.remove("thud");
   if (!animate) {
     row.classList.add("instant", "go");
     comparison.classList.add("instant", "answered");
@@ -213,6 +215,8 @@ function playReveal(animate) {
     guessEl.style.transform = "translateX(0)";
     row.classList.add("go");
     comparison.classList.add("answered");
+    // The card jolts as the "Perfect Answer!" stamp lands.
+    if (row.querySelector(".perfect-stamp")) card.classList.add("thud");
   });
 }
 
@@ -286,12 +290,15 @@ function reveal(question, guess, index) {
   const width = Math.abs(guessX - answerX);
   const answerHigher = question.answer >= guess;
   const arrow = guess === question.answer ? "=" : answerHigher ? "→" : "←";
+  const { tone, strength } = closeness(off);
+  const guessColor = `color-mix(in oklab, var(--${tone}) ${(strength * 100).toFixed(1)}%, var(--ink))`;
   return `<div class="reveal-row ${answerHigher ? "" : "lower"}" id="revealRow" aria-label="You guessed ${Number(guess).toFixed(1)} percent. The answer is ${question.answer.toFixed(1)} percent, ${off.toFixed(1)} points off.">
-      <span class="reveal-num reveal-guess">${Number(guess).toFixed(1)}<small>%</small></span>
+      <span class="reveal-num reveal-guess" style="--closeness:${guessColor}">${Number(guess).toFixed(1)}<small>%</small></span>
       <span class="reveal-arrow" aria-hidden="true">${arrow}</span>
       <span class="reveal-num reveal-answer">${question.answer.toFixed(1)}<small>%</small></span>
+      ${off === 0 ? '<span class="perfect-stamp" role="status">Perfect Answer!</span>' : ""}
     </div>
-    <div class="comparison" aria-hidden="true">
+    <div class="comparison${width < 12 ? " near" : ""}" aria-hidden="true">
       <div class="compare-track"><div class="compare-gap" style="left:${left}%;width:${width}%;transform-origin:${answerHigher ? "left" : "right"}"></div>
         <span class="marker guess" style="left:${guessX}%"><span class="marker-caption">YOU</span></span>
         <span class="marker answer" style="left:${answerX}%"><span class="marker-caption">ANSWER</span></span></div>

@@ -25,6 +25,18 @@ export function viewForProgress(progress, questionCount = PUZZLES_PER_DAY) {
   return { phase: hasPendingReveal ? "reveal" : "guess", index };
 }
 
+// How close a guess was, as a sliding colour scale: strength 1 is the deepest green (perfect) or
+// the deepest red (50+ points off); strength 0 is neutral (about 15 points off). Every tenth of a
+// point moves it a little.
+export const NEUTRAL_OFF = 15;
+export const WORST_OFF = 50;
+
+export function closeness(off) {
+  if (off <= PERFECT_MARGIN) return { tone: "good", strength: 1 };
+  if (off < NEUTRAL_OFF) return { tone: "good", strength: (NEUTRAL_OFF - off) / (NEUTRAL_OFF - PERFECT_MARGIN) };
+  return { tone: "bad", strength: Math.min(1, (off - NEUTRAL_OFF) / (WORST_OFF - NEUTRAL_OFF)) };
+}
+
 export function scoreColor(points) {
   if (points <= 5) return "green";
   if (points <= 15) return "yellow";

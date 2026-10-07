@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   applyGuessKey,
+  closeness,
   dailyTotal,
   guessEntryFrom,
   guessEntryText,
@@ -68,6 +69,16 @@ test("typed guesses keep a fixed decimal point", () => {
   assert.equal(typeKeys(37.4, backspace("<<")), "3.0", "then the whole digits");
   assert.equal(typeKeys(50, backspace("425<<")), "4.0");
   assert.equal(typeKeys(50, backspace("425<<6")), "46.0", "after deleting, typing continues in the whole part");
+});
+
+test("the closeness colour scale slides from deep green through neutral to deep red", () => {
+  assert.deepEqual(closeness(0), { tone: "good", strength: 1 });
+  assert.equal(closeness(5).tone, "good");
+  assert.ok(closeness(5).strength > closeness(5.1).strength, "each tenth further away is a little less green");
+  assert.equal(closeness(15).strength, 0, "about 15 off is neutral");
+  assert.equal(closeness(30).tone, "bad");
+  assert.ok(closeness(30.1).strength > closeness(30).strength, "each tenth further away is a little more red");
+  assert.deepEqual(closeness(80), { tone: "bad", strength: 1 });
 });
 
 test("result colors respect their point-off thresholds", () => {

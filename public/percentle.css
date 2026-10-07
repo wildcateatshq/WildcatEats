@@ -1,5 +1,5 @@
-:root{color-scheme:light;--paper:#f6f6f0;--card:#fff;--ink:#242824;--muted:#777d75;--line:#e6e8df;--green:#3f785c;--lime:#dff0df;--orange:#e8a354;--red:#c66b57;--serif:"Playfair Display",Georgia,serif;--sans:"DM Sans",Arial,sans-serif;--mono:"DM Mono",monospace;--shadow:0 18px 60px #263b2c0b}
-:root[data-theme=dark]{color-scheme:dark;--paper:#171c19;--card:#222a25;--ink:#f3f3e9;--muted:#a7b0a8;--line:#38423b;--green:#83b994;--lime:#294b38;--orange:#efb66d;--red:#df8a75;--shadow:0 18px 60px #0003}
+:root{color-scheme:light;--good:#17663a;--bad:#c62f22;--stamp:#145c34;--paper:#f6f6f0;--card:#fff;--ink:#242824;--muted:#777d75;--line:#e6e8df;--green:#3f785c;--lime:#dff0df;--orange:#e8a354;--red:#c66b57;--serif:"Playfair Display",Georgia,serif;--sans:"DM Sans",Arial,sans-serif;--mono:"DM Mono",monospace;--shadow:0 18px 60px #263b2c0b}
+:root[data-theme=dark]{color-scheme:dark;--good:#4fd27f;--bad:#ff5f4f;--stamp:#5fd38d;--paper:#171c19;--card:#222a25;--ink:#f3f3e9;--muted:#a7b0a8;--line:#38423b;--green:#83b994;--lime:#294b38;--orange:#efb66d;--red:#df8a75;--shadow:0 18px 60px #0003}
 *{box-sizing:border-box}
 body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);min-height:100vh;transition:background .25s,color .25s}
 button,input{font:inherit}
@@ -55,7 +55,15 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(-
 .compare-track{position:relative;height:10px;border-radius:8px;background:var(--line);margin:13px 7px 27px}
 .compare-gap{position:absolute;top:2px;height:6px;background:var(--green);opacity:.6;border-radius:5px;transform:scaleX(0);transition:transform 1.2s cubic-bezier(.3,.7,.2,1) .3s}
 .comparison.answered .compare-gap{transform:scaleX(1)}
-.reveal-row{display:flex;justify-content:center;align-items:baseline;gap:14px;margin:24px 0 3px}
+.reveal-row{position:relative;display:flex;justify-content:center;align-items:baseline;gap:14px;margin:24px 0 3px}
+.reveal-guess{transition:color .9s ease}
+.reveal-row.go .reveal-guess{color:var(--closeness)}
+.perfect-stamp{position:absolute;left:50%;top:-6px;z-index:3;padding:5px 14px 4px;border:3px solid var(--stamp);border-radius:7px;background:var(--card);color:var(--stamp);font:800 20px/1.1 var(--serif);letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;box-shadow:0 6px 18px #0002;opacity:0;transform:translate(-50%,-100%) rotate(-7deg);pointer-events:none}
+.reveal-row.go .perfect-stamp{animation:stamp .5s cubic-bezier(.3,1.5,.5,1) 1.35s both}
+.reveal-row.instant .perfect-stamp{animation:none;opacity:1}
+@keyframes stamp{0%{opacity:0;transform:translate(-50%,-100%) rotate(-16deg) scale(2.8)}55%{opacity:1;transform:translate(-50%,-100%) rotate(-6deg) scale(.9)}78%{transform:translate(-50%,-100%) rotate(-7.5deg) scale(1.05)}100%{opacity:1;transform:translate(-50%,-100%) rotate(-7deg) scale(1)}}
+.game-card.thud{animation:thud .35s ease-out 1.6s}
+@keyframes thud{0%{transform:none}30%{transform:translateY(4px) scale(.995)}60%{transform:translateY(-1px)}100%{transform:none}}
 .reveal-row.lower{flex-direction:row-reverse}
 .reveal-num{font:500 44px/1.1 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
 .reveal-num small{font:400 24px var(--mono);color:var(--muted);margin-left:2px}
@@ -71,6 +79,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(-
 .marker.answer{background:var(--green);color:var(--green);opacity:0;transition:opacity .5s 1.2s}
 .comparison.answered .marker.answer{opacity:1}
 .marker-caption{position:absolute;top:17px;white-space:nowrap;transform:translateX(-50%);font:9px var(--mono);color:var(--muted)}
+.comparison.near .marker.guess .marker-caption{top:auto;bottom:17px}
 .source-note{background:var(--paper);padding:12px 14px;border-radius:7px;color:var(--muted);font-size:11px;line-height:1.55}
 .source-note a{color:var(--green);font-weight:700;text-underline-offset:2px}
 .next-button{margin-top:17px}
