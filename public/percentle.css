@@ -102,3 +102,10 @@ dialog{width:min(440px,calc(100% - 32px));border:1px solid var(--line);border-ra
 @media(max-width:520px){.site-shell{width:min(100% - 28px,720px)}.topbar{height:64px}main{padding:36px 0 20px}.intro{margin-bottom:25px}.game-card{padding:17px 19px 24px;border-radius:13px;min-height:380px}.question-body{padding-top:25px}.guess-input{font-size:44px}.reveal-num{font-size:36px}.reveal-num small{font-size:20px}.reveal-row{gap:10px}.dialog-actions{flex-direction:column}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
 .rules{margin:4px 0 20px;padding-left:18px}.rules li{margin:0 0 8px;padding-left:2px}.rules li strong{color:var(--ink)}
+.recap{display:flex;flex-direction:column;gap:9px;margin-top:18px}
+.recap-item{position:relative;padding:13px 16px;background:var(--card);border:1px solid var(--line);border-radius:11px}
+.recap-item.best{border-color:var(--good);box-shadow:0 0 0 1px var(--good) inset}
+.recap-badge{display:inline-block;margin-bottom:7px;padding:3px 8px;border-radius:99px;background:var(--good);color:var(--card);font:500 9px var(--mono);letter-spacing:1px;text-transform:uppercase}
+.recap-question{margin:0 0 6px;font-size:13px;line-height:1.45;color:var(--ink)}
+.recap-numbers{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;font:500 12px var(--mono);color:var(--muted)}
+.recap-off{margin-left:auto;color:var(--ink)}

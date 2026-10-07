@@ -157,6 +157,9 @@ function renderScoreBox(progress, view, animate) {
   const note = document.querySelector("#scoreNote");
   const key = `${practiceMode ? "practice" : "daily"}:${currentDate}`;
   const locked = progress.guesses.length;
+  // The results screen shows the final score inside the card, so the box above it steps aside.
+  box.hidden = view.phase === "results";
+  if (view.phase !== "results") document.querySelector("#recap").hidden = true;
   if (!locked) {
     box.classList.remove("active");
     shownScore = { key, value: 0 };
@@ -328,16 +331,36 @@ function bindNext(index) {
   });
 }
 
+// Below the card on the results screen: every question with the player's guess, best to worst.
+function renderRecap(progress) {
+  const recap = document.querySelector("#recap");
+  const rows = currentQuestions
+    .map((question, index) => ({ question, guess: progress.guesses[index], off: pointsOff(progress.guesses[index], question.answer) }))
+    // Ties (e.g. two "Perfect!" scores) go to whichever guess was actually closer.
+    .sort((a, b) => a.off - b.off || Math.abs(a.guess - a.question.answer) - Math.abs(b.guess - b.question.answer));
+  recap.innerHTML = rows.map(({ question, guess, off }, rank) => {
+    const { tone, strength } = closeness(off);
+    const color = `color-mix(in oklab, var(--${tone}) ${(strength * 100).toFixed(1)}%, var(--ink))`;
+    return `<article class="recap-item${rank === 0 ? " best" : ""}">
+      ${rank === 0 ? '<span class="recap-badge">Guess of the day</span>' : ""}
+      <p class="recap-question">${escapeHtml(question.text)}</p>
+      <p class="recap-numbers"><span style="color:${color}">You: ${guess.toFixed(1)}%</span><span>Answer: ${question.answer.toFixed(1)}%</span><span class="recap-off">${off === 0 ? "Perfect!" : `${off.toFixed(1)}% off`}</span></p>
+    </article>`;
+  }).join("");
+  recap.hidden = false;
+}
+
 function renderResults() {
   const progress = progressFor();
   const score = Number(dailyTotal(progress.guesses, currentQuestions).toFixed(1));
-  stage.innerHTML = `<div class="final-score reveal"><span class="answer-label">YOUR ${currentDate === today ? "DAILY" : "PRACTICE"} SCORE</span><div class="score-number">${score.toFixed(1)}</div><p>The lower, the lovelier. Here's how each guess landed.</p></div>
+  stage.innerHTML = `<div class="final-score reveal"><span class="answer-label">YOUR ${currentDate === today ? "DAILY" : "PRACTICE"} SCORE</span><div class="score-number">${score.toFixed(1)}</div></div>
     ${practiceMode ? "" : `<section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">Today's score line</h3><p class="crowd-copy">Your total is added anonymously. Never your guesses, name, or account.</p><p class="crowd-status">Placing you on today's score line…</p></section>`}
     <button class="share-button" id="shareButton">Share ${currentDate === today ? "today's" : "this"} result <span aria-hidden="true">↗</span></button>
     ${practiceMode ? '<button class="next-button" id="replayButton" style="margin-top:9px;background:var(--paper);color:var(--ink)">Play this puzzle again</button><button class="next-button" id="todayButton" style="margin-top:9px;background:var(--paper);color:var(--ink)">Back to today\'s puzzle</button>' : ""}
     <button class="next-button" id="statsInline" style="margin-top:9px;background:var(--paper);color:var(--ink)">Your stats <span aria-hidden="true">→</span></button>`;
   document.querySelector("#questionCounter").textContent = "PUZZLE COMPLETE";
   renderDots(5);
+  renderRecap(progress);
   document.querySelector("#shareButton").addEventListener("click", () => shareResult(score, progress));
   document.querySelector("#replayButton")?.addEventListener("click", () => {
     state.progress[`practice:${currentDate}`] = { guesses: [], locked: [], revealed: 0, draft: null };
