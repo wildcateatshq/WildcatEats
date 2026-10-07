@@ -479,21 +479,50 @@ function consecutiveStreak(games) {
   return streak;
 }
 
+// Bars for the 10 most recent games, oldest to newest. Taller bars mean more points off.
+// Clicking a bar shows that game's date and score underneath.
+function lastTenGames(games) {
+  const recent = games.slice(-10);
+  if (!recent.length) return "<p class=\"hist-empty\">Finish today's puzzle to start your history.</p>";
+  const tallest = Math.max(...recent.map(game => game.score), 1);
+  const shortDate = date => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
+  return `<div class="recent-games" role="group" aria-label="Your last ${recent.length} games, oldest to newest">${recent.map((game, i) => `
+      <button class="recent-bar${i === recent.length - 1 ? " selected" : ""}" data-date="${escapeAttr(game.date)}" data-score="${game.score.toFixed(1)}" aria-label="${longDate(game.date)}: score ${game.score.toFixed(1)}">
+        <span class="recent-bar-fill" style="height:${Math.max(4, game.score / tallest * 100).toFixed(1)}%"></span>
+        <span class="recent-bar-date">${shortDate(game.date)}</span>
+      </button>`).join("")}</div>
+    <p class="recent-detail" id="recentDetail" aria-live="polite"></p>`;
+}
+
+function longDate(date) {
+  return new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+}
+
+function bindLastTenGames() {
+  const detail = dialog.querySelector("#recentDetail");
+  const bars = [...dialog.querySelectorAll(".recent-bar")];
+  const select = bar => {
+    bars.forEach(other => other.classList.toggle("selected", other === bar));
+    detail.innerHTML = `${longDate(bar.dataset.date)} · Score <strong>${bar.dataset.score}</strong>`;
+  };
+  bars.forEach(bar => bar.addEventListener("click", () => select(bar)));
+  if (bars.length) select(bars.at(-1));
+}
+
 function showStats() {
   const games = state.games;
   const scores = games.map(game => game.score);
   const average = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
   const best = scores.length ? Math.min(...scores) : null;
-  const bins = Array.from({ length: 10 }, (_, i) => scores.filter(score => Math.min(9, Math.floor(score / 50)) === i).length);
-  const maxBin = Math.max(1, ...bins);
   openDialog("Your stats", `<div class="stat-cards">
     <div class="stat-card"><span>GAMES PLAYED</span><strong>${games.length}</strong></div>
     <div class="stat-card"><span>AVERAGE SCORE</span><strong>${average === null ? "—" : average.toFixed(1)}</strong></div>
     <div class="stat-card"><span>BEST SCORE</span><strong>${best === null ? "—" : best.toFixed(1)}</strong></div>
     <div class="stat-card"><span>CURRENT STREAK</span><strong>${consecutiveStreak(games)} day${consecutiveStreak(games) === 1 ? "" : "s"}</strong></div></div>
-    <p>Score history · 0–500 points</p>${games.length ? `<div class="histogram" role="img" aria-label="Score histogram with scores grouped in 50-point ranges">${bins.map((count, i) => `<span class="hist-bar ${i === Math.min(9, Math.floor((games.at(-1)?.score || 0) / 50)) ? "today" : ""}" style="height:${Math.max(4, count / maxBin * 74)}%" title="${i * 50}–${(i + 1) * 50}: ${count} games"></span>`).join("")}</div><p>Your ${games.length} game${games.length === 1 ? "" : "s"}, grouped into 50-point score ranges. Your latest is highlighted.</p>` : `<p class="hist-empty">Finish today's puzzle to start your score history.</p>`}
+    <h3 class="dialog-subtitle">Last 10 games</h3>${lastTenGames(games)}
     <h3 class="dialog-title">Past puzzles</h3><p>${isTodayFinished() ? "Replay any of the last 30 daily puzzles." : "Finish today's puzzle to unlock the archive."}</p>
     <div class="archive-list" id="archiveList">${isTodayFinished() ? "<span class='hist-empty'>Loading past puzzles…</span>" : "<span class='hist-empty'>The archive unlocks after today's five questions.</span>"}</div>`);
+  bindLastTenGames();
   if (isTodayFinished()) loadArchive();
 }
 

@@ -97,7 +97,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(-
 .final-score{text-align:center;padding:40px 0 22px}.final-score .score-number{font:500 clamp(56px,13vw,88px)/1 var(--mono);letter-spacing:-6px;color:var(--green);font-variant-numeric:tabular-nums}.final-score h2{font:700 27px var(--serif);margin:12px 0 6px}.final-score p{color:var(--muted);font-size:12px;margin:0}
 .share-button{background:var(--ink);color:var(--card)}
 .stat-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin:16px 0}.stat-card{padding:14px;background:var(--paper);border-radius:8px}.stat-card span{display:block;color:var(--muted);font:9px var(--mono);letter-spacing:.6px}.stat-card strong{display:block;font:500 24px var(--mono);margin-top:6px}
-.histogram{display:flex;gap:5px;align-items:end;height:94px;border-bottom:1px solid var(--line);padding:8px 3px 0}.hist-bar{position:relative;flex:1;min-width:5px;background:color-mix(in srgb,var(--green) 66%,var(--card));border-radius:3px 3px 0 0}.hist-bar.today{background:var(--orange)}.hist-empty{color:var(--muted);font-size:12px;padding:20px 0}
+.hist-empty{color:var(--muted);font-size:12px;padding:20px 0}
 .crowd-panel{margin-top:17px;padding:19px;background:var(--paper);border:1px solid var(--line);border-radius:9px}.crowd-title{font:700 19px var(--serif);margin:0}.crowd-copy,.crowd-status{font-size:11px;line-height:1.6;color:var(--muted)}.crowd-copy{margin:7px 0 13px}.crowd-action{width:100%;padding:12px 14px;background:transparent;color:var(--green);border:1px solid var(--green);border-radius:6px;font-size:12px;font-weight:700;cursor:pointer}.crowd-action:hover{background:var(--lime)}.crowd-action:disabled{opacity:.6;cursor:wait}.crowd-position{margin:7px 0 12px;text-align:center;font-size:12px;color:var(--muted)}.crowd-position strong{color:var(--green);font:500 18px var(--mono)}.crowd-line{display:block;width:100%;height:auto;margin:12px 0 0;overflow:visible}.crowd-line .line-axis{stroke:var(--line);stroke-width:3}.crowd-line .you-marker{fill:var(--orange);stroke:var(--card);stroke-width:2}.crowd-line text{fill:var(--muted);font:9px var(--mono)}.crowd-line .you-label{fill:var(--green);font-weight:500}
 dialog{width:min(440px,calc(100% - 32px));border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--ink);padding:25px 27px 29px;box-shadow:0 24px 80px #0002}dialog::backdrop{background:#121a15a6;backdrop-filter:blur(3px)}.dialog-head{position:absolute;top:18px;right:18px}.close-button{font-size:21px}.dialog-title{font:700 29px var(--serif);margin:17px 0 12px}dialog h2{font:700 29px var(--serif);margin:4px 48px 12px 0}dialog p,dialog li{font-size:13px;line-height:1.7;color:var(--muted)}dialog p strong{color:var(--ink)}.dialog-actions{display:flex;gap:9px}.dialog-actions button{flex:1}
 .toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,15px);opacity:0;pointer-events:none;border-radius:99px;background:var(--ink);color:var(--card);padding:11px 16px;font-size:12px;transition:.2s;z-index:5}.toast.visible{opacity:1;transform:translate(-50%,0)}
@@ -112,3 +112,13 @@ dialog{width:min(440px,calc(100% - 32px));border:1px solid var(--line);border-ra
 .recap-question{margin:0 0 6px;font-size:13px;line-height:1.45;color:var(--ink)}
 .recap-numbers{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;font:500 12px var(--mono);color:var(--muted)}
 .recap-off{margin-left:auto;color:var(--ink)}
+.dialog-subtitle{font:600 12px var(--sans);color:var(--ink);margin:6px 0 10px}
+.recent-games{display:flex;gap:6px;align-items:stretch;height:118px;padding-bottom:18px;border-bottom:1px solid var(--line)}
+.recent-bar{position:relative;flex:1;min-width:0;display:flex;align-items:flex-end;padding:0;border:0;background:none;cursor:pointer}
+.recent-bar-fill{display:block;width:100%;border-radius:4px 4px 0 0;background:color-mix(in srgb,var(--green) 55%,var(--card));transition:background-color .2s}
+.recent-bar:hover .recent-bar-fill{background:color-mix(in srgb,var(--green) 80%,var(--card))}
+.recent-bar.selected .recent-bar-fill{background:var(--orange)}
+.recent-bar-date{position:absolute;left:50%;bottom:-18px;transform:translateX(-50%);font:9px var(--mono);color:var(--muted);white-space:nowrap}
+.recent-bar.selected .recent-bar-date{color:var(--ink)}
+.recent-detail{margin:12px 0 4px;text-align:center;font-size:13px;color:var(--muted);min-height:20px}
+.recent-detail strong{font:500 15px var(--mono);color:var(--ink)}
