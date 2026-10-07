@@ -509,7 +509,7 @@ async function loadArchive() {
 function showHowToPlay() {
   openDialog("How to play", `<ul class="rules">
       <li>Guess the percentage for each of 5 questions.</li>
-      <li>Your score is how far off you were, added up. <strong>Lower is better</strong>, and within 0.5 counts as perfect.</li>
+      <li>Your score is how far off you were, added up. <strong>Lower is better.</strong></li>
       <li>A new puzzle arrives every day at midnight Eastern.</li>
     </ul>
     <button class="share-button" data-close>Let's play</button>`);
