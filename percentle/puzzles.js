@@ -24,6 +24,16 @@ function easternDate(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
 
+// Seconds until the next midnight in New York, when the next puzzle goes live. Midnight is 04:00
+// or 05:00 UTC depending on daylight saving, so both are checked rather than assuming a 24-hour day.
+function secondsUntilEasternMidnight(now = new Date()) {
+  const tomorrow = addDays(easternDate(now), 1);
+  const [year, month, day] = tomorrow.split("-").map(Number);
+  const midnight = [4, 5].map(hour => Date.UTC(year, month - 1, day, hour))
+    .find(time => easternDate(new Date(time)) === tomorrow && easternDate(new Date(time - 1)) !== tomorrow);
+  return Math.max(1, Math.floor((midnight - now.getTime()) / 1000));
+}
+
 function daysBetween(from, to) {
   return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
 }
@@ -210,6 +220,7 @@ module.exports = {
   MAX_DAYS_AHEAD,
   addDays,
   createPuzzleStore,
+  secondsUntilEasternMidnight,
   daysBetween,
   easternDate,
   isCalendarDate,

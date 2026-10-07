@@ -2,7 +2,7 @@
 
 const crypto = require("node:crypto");
 const express = require("express");
-const { MAX_DAYS_AHEAD, addDays, daysBetween, easternDate, isCalendarDate, puzzleNumber, validatePuzzle } = require("./puzzles");
+const { MAX_DAYS_AHEAD, addDays, daysBetween, easternDate, isCalendarDate, puzzleNumber, secondsUntilEasternMidnight, validatePuzzle } = require("./puzzles");
 
 const ARCHIVE_DAYS = 30;
 const MAX_NOTES_LENGTH = 20_000;
@@ -35,11 +35,26 @@ function createPuzzleRouter(store, options = {}) {
 
   const send = (res, date, questions) => res.json({ date, number: puzzleNumber(date), questions });
 
+  // A live puzzle can't change, so it can be cached until the next one goes live at midnight
+  // Eastern (browsers re-check every 10 minutes; a CDN such as Cloudflare can hold it all day).
+  // Past puzzles never change at all. Anything else (not published yet, agent-only routes) is
+  // never cached, so it shows up the moment it changes.
+  const cacheUntilMidnight = res => {
+    const seconds = secondsUntilEasternMidnight();
+    res.set("Cache-Control", `public, max-age=${Math.min(seconds, 600)}, s-maxage=${seconds}`);
+  };
+  const cacheForever = res => res.set("Cache-Control", "public, max-age=86400, s-maxage=604800, immutable");
+  const noStore = res => res.set("Cache-Control", "no-store");
+
   router.get("/today", async (req, res, next) => {
     try {
       const date = today();
       const questions = await store.get(date);
-      if (!questions) return res.status(404).json({ error: "Today's puzzle hasn't been published yet.", date, number: puzzleNumber(date) });
+      if (!questions) {
+        noStore(res);
+        return res.status(404).json({ error: "Today's puzzle hasn't been published yet.", date, number: puzzleNumber(date) });
+      }
+      cacheUntilMidnight(res);
       send(res, date, questions);
     } catch (error) {
       next(error);
@@ -50,6 +65,7 @@ function createPuzzleRouter(store, options = {}) {
     try {
       const date = today();
       const dates = await store.dates(addDays(date, -ARCHIVE_DAYS), addDays(date, -1));
+      cacheUntilMidnight(res);
       res.json({ puzzles: dates.map(day => ({ date: day, number: puzzleNumber(day) })) });
     } catch (error) {
       next(error);
@@ -58,6 +74,7 @@ function createPuzzleRouter(store, options = {}) {
 
   // Recent and scheduled puzzles, so the agent can avoid repeating questions.
   router.get("/history", requirePublisher, async (req, res, next) => {
+    noStore(res);
     try {
       const days = Math.min(365, Math.max(1, Number.parseInt(req.query.days, 10) || 90));
       const date = today();
@@ -72,6 +89,7 @@ function createPuzzleRouter(store, options = {}) {
 
   // The agent's notes on the editor's likes and dislikes, read and rewritten on each run.
   router.get("/agent-notes", requirePublisher, async (req, res, next) => {
+    noStore(res);
     try {
       res.json(await store.getNotes());
     } catch (error) {
@@ -96,9 +114,13 @@ function createPuzzleRouter(store, options = {}) {
     try {
       const { date } = req.params;
       if (!isCalendarDate(date)) return res.status(400).json({ error: "Date must be YYYY-MM-DD." });
-      if (date > today() && !isPublisher(req)) return res.status(404).json({ error: "That puzzle isn't out yet." });
+      const current = today();
+      if (date > current && !isPublisher(req)) return res.status(404).json({ error: "That puzzle isn't out yet." });
       const questions = await store.get(date);
       if (!questions) return res.status(404).json({ error: "No puzzle was published for that date." });
+      if (date < current) cacheForever(res);
+      else if (date === current) cacheUntilMidnight(res);
+      else noStore(res);
       send(res, date, questions);
     } catch (error) {
       next(error);

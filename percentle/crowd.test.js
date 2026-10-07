@@ -5,7 +5,8 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
-const { createCrowdStore, isUtcDate, summarize, validateSubmission } = require("./crowd");
+const { createCrowdStore, isUtcDate, summarize, summaryFromCounts, validateSubmission } = require("./crowd");
+const { createRateLimit } = require("./crowd-router");
 
 const date = "2026-10-06";
 const ids = Array.from({ length: 8 }, (_, index) =>
@@ -82,4 +83,20 @@ test("persists submissions and updates the same anonymous browser ID", async () 
   } finally {
     await fs.rm(folder, { recursive: true, force: true });
   }
+});
+
+test("the counts Postgres returns give the same summary as counting the scores directly", () => {
+  const entries = new Map([[ids[0], 12.5], [ids[1], 88], [ids[2], 420], [ids[3], 88], [ids[4], 60], [ids[5], 410]]);
+  // What the SQL query returns for ids[1] (88): 2 worse (420 and 410), 2 tied (both 88s), 2 others ran out.
+  assert.deepEqual(summaryFromCounts({ players: 6, worse: 2, tied: 2, othersRanOut: 2 }, true), summarize(entries, ids[1]));
+  assert.equal(summaryFromCounts({ players: 6 }, false).betterThan, null, "no player to compare");
+});
+
+test("the crowd rate limit allows a burst per address, then resets each minute", () => {
+  let now = 0;
+  const allow = createRateLimit(3, () => now);
+  assert.deepEqual([1, 2, 3, 4].map(() => allow("a")), [true, true, true, false]);
+  assert.equal(allow("b"), true, "other addresses are counted separately");
+  now = 60_000;
+  assert.equal(allow("a"), true, "a new minute starts fresh");
 });

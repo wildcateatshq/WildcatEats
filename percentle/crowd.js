@@ -25,26 +25,31 @@ function validateSubmission(date, id, score) {
   }
 }
 
-function summarize(entries, ownId = null) {
-  const scoresById = entries instanceof Map ? entries : new Map(entries);
-  const scores = [...scoresById.values()];
-  const ownScore = ownId === null ? null : scoresById.get(ownId) ?? null;
-  const hasEnoughComparison = ownScore !== null && scoresById.size - 1 >= MINIMUM_COMPARISON_PLAYERS;
-  const betterThan = hasEnoughComparison
-    ? Number(((scores.filter(score => score > ownScore).length +
-      scores.filter(score => score === ownScore).length / 2) / scores.length * 100).toFixed(1))
-    : null;
-  // The share of the other players who also ran out of charge today.
-  const others = [...scoresById].filter(([id]) => id !== ownId).map(([, score]) => score);
-  const alsoRanOut = hasEnoughComparison
-    ? Number((others.filter(score => score >= OUT_OF_CHARGE_RANK).length / others.length * 100).toFixed(1))
-    : null;
+// Builds the public summary from counts, so Postgres can do the counting itself however many
+// players there are. players: everyone today; worse: scores above the player's (lower ranks
+// better); tied: scores equal to theirs, themselves included; othersRanOut: other players at
+// OUT_OF_CHARGE_RANK or above. hasOwn is false when there's no player to compare.
+function summaryFromCounts({ players, worse = 0, tied = 0, othersRanOut = 0 }, hasOwn) {
+  const hasEnoughComparison = hasOwn && players - 1 >= MINIMUM_COMPARISON_PLAYERS;
   return {
-    players: scoresById.size,
-    betterThan,
-    alsoRanOut,
+    players,
+    betterThan: hasEnoughComparison ? Number(((worse + tied / 2) / players * 100).toFixed(1)) : null,
+    // The share of the other players who also ran out of charge today.
+    alsoRanOut: hasEnoughComparison ? Number((othersRanOut / (players - 1) * 100).toFixed(1)) : null,
     minimumComparisonPlayers: MINIMUM_COMPARISON_PLAYERS
   };
+}
+
+function summarize(entries, ownId = null) {
+  const scoresById = entries instanceof Map ? entries : new Map(entries);
+  const ownScore = ownId === null ? null : scoresById.get(ownId) ?? null;
+  const counts = { players: scoresById.size, worse: 0, tied: 0, othersRanOut: 0 };
+  for (const [id, score] of scoresById) {
+    if (ownScore !== null && score > ownScore) counts.worse++;
+    if (ownScore !== null && score === ownScore) counts.tied++;
+    if (id !== ownId && score >= OUT_OF_CHARGE_RANK) counts.othersRanOut++;
+  }
+  return summaryFromCounts(counts, ownScore !== null);
 }
 
 function createCrowdStore(options = {}) {
@@ -94,6 +99,7 @@ function createCrowdStore(options = {}) {
           primary key (puzzle_date, anonymous_id)
         )
       `);
+      await pool.query("create index if not exists percentle_daily_scores_date_score on percentle_daily_scores (puzzle_date, score)");
       return;
     }
     try {
@@ -119,11 +125,8 @@ function createCrowdStore(options = {}) {
   async function getSummary(date) {
     if (!isUtcDate(date)) throw new RangeError("Date must be a UTC calendar date.");
     if (pool) {
-      const { rows } = await pool.query(
-        "select anonymous_id, score from percentle_daily_scores where puzzle_date = $1",
-        [date]
-      );
-      return summarize(new Map(rows.map(row => [row.anonymous_id, Number(row.score)])));
+      const { rows } = await pool.query("select count(*)::int as players from percentle_daily_scores where puzzle_date = $1", [date]);
+      return summaryFromCounts(rows[0], false);
     }
     const entries = dailyScores.get(date) || new Map();
     return summarize(entries);
@@ -140,10 +143,14 @@ function createCrowdStore(options = {}) {
         [date, id, score]
       );
       const { rows } = await pool.query(
-        "select anonymous_id, score from percentle_daily_scores where puzzle_date = $1",
-        [date]
+        `select count(*)::int as players,
+                coalesce(sum(case when score > $2 then 1 else 0 end), 0)::int as worse,
+                coalesce(sum(case when score = $2 then 1 else 0 end), 0)::int as tied,
+                coalesce(sum(case when score >= $4 and anonymous_id <> $3 then 1 else 0 end), 0)::int as "othersRanOut"
+         from percentle_daily_scores where puzzle_date = $1`,
+        [date, score, id, OUT_OF_CHARGE_RANK]
       );
-      return summarize(new Map(rows.map(row => [row.anonymous_id, Number(row.score)])), id);
+      return summaryFromCounts(rows[0], true);
     }
     const operation = writes.then(async () => {
       const entries = dailyScores.get(date) || new Map();
@@ -159,4 +166,4 @@ function createCrowdStore(options = {}) {
   return { init, getSummary, submit };
 }
 
-module.exports = { createCrowdStore, isUtcDate, summarize, validateSubmission };
+module.exports = { createCrowdStore, isUtcDate, summarize, summaryFromCounts, validateSubmission };

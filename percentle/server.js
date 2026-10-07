@@ -18,11 +18,17 @@ const crowd = createCrowdStore();
 const puzzles = createPuzzleStore();
 const app = express();
 
+// The page itself is always re-checked so a deploy shows up straight away; its styles, scripts,
+// and icon can be reused for a few minutes (they're small, and not renamed between deploys).
+const ASSET_CACHE_MS = 5 * 60 * 1000;
+const page = { headers: { "Cache-Control": "no-cache" } };
+const asset = { maxAge: ASSET_CACHE_MS };
+
 app.use(express.json());
-app.get(["/", "/percentle.html"], (req, res) => res.sendFile(path.join(publicDir, "percentle.html")));
-app.get("/percentle.css", (req, res) => res.sendFile(path.join(publicDir, "percentle.css")));
-app.get("/percentle.mjs", (req, res) => res.sendFile(path.join(publicDir, "percentle.mjs")));
-app.use("/percentle", express.static(path.join(publicDir, "percentle")));
+app.get(["/", "/percentle.html"], (req, res) => res.sendFile(path.join(publicDir, "percentle.html"), page));
+app.get("/percentle.css", (req, res) => res.sendFile(path.join(publicDir, "percentle.css"), asset));
+app.get("/percentle.mjs", (req, res) => res.sendFile(path.join(publicDir, "percentle.mjs"), asset));
+app.use("/percentle", express.static(path.join(publicDir, "percentle"), asset));
 app.use("/api/percentle/crowd", createCrowdRouter(crowd));
 app.use("/api/percentle/puzzles", createPuzzleRouter(puzzles));
 app.use((req, res) => res.redirect("/"));

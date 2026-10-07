@@ -6,7 +6,7 @@ const express = require("express");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
-const { createPuzzleStore, easternDate, puzzleNumber, validatePuzzle } = require("./puzzles");
+const { createPuzzleStore, easternDate, puzzleNumber, secondsUntilEasternMidnight, validatePuzzle } = require("./puzzles");
 const { createPuzzleRouter } = require("./puzzle-router");
 
 const question = (category, overrides = {}) => ({
@@ -130,4 +130,35 @@ test("puzzle API publishes with a token and never leaks future puzzles", async t
   assert.equal(saved.status, 200);
   assert.equal((await fetch(`${url}/agent-notes`, { headers: auth }).then(response => response.json())).notes, "Likes NBA; dislikes census stats.");
   assert.equal((await fetch(`${url}/agent-notes`, { method: "PUT", headers: auth, body: JSON.stringify({ notes: "x".repeat(20_001) }) })).status, 400);
+});
+
+test("counts the seconds to the next Eastern midnight, including on daylight-saving days", () => {
+  assert.equal(secondsUntilEasternMidnight(new Date("2026-10-07T03:00:00Z")), 3600, "11 PM EDT");
+  assert.equal(secondsUntilEasternMidnight(new Date("2026-12-01T04:00:00Z")), 3600, "11 PM EST");
+  // Clocks fall back on Nov 1, 2026: that day is 25 hours long, and the midnight after it is 05:00 UTC.
+  assert.equal(secondsUntilEasternMidnight(new Date("2026-11-01T04:00:00Z")), 25 * 3600);
+  // Clocks spring forward on Mar 8, 2026: that day is 23 hours long, and the midnight after it is 04:00 UTC.
+  assert.equal(secondsUntilEasternMidnight(new Date("2026-03-08T05:00:00Z")), 23 * 3600);
+});
+
+test("puzzle responses are cached only while they can't change", async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "percentle-cache-"));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const store = createPuzzleStore({ filePath: path.join(dir, "puzzles.json") });
+  await store.init();
+  const app = express();
+  app.use(express.json());
+  app.use("/p", createPuzzleRouter(store, { today: () => "2026-10-07", publishToken: "secret" }));
+  const server = app.listen(0);
+  t.after(() => server.close());
+  const url = `http://localhost:${server.address().port}/p`;
+  const auth = { "Content-Type": "application/json", Authorization: "Bearer secret" };
+  const cacheOf = async (pathname, headers) => (await fetch(url + pathname, { headers })).headers.get("cache-control");
+  assert.equal(await cacheOf("/today"), "no-store", "not published yet");
+  const questions = ["U.S. life", "Sports", "Music", "Movies", "World"].map((category, i) => question(category, { text: `Question number ${i + 1} for caching?` }));
+  await store.put("2026-10-07", questions);
+  await store.put("2026-10-06", questions);
+  assert.match(await cacheOf("/today"), /^public, max-age=\d+, s-maxage=\d+$/);
+  assert.match(await cacheOf("/2026-10-06"), /immutable/, "past puzzles never change");
+  assert.equal(await cacheOf("/history", auth), "no-store");
 });
