@@ -1,5 +1,5 @@
-:root{color-scheme:light;--good:#17663a;--bad:#c62f22;--stamp:#145c34;--paper:#f2f2f2;--card:#fff;--ink:#242824;--muted:#757a76;--line:#e3e5e3;--charge:#14c95c;--charge-glow:#14c95c59;--charge-ink:#04220f;--drained:#55595a;--shell:#b9bdba;--negative:#e5372b;--charge-yellow:#f0c000;--charge-orange:#ff8a1f;--green:#0e9f47;--lime:#dcf8e6;--orange:#e0a400;--red:#c66b57;--display:"Chakra Petch","Arial Narrow",sans-serif;--sans:"Space Grotesk",Arial,sans-serif;--mono:"JetBrains Mono",monospace;--shadow:0 18px 50px #0b2a1612}
-:root[data-theme=dark]{color-scheme:dark;--good:#4fd27f;--bad:#ff5f4f;--stamp:#5fd38d;--paper:#000;--card:#101412;--ink:#f3f3e9;--muted:#9aa39c;--line:#262d29;--charge:#39ff88;--charge-glow:#39ff8873;--charge-ink:#04220f;--drained:#3a3e3c;--shell:#3d4842;--negative:#ff4d4d;--charge-yellow:#ffd23f;--charge-orange:#ff9a2e;--green:#39ff88;--lime:#0f2a1b;--orange:#ffd23f;--red:#df8a75;--shadow:0 0 0 1px #39ff880d,0 24px 70px #000}
+:root{color-scheme:light;--paper:#f2f2f2;--card:#fff;--ink:#242824;--muted:#757a76;--line:#e3e5e3;--charge:#14c95c;--charge-glow:#14c95c59;--charge-ink:#04220f;--drained:#55595a;--shell:#b9bdba;--negative:#e5372b;--charge-yellow:#f0c000;--charge-orange:#ff8a1f;--lit:#0b8f3f;--unlit:#b3b8b5;--green:#0e9f47;--lime:#dcf8e6;--orange:#e0a400;--red:#c66b57;--display:"Chakra Petch","Arial Narrow",sans-serif;--sans:"Space Grotesk",Arial,sans-serif;--mono:"JetBrains Mono",monospace;--shadow:0 18px 50px #0b2a1612}
+:root[data-theme=dark]{color-scheme:dark;--paper:#000;--card:#101412;--ink:#f3f3e9;--muted:#9aa39c;--line:#262d29;--charge:#39ff88;--charge-glow:#39ff8873;--charge-ink:#04220f;--drained:#3a3e3c;--shell:#3d4842;--negative:#ff4d4d;--charge-yellow:#ffd23f;--charge-orange:#ff9a2e;--lit:#effff4;--unlit:#4d544f;--green:#39ff88;--lime:#0f2a1b;--orange:#ffd23f;--red:#df8a75;--shadow:0 0 0 1px #39ff880d,0 24px 70px #000}
 *{box-sizing:border-box}
 body{margin:0;background:radial-gradient(ellipse 90% 340px at 50% -60px,color-mix(in srgb,var(--charge) 13%,transparent),transparent) no-repeat,var(--paper);color:var(--ink);font-family:var(--sans);min-height:100vh;transition:background .25s,color .25s}
 button,input{font:inherit}
@@ -56,14 +56,33 @@ main{padding:47px 0 34px}
 .answer-label{display:block;color:var(--green);font:500 10px var(--mono);letter-spacing:3px;margin-bottom:4px}
 .comparison{padding:30px 0 2px}
 .reveal-row{position:relative;display:flex;justify-content:center;align-items:baseline;gap:14px;margin:24px 0 3px}
-.reveal-guess{transition:color .9s ease}
-.reveal-row.go .reveal-guess{color:var(--closeness)}
-.perfect-stamp{position:absolute;left:50%;top:-6px;z-index:3;padding:5px 14px 4px;border:3px solid var(--charge);border-radius:4px;background:var(--card);color:var(--green);font:700 21px/1.1 var(--display);letter-spacing:2px;text-transform:uppercase;white-space:nowrap;box-shadow:0 0 22px var(--charge-glow),inset 0 0 10px var(--charge-glow);opacity:0;transform:translate(-50%,-100%) rotate(-7deg);pointer-events:none}
-.reveal-row.go .perfect-stamp{animation:stamp .5s cubic-bezier(.3,1.5,.5,1) 1.35s both}
-.reveal-row.instant .perfect-stamp{animation:none;opacity:1}
-@keyframes stamp{0%{opacity:0;transform:translate(-50%,-100%) rotate(-16deg) scale(2.8)}55%{opacity:1;transform:translate(-50%,-100%) rotate(-6deg) scale(.9)}78%{transform:translate(-50%,-100%) rotate(-7.5deg) scale(1.05)}100%{opacity:1;transform:translate(-50%,-100%) rotate(-7deg) scale(1)}}
-.game-card.thud{animation:thud .35s ease-out 1.6s}
-@keyframes thud{0%{transform:none}30%{transform:translateY(4px) scale(.995)}60%{transform:translateY(-1px)}100%{transform:none}}
+.reveal-guess{transition:color .9s ease,text-shadow .9s ease}
+/* The guess lights up by how close it was (litStyle in percentle.mjs). */
+.reveal-row.go .reveal-guess{color:var(--lit-color);text-shadow:var(--lit-glow)}
+/* A supercharged guess (no charge lost) is struck by lightning just as the answer appears: the bolt
+   cracks down from the top of the card and flickers, the card flashes and jolts, the numbers flare
+   white-hot, and "SUPERCHARGED" lands above them. */
+.strike{--strike-core:#fff;position:absolute;left:50%;bottom:50%;width:210px;height:min(330px,62vw);transform:translateX(-50%);overflow:visible;pointer-events:none;z-index:4;opacity:0}
+:root:not([data-theme=dark]) .strike{--strike-core:#0a7a35}
+.strike polyline{fill:none;stroke-linejoin:miter;stroke-linecap:round;vector-effect:non-scaling-stroke}
+.strike-glow{stroke:var(--charge);stroke-width:16;opacity:.6;filter:blur(5px)}
+.strike-core{stroke:var(--strike-core);stroke-width:5}
+.reveal-row.go .strike{animation:strike-draw .1s ease-in 1.3s both,strike-flash .65s linear 1.3s both}
+.reveal-row.instant .strike{display:none}
+@keyframes strike-draw{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0)}}
+@keyframes strike-flash{0%,22%{opacity:1}28%{opacity:.15}34%{opacity:1}55%{opacity:.8}100%{opacity:0}}
+.game-card.struck{animation:jolt .35s ease-out 1.38s}
+@keyframes jolt{0%,100%{transform:none}25%{transform:translateY(5px)}55%{transform:translateY(-2px)}}
+.game-card.struck::after{content:"";position:absolute;inset:0;z-index:5;pointer-events:none;background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--charge) 60%,#fff),transparent 70%);opacity:0;animation:card-flash .5s ease-out 1.38s both}
+@keyframes card-flash{0%{opacity:0}12%{opacity:.55}100%{opacity:0}}
+.reveal-row.struck.go .reveal-num{animation:white-hot .8s ease-out 1.38s}
+@keyframes white-hot{0%{filter:brightness(2.2) drop-shadow(0 0 12px var(--charge))}100%{filter:none}}
+.supercharged{--glow-core:#effff4;position:absolute;left:50%;top:-12px;z-index:3;transform:translate(-50%,-100%);font:700 clamp(20px,5.6vw,30px)/1 var(--display);letter-spacing:clamp(3px,1vw,6px);text-transform:uppercase;white-space:nowrap;color:var(--glow-core);text-shadow:0 0 3px var(--charge),0 0 10px var(--charge),0 0 24px var(--charge),0 0 46px var(--charge-glow);opacity:0;pointer-events:none}
+:root:not([data-theme=dark]) .supercharged{--glow-core:var(--green)}
+.supercharged::before{content:"";position:absolute;inset:-22px -46px;z-index:-1;background:radial-gradient(closest-side,var(--charge-glow),transparent)}
+.reveal-row.go .supercharged{animation:land .4s cubic-bezier(.3,1.5,.5,1) 1.42s both}
+.reveal-row.instant .supercharged{opacity:1;animation:none}
+@keyframes land{from{opacity:0;transform:translate(-50%,-100%) scale(1.8)}to{opacity:1;transform:translate(-50%,-100%) scale(1)}}
 .reveal-row.lower{flex-direction:row-reverse}
 .reveal-num{font:700 44px/1.1 var(--mono);letter-spacing:-2px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .reveal-num small{font:400 24px var(--mono);color:var(--muted);margin-left:2px}
@@ -77,8 +96,8 @@ main{padding:47px 0 34px}
 .instant,.instant *{transition:none!important}
 /* YOU and ANSWER are thin ticks across the battery bar: YOU's label sits above it, ANSWER's below. */
 .marker{position:absolute;top:-8px;bottom:-8px;width:3px;border-radius:2px;transform:translateX(-50%);z-index:3}
-.marker.guess{background:var(--ink);transition:background-color .9s ease}
-.comparison.answered .marker.guess{background:var(--closeness)}
+.marker.guess{background:var(--ink);transition:background-color .9s ease,box-shadow .9s ease}
+.comparison.answered .marker.guess{background:var(--lit-color);box-shadow:var(--lit-glow)}
 .marker.answer{background:var(--ink);opacity:0;transition:opacity .5s 1.2s}
 .comparison.answered .marker.answer{opacity:1}
 .marker-caption{position:absolute;top:calc(100% + 4px);left:50%;white-space:nowrap;transform:translateX(-50%);font:9px var(--mono);color:var(--muted)}
@@ -120,11 +139,9 @@ body.starting .intro,body.starting #gameCard,body.starting #recap{display:none}
 .rules{margin:4px 0 20px;padding-left:0;list-style:none}.rules li{position:relative;margin:0 0 8px;padding-left:24px}.rules li::before{content:"";position:absolute;left:3px;top:3px;width:11px;height:15px;background:var(--charge);clip-path:polygon(60% 0,0 58%,45% 58%,30% 100%,100% 38%,55% 38%,75% 0);filter:drop-shadow(0 0 3px var(--charge))}.rules li strong{color:var(--ink)}
 .recap{display:flex;flex-direction:column;gap:9px;margin-top:18px}
 .recap-item{position:relative;padding:13px 16px;background:var(--card);border:1px solid var(--line);border-radius:6px}
-.recap-item.best{border-color:var(--charge);box-shadow:0 0 0 1px var(--charge) inset,0 0 22px var(--charge-glow)}
 .recap-badge{display:inline-block;margin-bottom:7px;padding:3px 8px;border-radius:3px;background:var(--charge);color:var(--charge-ink);font:700 9px var(--mono);letter-spacing:1px;text-transform:uppercase}
 .recap-question{margin:0 0 6px;font-size:13px;line-height:1.45;color:var(--ink)}
 .recap-numbers{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;font:500 12px var(--mono);color:var(--muted)}
-.recap-off{margin-left:auto;color:var(--ink)}
 .dialog-subtitle{font:500 10px var(--mono);letter-spacing:3px;text-transform:uppercase;color:var(--green);margin:6px 0 10px}
 .recent-games{display:flex;gap:6px;align-items:stretch;height:118px;padding-bottom:18px;border-bottom:1px solid var(--line)}
 .recent-bar{position:relative;flex:1;min-width:0;display:flex;align-items:flex-end;padding:0;border:0;background:none;cursor:pointer}
@@ -149,6 +166,8 @@ body.starting .intro,body.starting #gameCard,body.starting #recap{display:none}
 .score-battery{width:min(240px,64vw);height:76px;margin:8px 9px 10px 0}
 .drain-chip{position:absolute;right:-14px;top:-12px;padding:3px 7px;border-radius:99px;background:var(--drained);color:#fff;font:500 12px var(--mono);opacity:0;pointer-events:none;z-index:4}
 .drain-chip.fly{animation:chip-fly 1.8s cubic-bezier(.2,.8,.2,1) .5s both}
+.drain-chip.no-drain{background:var(--charge);color:var(--charge-ink);font-weight:700;box-shadow:0 0 14px var(--charge-glow);white-space:nowrap;padding-left:19px}
+.drain-chip.no-drain::before{content:"";position:absolute;left:7px;top:50%;width:8px;height:11px;transform:translateY(-50%);background:currentColor;clip-path:polygon(60% 0,0 58%,45% 58%,30% 100%,100% 38%,55% 38%,75% 0)}
 @keyframes chip-fly{0%{opacity:0;transform:translateY(8px) scale(.8)}20%{opacity:1;transform:translateY(0) scale(1)}70%{opacity:1}100%{opacity:0;transform:translate(14px,-26px) scale(.9)}}
 /* Guess bar: the slider sits invisibly over the battery so the fill end is what you drag. */
 .bar-battery{height:50px;margin-right:9px}
@@ -220,3 +239,33 @@ body.dead,body.power-out{background:var(--paper)}
 .out-where{font:500 13px var(--mono)!important;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
 .recap-item.unreached{opacity:.6;border-style:dashed}
 .recap-item.unreached .recap-badge{background:var(--line);color:var(--muted)}
+/* "Drain by question": the results graph and the one question box under it. */
+.log{padding:16px 16px 12px;background:var(--card);border:1px solid var(--line);border-radius:6px}
+.log-title{margin:0 0 12px;font:500 10px var(--mono);letter-spacing:3px;text-transform:uppercase;color:var(--green)}
+.log-graph{position:relative;height:150px;margin:0 6px 4px 34px}
+.log-graph svg{display:block;width:100%;height:100%;overflow:visible;animation:log-draw 1.4s ease-in-out .2s both}
+.log-grid{stroke:var(--line);stroke-width:1;vector-effect:non-scaling-stroke}
+.log-area{fill:url(#logFill);opacity:0;animation:log-fade .6s ease-out 1.2s forwards}
+.log-line{fill:none;stroke:var(--charge);stroke-width:3;stroke-linejoin:round;vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 4px var(--charge-glow))}
+.log-unreached{fill:none;stroke:var(--muted);stroke-width:2;stroke-dasharray:3 3;vector-effect:non-scaling-stroke;opacity:.6}
+@keyframes log-draw{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0)}}
+@keyframes log-fade{to{opacity:1}}
+.log-axis{position:absolute;right:calc(100% + 8px);transform:translateY(-50%);font:500 9px var(--mono);color:var(--muted)}
+.log-step{position:absolute;width:22px;height:22px;transform:translate(-50%,-50%);border:2px solid var(--card);border-radius:50%;background:var(--fill);color:var(--charge-ink);font:700 10px var(--mono);cursor:pointer;box-shadow:0 0 10px color-mix(in srgb,var(--fill) 60%,transparent);opacity:0;animation:log-fade .3s ease-out both}
+.log-step:nth-of-type(1){animation-delay:0.45s}
+.log-step:nth-of-type(2){animation-delay:0.70s}
+.log-step:nth-of-type(3){animation-delay:0.95s}
+.log-step:nth-of-type(4){animation-delay:1.20s}
+.log-step:nth-of-type(5){animation-delay:1.45s}
+.log-step.selected,.log-step:hover{outline:2px solid var(--ink);outline-offset:2px}
+.log-step.unreached-step{--fill:var(--line);color:var(--muted);box-shadow:none}
+#logDetail .log-row{margin-top:9px;animation:rise .35s ease-out both}
+.log-row-head{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.log-row-head .recap-badge{margin:0}
+.log-q{font:700 11px var(--mono);color:var(--green);letter-spacing:1px}
+.log-cost{margin-left:auto;font:700 12px var(--mono);color:var(--ink)}
+.mini-bar{position:relative;height:10px;margin:4px 0 9px;border:2px solid var(--shell);border-radius:4px;background:var(--card)}
+.mini-fill{position:absolute;left:0;top:0;bottom:0;background:var(--charge);border-radius:2px 0 0 2px;box-shadow:0 0 8px var(--charge-glow)}
+.mini-gap{position:absolute;top:0;bottom:0;background:var(--drained)}
+.mini-tick{position:absolute;top:-5px;bottom:-5px;width:2px;transform:translateX(-50%);border-radius:1px}
+.mini-tick.answer{background:var(--ink)}

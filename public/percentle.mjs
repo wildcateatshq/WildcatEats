@@ -1,9 +1,13 @@
-import { applyGuessKey, chargeLeft, closeness, crowdRank, dailyTotal, DRAIN_RATE, reactionFor, easternDate, guessEntryFrom, guessEntryText, isOutOfCharge, pointsOff, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { applyGuessKey, chargeLeft, crowdRank, dailyTotal, DRAIN_RATE, reactionFor, easternDate, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, pointsOff, utcDate, viewForProgress } from "/percentle/game.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
 const GAME_NAME = "Chargle";
+// What a guess within the perfect margin (no charge lost) is called, in neon on the reveal.
+const NO_DRAIN_WORD = "SUPERCHARGED";
 // The charge battery's colour as it drains: green while healthy, through yellow and orange, to red.
 // Between two stops the colours blend smoothly.
+// At or below this charge, the label above the running battery reads "Warning: low battery".
+const LOW_BATTERY = 20;
 const CHARGE_COLORS = [
   { at: 60, color: "var(--charge)" },
   { at: 40, color: "var(--charge-yellow)" },
@@ -135,6 +139,12 @@ function setBattery(battery, charge) {
   battery.style.setProperty("--level", Math.max(0, Math.min(100, charge)));
   battery.style.setProperty("--fill", chargeColor(charge));
   battery.querySelectorAll(".battery-value").forEach(value => { value.textContent = formatCharge(charge); });
+  // The running battery's label takes its colour, and turns into a warning once the charge is low.
+  const label = battery.id === "scoreBattery" ? document.querySelector("#scoreLabel") : null;
+  if (label) {
+    label.style.color = chargeColor(charge);
+    label.textContent = charge <= LOW_BATTERY ? "WARNING: LOW BATTERY" : "YOUR CHARGE";
+  }
 }
 
 function chargeColor(charge) {
@@ -282,16 +292,16 @@ function renderScoreBox(progress, view, animate) {
   const charge = chargeLeft(dailyTotal(progress.guesses, currentQuestions.slice(0, locked)));
   const lastOff = pointsOff(progress.guesses[locked - 1], currentQuestions[locked - 1].answer);
   // Blank while answering; "X% off" pops in with each reveal.
-  note.textContent = view.phase === "reveal" ? lastOff === 0 ? "Perfect!" : `${lastOff.toFixed(1)}% off` : "";
+  note.textContent = view.phase === "reveal" ? lastOff === 0 ? "NO CHARGE LOST!" : `${lastOff.toFixed(1)}% off` : "";
   note.classList.remove("pop");
   if (animate && view.phase === "reveal") {
     note.getBoundingClientRect();
     note.classList.add("pop");
-    if (lastOff > 0) {
-      chip.textContent = `−${(lastOff * DRAIN_RATE).toFixed(1)}%`;
-      chip.getBoundingClientRect();
-      chip.classList.add("fly");
-    }
+    // A perfect answer costs nothing, so a green "NO DRAIN" chip pops off instead.
+    chip.classList.toggle("no-drain", lastOff === 0);
+    chip.textContent = lastOff === 0 ? "NO DRAIN" : `−${(lastOff * DRAIN_RATE).toFixed(1)}%`;
+    chip.getBoundingClientRect();
+    chip.classList.add("fly");
   }
   // The battery never shows below empty.
   const shown = Math.max(0, charge);
@@ -318,9 +328,9 @@ function playReveal(animate) {
   const battery = document.querySelector("#revealBattery");
   // When the guess was too high, the green drains back to end at the answer.
   const drainTo = comparison.classList.contains("too-high") ? comparison.dataset.answer : null;
-  const card = document.querySelector("#gameCard");
   const next = document.querySelector("#nextButton");
-  card.classList.remove("thud");
+  const card = document.querySelector("#gameCard");
+  card.classList.remove("struck");
   document.querySelector(".reaction")?.classList.add(animate ? "pop" : "shown");
   clearTimeout(nextButtonTimer);
   if (isOutOfCharge(progressFor().guesses, currentQuestions)) {
@@ -348,8 +358,7 @@ function playReveal(animate) {
     row.classList.add("go");
     comparison.classList.add("answered");
     if (drainTo !== null) battery.style.setProperty("--level", drainTo);
-    // The card jolts as the "Perfect Answer!" stamp lands.
-    if (row.querySelector(".perfect-stamp")) card.classList.add("thud");
+    if (row.classList.contains("struck")) card.classList.add("struck");
   });
 }
 
@@ -445,6 +454,27 @@ function reactionLine(question, guess) {
   return reaction ? `<span class="reaction">${escapeHtml(reaction)}</span>` : "";
 }
 
+// A supercharged guess is struck by lightning: a jagged bolt (with a fork) cracks down from the
+// top of the card onto the numbers. Each line is drawn twice: a blurred glow, then a bright core.
+const BOLT_LINES = ["27,0 13,24 29,30 7,56 25,62 11,84 20,100", "13,24 1,37 8,41 0,55"];
+const STRIKE = `<svg class="strike" viewBox="-15 0 70 100" preserveAspectRatio="none" aria-hidden="true">${BOLT_LINES.map(points =>
+  `<polyline class="strike-glow" points="${points}"/><polyline class="strike-core" points="${points}"/>`).join("")}</svg>`;
+
+// A guess's number glows like it's charged: bright and glowing when close, dimming toward a
+// drained gray the further off it is (litLevel in game.mjs).
+function litStyle(off) {
+  const lit = (litLevel(off) * 100).toFixed(1);
+  return {
+    color: `color-mix(in oklab, var(--lit) ${lit}%, var(--unlit))`,
+    glow: `0 0 ${(lit * 0.16).toFixed(1)}px color-mix(in srgb, var(--charge) ${lit}%, transparent)`
+  };
+}
+
+// "Supercharged!": the short note for a guess that cost no charge.
+function noDrainNote() {
+  return `${NO_DRAIN_WORD.charAt(0)}${NO_DRAIN_WORD.slice(1).toLowerCase()}!`;
+}
+
 function reveal(question, guess, index) {
   const off = pointsOff(guess, question.answer);
   const guessX = Math.max(0, Math.min(100, guess));
@@ -453,23 +483,22 @@ function reveal(question, guess, index) {
   const width = Math.abs(guessX - answerX);
   const answerHigher = question.answer >= guess;
   const arrow = guess === question.answer ? "=" : answerHigher ? "→" : "←";
-  const { tone, strength } = closeness(off);
-  const guessColor = `color-mix(in oklab, var(--${tone}) ${(strength * 100).toFixed(1)}%, var(--ink))`;
-  return `<div class="reveal-row ${answerHigher ? "" : "lower"}" id="revealRow" aria-label="You guessed ${Number(guess).toFixed(1)} percent. The answer is ${question.answer.toFixed(1)} percent, ${off.toFixed(1)} points off.">
-      <span class="reveal-num reveal-guess" style="--closeness:${guessColor}">${Number(guess).toFixed(1)}<small>%</small></span>
+  const lit = litStyle(off);
+  return `<div class="reveal-row ${answerHigher ? "" : "lower"}${off === 0 ? " struck" : ""}" id="revealRow" aria-label="You guessed ${Number(guess).toFixed(1)} percent. The answer is ${question.answer.toFixed(1)} percent, ${off.toFixed(1)} points off.">
+      <span class="reveal-num reveal-guess" style="--lit-color:${lit.color};--lit-glow:${lit.glow}">${Number(guess).toFixed(1)}<small>%</small></span>
       <span class="reveal-arrow" aria-hidden="true">${arrow}</span>
       <span class="reveal-num reveal-answer">${question.answer.toFixed(1)}<small>%</small></span>
-      ${off === 0 ? '<span class="perfect-stamp" role="status">Perfect Answer!</span>' : ""}
+      ${off === 0 ? `${STRIKE}<span class="supercharged" role="status">${NO_DRAIN_WORD}</span>` : ""}
     </div>
     <div class="comparison ${answerHigher ? "too-low" : "too-high"}" data-answer="${answerX}" aria-hidden="true">
       <div class="battery bar-battery" id="revealBattery" style="--level:${guessX}"><div class="battery-cell">
         <span class="drained" style="left:${left}%;width:${width}%"></span><span class="battery-fill"></span>
-        <span class="marker guess" style="left:${guessX}%;--closeness:${guessColor}"><span class="marker-caption">YOU</span></span>
+        <span class="marker guess" style="left:${guessX}%;--lit-color:${lit.color};--lit-glow:${lit.glow}"><span class="marker-caption">YOU</span></span>
         <span class="marker answer" style="left:${answerX}%"><span class="marker-caption">ANSWER</span></span></div></div>
       <div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div>
     </div>
     <p class="source-note">${escapeHtml(question.funFact)}</p>
-    <button class="next-button" id="nextButton">${index === 4 ? "See my charge" : "Next question"} <span aria-hidden="true">→</span></button>`;
+    <button class="next-button" id="nextButton">${index === 4 ? "Battery report" : "Next question"} <span aria-hidden="true">→</span></button>`;
 }
 
 function bindNext(index) {
@@ -483,27 +512,82 @@ function bindNext(index) {
   });
 }
 
-// Below the card on the results screen: every question with the player's guess, best to worst.
+// Below the card on the results screen: "Drain by question". A graph shows the battery stepping
+// down question by question, like a phone's battery-usage chart, and under it one box shows a
+// single question with a mini version of its reveal bar. It starts on question 1; tapping a step
+// on the graph switches the box to that question.
 function renderRecap(progress) {
   const recap = document.querySelector("#recap");
-  const rows = currentQuestions.slice(0, progress.guesses.length)
-    .map((question, index) => ({ question, guess: progress.guesses[index], off: pointsOff(progress.guesses[index], question.answer) }))
-    // Ties (e.g. two "Perfect!" scores) go to whichever guess was actually closer.
-    .sort((a, b) => a.off - b.off || Math.abs(a.guess - a.question.answer) - Math.abs(b.guess - b.question.answer));
-  recap.innerHTML = rows.map(({ question, guess, off }, rank) => {
-    const { tone, strength } = closeness(off);
-    const color = `color-mix(in oklab, var(--${tone}) ${(strength * 100).toFixed(1)}%, var(--ink))`;
-    return `<article class="recap-item${rank === 0 ? " best" : ""}">
-      ${rank === 0 ? '<span class="recap-badge">Best guess</span>' : ""}
-      <p class="recap-question">${escapeHtml(question.text)}</p>
-      <p class="recap-numbers"><span style="color:${color}">You: ${guess.toFixed(1)}%</span><span>Answer: ${question.answer.toFixed(1)}%</span><span class="recap-off">${off === 0 ? "Perfect!" : `${off.toFixed(1)}% off`}</span></p>
-    </article>`;
-  }).join("") + currentQuestions.slice(progress.guesses.length).map(question => `<article class="recap-item unreached">
-      <span class="recap-badge">Not reached</span>
+  const offs = progress.guesses.map((guess, i) => pointsOff(guess, currentQuestions[i].answer));
+  const charges = offs.map((_, i) => chargeLeft(dailyTotal(progress.guesses.slice(0, i + 1), currentQuestions.slice(0, i + 1))));
+  recap.innerHTML = `<section class="log" aria-label="Drain by question: your charge after each question">
+      <h3 class="log-title">Drain by question</h3>
+      ${dischargeGraph(charges)}
+    </section>
+    <div id="logDetail" aria-live="polite"></div>`;
+  recap.hidden = false;
+  const detail = recap.querySelector("#logDetail");
+  const show = step => {
+    recap.querySelectorAll(".log-step").forEach(button => {
+      button.classList.toggle("selected", Number(button.dataset.step) === step);
+      button.setAttribute("aria-pressed", Number(button.dataset.step) === step);
+    });
+    const question = currentQuestions[step];
+    detail.innerHTML = step < progress.guesses.length ? logRow(question, progress.guesses[step], offs[step], step) : `<article class="recap-item log-row unreached">
+      <div class="log-row-head"><span class="log-q">Q${step + 1}</span><span class="recap-badge">Not reached</span></div>
       <p class="recap-question">${escapeHtml(question.text)}</p>
       <p class="recap-numbers"><span>Answer: ${question.answer.toFixed(1)}%</span></p>
-    </article>`).join("");
-  recap.hidden = false;
+    </article>`;
+  };
+  recap.querySelectorAll(".log-step").forEach(button => button.addEventListener("click", () => show(Number(button.dataset.step))));
+  show(0);
+}
+
+// The stepped line: flat at the charge going into each question, then a drop at the question to
+// the charge after it. The battery never shows below empty; any questions after it ran out are a
+// dashed "not reached" stretch.
+function dischargeGraph(charges) {
+  const count = currentQuestions.length;
+  const x = step => 6 + step * (288 / count);
+  const y = charge => 8 + (100 - Math.max(0, Math.min(100, charge))) * 1.04;
+  let line = `M${x(0)},${y(100)}`;
+  charges.forEach((charge, i) => {
+    line += ` H${x(i + 1) - 10} L${x(i + 1)},${y(charge)}`;
+  });
+  const lastX = x(charges.length);
+  const area = `${line} V${y(0)} H${x(0)} Z`;
+  const unreached = charges.length < count
+    ? `<path class="log-unreached" d="M${lastX},${y(0)} H${x(count)}"/>` : "";
+  const at = (step, charge) => `left:${(x(step + 1) / 300 * 100).toFixed(2)}%;top:${(y(charge) / 120 * 100).toFixed(2)}%`;
+  const steps = charges.map((charge, i) => `<button class="log-step" data-step="${i}" style="${at(i, charge)};--fill:${chargeColor(charge)}" aria-label="Question ${i + 1}: ${charge < 0 ? "out of charge" : `${formatCharge(charge)} left`}">${i + 1}</button>`).join("") +
+    currentQuestions.slice(charges.length).map((_, n) => `<button class="log-step unreached-step" data-step="${charges.length + n}" style="${at(charges.length + n, 0)}" aria-label="Question ${charges.length + n + 1}: not reached">${charges.length + n + 1}</button>`).join("");
+  return `<div class="log-graph">
+      <svg viewBox="0 0 300 120" preserveAspectRatio="none" aria-hidden="true">
+        <defs><linearGradient id="logFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--charge)" stop-opacity=".35"/><stop offset="1" stop-color="var(--charge)" stop-opacity="0"/></linearGradient></defs>
+        ${[100, 50, 0].map(charge => `<line class="log-grid" x1="0" x2="300" y1="${y(charge)}" y2="${y(charge)}"/>`).join("")}
+        <path class="log-area" d="${area}"/>
+        <path class="log-line" d="${line}"/>
+        ${unreached}
+      </svg>
+      <span class="log-axis" style="top:${(y(100) / 120 * 100).toFixed(2)}%">100%</span><span class="log-axis" style="top:${(y(0) / 120 * 100).toFixed(2)}%">0%</span>
+      ${steps}
+    </div>`;
+}
+
+// One answered question: what it cost, the question, a mini reveal bar (green up to the lower of
+// guess and answer, gray across the gap, a YOU tick and an ANSWER tick), and the two numbers.
+function logRow(question, guess, off, i) {
+  const lit = litStyle(off);
+  const guessX = Math.max(0, Math.min(100, guess));
+  const answerX = Math.max(0, Math.min(100, question.answer));
+  const low = Math.min(guessX, answerX);
+  return `<article class="recap-item log-row">
+      <div class="log-row-head"><span class="log-q">Q${i + 1}</span><span class="log-cost">${off === 0 ? noDrainNote() : `−${(off * DRAIN_RATE).toFixed(1)}%`}</span></div>
+      <p class="recap-question">${escapeHtml(question.text)}</p>
+      <div class="mini-bar" aria-hidden="true"><span class="mini-fill" style="width:${low}%"></span><span class="mini-gap" style="left:${low}%;width:${Math.abs(guessX - answerX)}%"></span>
+        <span class="mini-tick" style="left:${guessX}%;background:${lit.color};box-shadow:${lit.glow}"></span><span class="mini-tick answer" style="left:${answerX}%"></span></div>
+      <p class="recap-numbers"><span style="color:${lit.color};text-shadow:${lit.glow}">You: ${guess.toFixed(1)}%</span><span>Answer: ${question.answer.toFixed(1)}%</span></p>
+    </article>`;
 }
 
 function renderResults() {

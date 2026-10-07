@@ -54,20 +54,17 @@ export function viewForProgress(progress, questionCount = PUZZLES_PER_DAY, outOf
   return { phase: hasPendingReveal ? "reveal" : "guess", index };
 }
 
-// How close a guess was, as a sliding colour scale: strength 1 is the deepest green (perfect) or
-// the deepest red (50+ points off); strength 0 is neutral (about 15 points off). Every tenth of a
-// point moves it a little.
-export const NEUTRAL_OFF = 15;
-export const WORST_OFF = 50;
+// How "charged" a guess looks: 1 (fully lit) for a guess within the perfect margin, fading
+// evenly to 0 (drained) at DRAINED_OFF points off or more. Every tenth of a point moves it a little.
+export const DRAINED_OFF = 50;
 
-export function closeness(off) {
-  if (off <= PERFECT_MARGIN) return { tone: "good", strength: 1 };
-  if (off < NEUTRAL_OFF) return { tone: "good", strength: (NEUTRAL_OFF - off) / (NEUTRAL_OFF - PERFECT_MARGIN) };
-  return { tone: "bad", strength: Math.min(1, (off - NEUTRAL_OFF) / (WORST_OFF - NEUTRAL_OFF)) };
+export function litLevel(off) {
+  if (off <= PERFECT_MARGIN) return 1;
+  return Math.max(0, 1 - off / DRAINED_OFF);
 }
 
-// Short reactions shown after each reveal, from closest to farthest. A perfect answer gets the
-// "Perfect Answer!" stamp instead, so it has no entry here.
+// Short reactions shown after each reveal, from closest to farthest. A guess within the perfect
+// margin gets the neon "SUPERCHARGED" instead, so it has no entry here.
 export const REACTIONS = [
   { upTo: 3, lines: ["Fantastic!", "So close!", "Incredible!", "What a guess!", "Razor sharp!"] },
   { upTo: 8, lines: ["Great guess!", "Really close!", "Nice one!", "Sharp instincts!", "Well played!"] },
