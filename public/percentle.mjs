@@ -122,7 +122,7 @@ function render() {
   stage.innerHTML = `
     <div class="question-body">
       <h2 class="question-text">${escapeHtml(question.text)}</h2>
-      <p class="question-hint">Your best guess, from 0 to 100. Decimals welcome.</p>
+      <p class="question-hint">Percentage 0-100</p>
       ${view.phase === "reveal" ? reveal(question, progress.guesses[index], index) : guessForm(guess)}
     </div>`;
   if (view.phase === "guess") bindGuessControls(guess, index);
