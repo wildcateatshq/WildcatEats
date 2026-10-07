@@ -486,7 +486,7 @@ function lastTenGames(games) {
   if (!recent.length) return "<p class=\"hist-empty\">Finish today's puzzle to start your history.</p>";
   const tallest = Math.max(...recent.map(game => game.score), 1);
   const shortDate = date => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
-  return `<div class="recent-games" role="group" aria-label="Your last ${recent.length} games, oldest to newest">${recent.map((game, i) => `
+  return `<div class="recent-games" role="group" aria-label="Your recent games, oldest to newest">${recent.map((game, i) => `
       <button class="recent-bar${i === recent.length - 1 ? " selected" : ""}" data-date="${escapeAttr(game.date)}" data-score="${game.score.toFixed(1)}" aria-label="${longDate(game.date)}: score ${game.score.toFixed(1)}">
         <span class="recent-bar-fill" style="height:${Math.max(4, game.score / tallest * 100).toFixed(1)}%"></span>
         <span class="recent-bar-date">${shortDate(game.date)}</span>
@@ -519,7 +519,7 @@ function showStats() {
     <div class="stat-card"><span>AVERAGE SCORE</span><strong>${average === null ? "—" : average.toFixed(1)}</strong></div>
     <div class="stat-card"><span>BEST SCORE</span><strong>${best === null ? "—" : best.toFixed(1)}</strong></div>
     <div class="stat-card"><span>CURRENT STREAK</span><strong>${consecutiveStreak(games)} day${consecutiveStreak(games) === 1 ? "" : "s"}</strong></div></div>
-    <h3 class="dialog-subtitle">Last 10 games</h3>${lastTenGames(games)}
+    <h3 class="dialog-subtitle">Recent games</h3>${lastTenGames(games)}
     <h3 class="dialog-title">Past puzzles</h3><p>${isTodayFinished() ? "Replay any of the last 30 daily puzzles." : "Finish today's puzzle to unlock the archive."}</p>
     <div class="archive-list" id="archiveList">${isTodayFinished() ? "<span class='hist-empty'>Loading past puzzles…</span>" : "<span class='hist-empty'>The archive unlocks after today's five questions.</span>"}</div>`);
   bindLastTenGames();
