@@ -1,4 +1,4 @@
-import { applyGuessKey, closeness, dailyTotal, reactionFor, easternDate, guessEntryFrom, guessEntryText, pointsOff, scoreColor, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { applyGuessKey, closeness, dailyTotal, reactionFor, easternDate, guessEntryFrom, guessEntryText, pointsOff, utcDate, viewForProgress } from "/percentle/game.mjs";
 
 const PUZZLES_URL = "/api/percentle/puzzles";
 // v2: puzzles now come from the daily agent, so v1 progress (from the old bank) no longer matches.
@@ -443,11 +443,10 @@ function crowdLine(position) {
 }
 
 function shareResult(score, progress) {
-  const squares = currentQuestions.map((question, i) => {
-    const color = scoreColor(pointsOff(progress.guesses[i], question.answer));
-    return { green: "🟩", yellow: "🟨", orange: "🟧", red: "🟥" }[color];
-  }).join("");
-  const result = `Percentle #${currentNumber}\nScore: ${score.toFixed(1)}\n${squares}`;
+  // The real distance of the best guess (even one that scored a perfect 0), e.g. "0.2% away".
+  const closest = Math.min(...currentQuestions.map((question, i) => Math.abs(progress.guesses[i] - question.answer)));
+  const link = `${location.origin}${location.pathname}`;
+  const result = `Percentle #${currentNumber}\nScore: ${score.toFixed(1)}\nClosest guess - ${closest.toFixed(1)}% away\n${link}`;
   if (navigator.share) {
     navigator.share({ text: result }).catch(error => {
       if (error.name !== "AbortError") copyResult(result);
