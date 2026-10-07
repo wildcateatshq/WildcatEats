@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  applyGuessKey,
   dailyTotal,
+  guessEntryFrom,
+  guessEntryText,
   easternDate,
   pointsOff,
   scoreColor,
@@ -40,6 +43,22 @@ test("each locked question reveals before the next guess and final results", () 
     progress.revealed++;
   }
   assert.deepEqual(viewForProgress(progress), { phase: "results", index: 5 });
+});
+
+test("typed guesses keep a fixed decimal point", () => {
+  const type = (start, keys) => guessEntryText([...keys].reduce(applyGuessKey, guessEntryFrom(start)));
+  assert.equal(type(50, "425"), "42.5", "two whole digits, then the tenths");
+  assert.equal(type(50, "42"), "42.0");
+  assert.equal(type(50, "7.5"), "7.5", "a decimal point jumps to the tenths early");
+  assert.equal(type(50, "4"), "4.0");
+  assert.equal(type(50, "4256"), "42.6", "extra digits replace the tenths");
+  assert.equal(type(50, "05"), "5.0", "no leading zero");
+  const backspace = keys => [...keys].map(key => key === "<" ? "Backspace" : key);
+  const typeKeys = (start, keys) => guessEntryText(keys.reduce(applyGuessKey, guessEntryFrom(start)));
+  assert.equal(typeKeys(37.4, backspace("<")), "37.0", "backspace clears the tenths first");
+  assert.equal(typeKeys(37.4, backspace("<<")), "3.0", "then the whole digits");
+  assert.equal(typeKeys(50, backspace("425<<")), "4.0");
+  assert.equal(typeKeys(50, backspace("425<<6")), "46.0", "after deleting, typing continues in the whole part");
 });
 
 test("result colors respect their point-off thresholds", () => {

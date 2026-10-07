@@ -1,4 +1,4 @@
-import { dailyTotal, easternDate, pointsOff, scoreColor, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { applyGuessKey, dailyTotal, easternDate, guessEntryFrom, guessEntryText, pointsOff, scoreColor, utcDate, viewForProgress } from "/percentle/game.mjs";
 
 const PUZZLES_URL = "/api/percentle/puzzles";
 // v2: puzzles now come from the daily agent, so v1 progress (from the old bank) no longer matches.
@@ -20,7 +20,7 @@ try {
     throw new Error(body.error);
   }
   if (!response.ok || !Array.isArray(body.questions)) throw new Error(body.error || `Puzzle request failed (${response.status}).`);
-  todayPuzzle = body;
+  todayPuzzle = { ...body, questions: withRoundedAnswers(body.questions) };
 } catch (error) {
   console.error("Could not load today's Percentle puzzle.", error);
   if (!stage.innerHTML.trim()) {
@@ -41,6 +41,11 @@ let justLocked = false;
 // What the score box above the card is showing, so the next update can count up from it.
 let shownScore = null;
 let countUpRun = 0;
+
+// Answers always have exactly one decimal place, even if a puzzle was stored with more.
+function withRoundedAnswers(questions) {
+  return questions.map(question => ({ ...question, answer: Math.round(question.answer * 10) / 10 }));
+}
 
 function readState() {
   try {
@@ -212,7 +217,7 @@ function playReveal(animate) {
 }
 
 function guessForm(guess) {
-  return `<div class="guess-display"><input class="guess-input" id="guessInput" type="number" inputmode="decimal" min="0" max="100" step="0.1" value="${Number(guess).toFixed(1)}" aria-label="Your percentage guess, from 0 to 100"><span class="percent-sign">%</span></div>
+  return `<div class="guess-display"><input class="guess-input" id="guessInput" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="${Number(guess).toFixed(1)}" aria-label="Your percentage guess, from 0 to 100"><span class="percent-sign">%</span></div>
     <div class="range-wrap"><input id="guessRange" type="range" min="0" max="100" step="0.1" value="${guess}" aria-label="Adjust your percentage guess from 0 to 100"><div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div></div>
     <button class="lock-button" id="lockButton">Lock in my guess <span aria-hidden="true">→</span></button>`;
 }
@@ -220,23 +225,36 @@ function guessForm(guess) {
 function bindGuessControls(initial, index) {
   const input = document.querySelector("#guessInput");
   const range = document.querySelector("#guessRange");
+  let entry = guessEntryFrom(initial);
   const persistDraft = () => {
-    if (input.value.trim() === "" || !Number.isFinite(Number(input.value))) return;
     progressFor().draft = Number(input.value);
     save();
   };
-  const syncRange = () => {
-    if (input.value === "") return;
-    const value = Math.max(0, Math.min(100, Number(input.value)));
-    range.value = String(value);
+  const showEntry = () => {
+    input.value = guessEntryText(entry);
+    range.value = input.value;
+    input.setSelectionRange(input.value.length, input.value.length);
     persistDraft();
   };
-  const syncInput = () => {
-    input.value = Number(range.value).toFixed(1);
+  // Handle typing ourselves so the decimal point stays put (see applyGuessKey).
+  input.addEventListener("beforeinput", event => {
+    event.preventDefault();
+    if (event.inputType.startsWith("delete")) entry = applyGuessKey(entry, "Backspace");
+    else if (event.inputType === "insertFromPaste" || event.inputType === "insertFromDrop") {
+      const pasted = Number.parseFloat(event.data ?? event.dataTransfer?.getData("text") ?? "");
+      if (Number.isFinite(pasted)) entry = { ...guessEntryFrom(Math.max(0, Math.min(100, pasted))), fresh: false };
+    } else for (const key of event.data ?? "") entry = applyGuessKey(entry, key);
+    showEntry();
+  });
+  input.addEventListener("focus", () => {
+    entry = { ...entry, fresh: true };
+    requestAnimationFrame(() => input.setSelectionRange(input.value.length, input.value.length));
+  });
+  range.addEventListener("input", () => {
+    entry = guessEntryFrom(range.value);
+    input.value = guessEntryText(entry);
     persistDraft();
-  };
-  input.addEventListener("input", syncRange);
-  range.addEventListener("input", syncInput);
+  });
   document.querySelector("#lockButton").addEventListener("click", () => {
     const value = Number(input.value);
     if (input.value.trim() === "" || !Number.isFinite(value) || value < 0 || value > 100) {
@@ -268,10 +286,10 @@ function reveal(question, guess, index) {
   const width = Math.abs(guessX - answerX);
   const answerHigher = question.answer >= guess;
   const arrow = off === 0 ? "=" : answerHigher ? "→" : "←";
-  return `<div class="reveal-row ${answerHigher ? "" : "lower"}" id="revealRow" aria-label="You guessed ${Number(guess).toFixed(1)} percent. The answer is ${question.answer} percent, ${off.toFixed(1)} points off.">
+  return `<div class="reveal-row ${answerHigher ? "" : "lower"}" id="revealRow" aria-label="You guessed ${Number(guess).toFixed(1)} percent. The answer is ${question.answer.toFixed(1)} percent, ${off.toFixed(1)} points off.">
       <span class="reveal-num reveal-guess">${Number(guess).toFixed(1)}<small>%</small></span>
       <span class="reveal-arrow" aria-hidden="true">${arrow}</span>
-      <span class="reveal-num reveal-answer">${question.answer}<small>%</small></span>
+      <span class="reveal-num reveal-answer">${question.answer.toFixed(1)}<small>%</small></span>
     </div>
     <div class="comparison" aria-hidden="true">
       <div class="compare-track"><div class="compare-gap" style="left:${left}%;width:${width}%;transform-origin:${answerHigher ? "left" : "right"}"></div>
@@ -457,7 +475,7 @@ async function loadArchive() {
       if (!response.ok) throw new Error(puzzle.error || `Puzzle request failed (${response.status}).`);
       currentDate = puzzle.date;
       currentNumber = puzzle.number;
-      currentQuestions = puzzle.questions;
+      currentQuestions = withRoundedAnswers(puzzle.questions);
       practiceMode = true;
       dialog.close();
       render();

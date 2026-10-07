@@ -60,15 +60,16 @@ function validatePuzzle(questions) {
     }
     const result = {
       text: text(question.text, `${label} text`, 15, 220, problems),
-      answer: question.answer,
+      // Answers are always stored rounded to one decimal place (42.46 becomes 42.5).
+      answer: Number.isFinite(question.answer) ? Math.round(question.answer * 10) / 10 : question.answer,
       category: question.category,
       funFact: text(question.funFact, `${label} funFact`, 10, 180, problems),
       sourceName: text(question.sourceName, `${label} sourceName`, 3, 140, problems),
       sourceUrl: question.sourceUrl
     };
     if (result.text && !result.text.endsWith("?")) problems.push(`${label} text must be a question ending in "?".`);
-    if (!Number.isFinite(result.answer) || result.answer <= 0 || result.answer >= 100 || Math.round(result.answer * 10) !== result.answer * 10) {
-      problems.push(`${label} answer must be a number strictly between 0 and 100 with at most one decimal place.`);
+    if (!Number.isFinite(result.answer) || result.answer <= 0 || result.answer >= 100) {
+      problems.push(`${label} answer must be a number strictly between 0 and 100 after rounding to one decimal place.`);
     }
     if (!CATEGORIES.includes(result.category)) problems.push(`${label} category must be one of: ${CATEGORIES.join(", ")}.`);
     try {

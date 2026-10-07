@@ -35,3 +35,41 @@ export function utcDate(date = new Date()) {
 export function easternDate(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
+
+// Typed guesses keep a fixed decimal point: up to two whole digits, then the tenths digit.
+// Typing "4", "2", "5" gives 42.5; "." jumps to the tenths early ("7", ".", "5" gives 7.5).
+// The first digit after focusing or dragging replaces the current value.
+export function guessEntryFrom(value) {
+  const [whole, tenth] = Number(value).toFixed(1).split(".");
+  return { whole, tenth, inTenths: true, fresh: true };
+}
+
+export function applyGuessKey(entry, key) {
+  let { whole, tenth, inTenths } = entry;
+  const isDigit = /^\d$/.test(key);
+  if (entry.fresh && (isDigit || key === "." || key === ",")) {
+    whole = "";
+    tenth = "";
+    inTenths = false;
+  }
+  if (isDigit) {
+    if (inTenths) tenth = key;
+    else {
+      whole = whole === "0" ? key : whole + key;
+      if (whole.length >= 2) inTenths = true;
+    }
+  } else if (key === "." || key === ",") {
+    inTenths = true;
+  } else if (key === "Backspace") {
+    if (inTenths && tenth) tenth = "";
+    else {
+      inTenths = false;
+      whole = whole.slice(0, -1);
+    }
+  }
+  return { whole, tenth, inTenths, fresh: false };
+}
+
+export function guessEntryText(entry) {
+  return `${entry.whole || "0"}.${entry.tenth || "0"}`;
+}

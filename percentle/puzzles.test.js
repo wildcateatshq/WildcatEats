@@ -28,6 +28,17 @@ test("puzzle numbers count Eastern calendar days from launch", () => {
   assert.equal(easternDate(new Date("2026-10-07T03:59:00Z")), "2026-10-06");
 });
 
+test("answers are rounded to one decimal place", () => {
+  const puzzle = validPuzzle();
+  puzzle[0].answer = 42.46;
+  puzzle[1].answer = 1.1;
+  puzzle[2].answer = 99.94;
+  const cleaned = validatePuzzle(puzzle);
+  assert.deepEqual(cleaned.slice(0, 3).map(question => question.answer), [42.5, 1.1, 99.9]);
+  puzzle[3].answer = 99.96;
+  assert.throws(() => validatePuzzle(puzzle), /Question 4 answer/, "rounding up to 100 is rejected");
+});
+
 test("valid puzzles pass and keep only the published fields", () => {
   const cleaned = validatePuzzle(validPuzzle().map(item => ({ ...item, extra: "dropped" })));
   assert.equal(cleaned.length, 5);
