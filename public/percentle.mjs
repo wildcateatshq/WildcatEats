@@ -1,5 +1,15 @@
-import { applyGuessKey, closeness, dailyTotal, reactionFor, easternDate, guessEntryFrom, guessEntryText, pointsOff, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { applyGuessKey, chargeLeft, closeness, crowdRank, dailyTotal, DRAIN_RATE, reactionFor, easternDate, guessEntryFrom, guessEntryText, isOutOfCharge, pointsOff, utcDate, viewForProgress } from "/percentle/game.mjs";
 
+// The game's name everywhere players see it (title, wordmark, start screen, share text).
+const GAME_NAME = "Chargle";
+// The charge battery's colour as it drains: green while healthy, through yellow and orange, to red.
+// Between two stops the colours blend smoothly.
+const CHARGE_COLORS = [
+  { at: 60, color: "var(--charge)" },
+  { at: 40, color: "var(--charge-yellow)" },
+  { at: 20, color: "var(--charge-orange)" },
+  { at: 5, color: "var(--negative)" }
+];
 const PUZZLES_URL = "/api/percentle/puzzles";
 // v2: puzzles now come from the daily agent, so v1 progress (from the old bank) no longer matches.
 const STORAGE_KEY = "percentle.v2";
@@ -13,6 +23,12 @@ if (location.hostname === "localhost" && new URLSearchParams(location.search).ha
 }
 const savedTheme = readPreference("percentle.theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 document.documentElement.dataset.theme = savedTheme;
+document.title = `${GAME_NAME} — a little game of big percentages`;
+document.querySelectorAll("[data-game-name]").forEach(element => {
+  element.textContent = element.dataset.gameName === "lower" ? GAME_NAME.toLowerCase() : GAME_NAME;
+});
+document.querySelector(".wordmark").setAttribute("aria-label", `${GAME_NAME} home`);
+document.querySelectorAll("[data-drain-rule]").forEach(element => { element.innerHTML = drainRule(); });
 
 let todayPuzzle;
 try {
@@ -46,12 +62,23 @@ let toastTimer;
 let justLocked = false;
 // What the score box above the card is showing, so the next update can count up from it.
 let shownScore = null;
-let countUpRun = 0;
+// Set when the results screen should play its drain animation (not when it's just reloaded).
+let animateResults = false;
 // The revealed answer finishes fading in about this long after a guess is locked...
 const ANSWER_SHOWN_MS = 1450;
 // ...and the Next button fades in this long after that.
 const NEXT_BUTTON_DELAY_MS = 1000;
 let nextButtonTimer;
+// Running out of charge: the battery above drains to empty, shows "!" and the alarms go off.
+// While they're going, the lights flicker (once, a beat, twice quickly) and go out, and the
+// out-of-charge screen comes up. The flicker starts POWER_OUT_DELAY_MS after the guess is locked;
+// the other two count from the start of the flicker (1.7s long in percentle.css, with the lights
+// going out for good 75% of the way through).
+const POWER_OUT_DELAY_MS = 3300;
+const LIGHTS_OUT_MS = 1275;
+const POWER_OUT_MS = 2660;
+let powerOutTimer;
+let lightsOutTimer;
 
 // Answers always have exactly one decimal place, even if a puzzle was stored with more.
 function withRoundedAnswers(questions) {
@@ -85,6 +112,65 @@ function save() {
   }
 }
 
+// The scoring rule in words, kept in step with DRAIN_RATE.
+function drainRule() {
+  const amount = DRAIN_RATE === 1 ? "" : DRAIN_RATE === 0.5 ? "half of " : `${DRAIN_RATE}× `;
+  return `Every miss drains your battery by ${amount}how far off you were. <strong>Finish with as much charge as you can.</strong>`;
+}
+
+function formatCharge(charge) {
+  return `${charge < 0 ? "−" : ""}${Math.abs(charge).toFixed(1)}%`;
+}
+
+// A battery: an outline with a nub, a green fill set by --level (0–100), the charge written on
+// top (a second, dark copy is clipped to the fill so it stays readable on green).
+function batteryMarkup(className, id, charge = 100) {
+  return `<div class="battery ${className}"${id ? ` id="${id}"` : ""} style="--level:${Math.max(0, Math.min(100, charge))}">
+      <div class="battery-cell"><span class="battery-fill"></span>
+        <strong class="battery-value">${formatCharge(charge)}</strong><strong class="battery-value lit" aria-hidden="true">${formatCharge(charge)}</strong></div>
+    </div>`;
+}
+
+function setBattery(battery, charge) {
+  battery.style.setProperty("--level", Math.max(0, Math.min(100, charge)));
+  battery.style.setProperty("--fill", chargeColor(charge));
+  battery.querySelectorAll(".battery-value").forEach(value => { value.textContent = formatCharge(charge); });
+}
+
+function chargeColor(charge) {
+  if (charge >= CHARGE_COLORS[0].at) return CHARGE_COLORS[0].color;
+  for (let i = 1; i < CHARGE_COLORS.length; i++) {
+    const upper = CHARGE_COLORS[i - 1];
+    const lower = CHARGE_COLORS[i];
+    if (charge >= lower.at) {
+      const share = ((charge - lower.at) / (upper.at - lower.at) * 100).toFixed(1);
+      return `color-mix(in oklab, ${upper.color} ${share}%, ${lower.color})`;
+    }
+  }
+  return CHARGE_COLORS.at(-1).color;
+}
+
+// Drains (or fills) a battery from one charge to another, moving the number with it.
+function animateBattery(battery, from, to, duration) {
+  const run = (battery.drainRun = (battery.drainRun || 0) + 1);
+  return new Promise(resolve => {
+    if (from === to || matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setBattery(battery, to);
+      resolve(run === battery.drainRun);
+      return;
+    }
+    const start = performance.now();
+    function tick(now) {
+      if (run !== battery.drainRun) return resolve(false);
+      const ratio = Math.min(1, (now - start) / duration);
+      setBattery(battery, Math.round((from + (to - from) * (1 - Math.pow(1 - ratio, 3))) * 10) / 10);
+      if (ratio < 1) requestAnimationFrame(tick);
+      else resolve(true);
+    }
+    requestAnimationFrame(tick);
+  });
+}
+
 function readPreference(key) {
   try {
     return localStorage.getItem(key);
@@ -107,8 +193,9 @@ function isTodayFinished() {
 
 function recordTodayIfComplete(progress) {
   const questions = todayPuzzle.questions;
-  if (practiceMode || currentDate !== today || progress.guesses.length !== questions.length || state.games.some(game => game.date === today)) return;
-  const score = Number(dailyTotal(progress.guesses, questions).toFixed(1));
+  const finished = progress.guesses.length === questions.length || isOutOfCharge(progress.guesses, questions);
+  if (practiceMode || currentDate !== today || !finished || state.games.some(game => game.date === today)) return;
+  const score = Number(dailyTotal(progress.guesses, questions.slice(0, progress.guesses.length)).toFixed(1));
   state.games.push({ date: today, score });
   state.games.sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -128,8 +215,13 @@ function renderDots(index) {
 
 function render() {
   const progress = progressFor();
-  const view = viewForProgress(progress, currentQuestions.length);
+  const out = isOutOfCharge(progress.guesses, currentQuestions);
+  const view = viewForProgress(progress, currentQuestions.length, out);
   const index = view.index;
+  clearTimeout(powerOutTimer);
+  clearTimeout(lightsOutTimer);
+  document.body.classList.remove("power-out", "lights-out");
+  document.querySelector(".alarm-lights")?.remove();
   // Only shown while replaying an archived puzzle, so players can leave it at any time.
   document.querySelector("#returnButton").hidden = !practiceMode;
   if (practiceMode) leaveStartScreen();
@@ -138,6 +230,13 @@ function render() {
   renderDots(Math.min(index, 4));
   const animate = justLocked;
   justLocked = false;
+  // Reloading part-way through a power-out goes straight to the out-of-charge screen.
+  if (view.phase === "reveal" && out && !animate) {
+    progress.revealed = progress.guesses.length;
+    save();
+    return render();
+  }
+  document.body.classList.toggle("dead", view.phase === "results" && out);
   renderScoreBox(progress, view, animate);
   if (view.phase === "results") {
     renderResults();
@@ -159,70 +258,79 @@ function render() {
   }
 }
 
-// The box above the card shows the running total (points off so far). It stays empty until the
-// first answer, then counts up to the new total each time a guess is revealed.
+// The battery above the card shows the charge left so far. It starts full, and each time a guess
+// is revealed it drains by that miss (with a "−X%" chip flying off it).
 function renderScoreBox(progress, view, animate) {
   const box = document.querySelector("#scoreBox");
-  const value = document.querySelector("#scoreValue");
+  const battery = document.querySelector("#scoreBattery");
+  const chip = document.querySelector("#drainChip");
   const note = document.querySelector("#scoreNote");
   const key = `${practiceMode ? "practice" : "daily"}:${currentDate}`;
   const locked = progress.guesses.length;
-  // The results screen shows the final score inside the card, so the box above it steps aside.
+  // The results screen shows the final battery inside the card, so the box above it steps aside.
   box.hidden = view.phase === "results";
   if (view.phase !== "results") document.querySelector("#recap").hidden = true;
+  chip.classList.remove("fly");
+  battery.classList.remove("alarm");
   if (!locked) {
-    box.classList.remove("active");
-    shownScore = { key, value: 0 };
-    value.textContent = "0.0";
+    shownScore = { key, value: 100 };
+    battery.drainRun = (battery.drainRun || 0) + 1;
+    setBattery(battery, 100);
     note.textContent = "";
     return;
   }
-  const total = Number(dailyTotal(progress.guesses, currentQuestions.slice(0, locked)).toFixed(1));
+  const charge = chargeLeft(dailyTotal(progress.guesses, currentQuestions.slice(0, locked)));
   const lastOff = pointsOff(progress.guesses[locked - 1], currentQuestions[locked - 1].answer);
-  box.classList.add("active");
-  // Blank while answering; "You were X pts off" pops in with each reveal.
-  note.textContent = view.phase === "reveal"
-    ? lastOff === 0 ? "Perfect!" : `${lastOff.toFixed(1)}% off`
-    : view.phase === "results" ? "Final score · lower is better" : "";
+  // Blank while answering; "X% off" pops in with each reveal.
+  note.textContent = view.phase === "reveal" ? lastOff === 0 ? "Perfect!" : `${lastOff.toFixed(1)}% off` : "";
   note.classList.remove("pop");
   if (animate && view.phase === "reveal") {
     note.getBoundingClientRect();
     note.classList.add("pop");
+    if (lastOff > 0) {
+      chip.textContent = `−${(lastOff * DRAIN_RATE).toFixed(1)}%`;
+      chip.getBoundingClientRect();
+      chip.classList.add("fly");
+    }
   }
-  const from = shownScore?.key === key ? shownScore.value : animate ? total - lastOff : total;
-  shownScore = { key, value: total };
-  countUp(value, from, total);
+  // The battery never shows below empty.
+  const shown = Math.max(0, charge);
+  const from = shownScore?.key === key ? shownScore.value : animate ? chargeLeft(dailyTotal(progress.guesses.slice(0, -1), currentQuestions.slice(0, locked - 1))) : shown;
+  shownScore = { key, value: shown };
+  // Only the reveal of a guess that runs the battery out sounds the alarm, once it has drained to empty.
+  const alarm = animate && view.phase === "reveal" && charge < 0;
+  animateBattery(battery, from, shown, 1400).then(finished => { if (finished && alarm) soundAlarm(battery); });
 }
 
-function countUp(element, from, to) {
-  const run = ++countUpRun;
-  if (from === to || matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    element.textContent = to.toFixed(1);
-    return;
+function soundAlarm(battery) {
+  battery.classList.add("alarm");
+  if (!document.querySelector(".alarm-lights")) {
+    document.body.insertAdjacentHTML("beforeend", '<div class="alarm-lights" aria-hidden="true"><div class="alarm-glow"></div></div>');
   }
-  const start = performance.now();
-  function tick(now) {
-    if (run !== countUpRun) return;
-    const ratio = Math.min(1, (now - start) / 1400);
-    element.textContent = (from + (to - from) * (1 - Math.pow(1 - ratio, 3))).toFixed(1);
-    if (ratio < 1) requestAnimationFrame(tick);
-  }
-  requestAnimationFrame(tick);
 }
 
-// Slides the guess sideways away from the answer, then fades in the arrow and the real answer,
-// while the line on the track grows from the guess dot to the answer dot.
+// Slides the guess sideways away from the answer, then fades in the arrow and the real answer.
+// On the battery, a guess that was too high drains back to the answer, leaving gray where the
+// charge was; a guess that was too low grows a gray stretch from the guess out to the answer.
 function playReveal(animate) {
   const row = document.querySelector("#revealRow");
   const comparison = document.querySelector(".comparison");
+  const battery = document.querySelector("#revealBattery");
+  // When the guess was too high, the green drains back to end at the answer.
+  const drainTo = comparison.classList.contains("too-high") ? comparison.dataset.answer : null;
   const card = document.querySelector("#gameCard");
   const next = document.querySelector("#nextButton");
   card.classList.remove("thud");
   document.querySelector(".reaction")?.classList.add(animate ? "pop" : "shown");
   clearTimeout(nextButtonTimer);
+  if (isOutOfCharge(progressFor().guesses, currentQuestions)) {
+    next.remove();
+    powerOutTimer = setTimeout(powerOut, POWER_OUT_DELAY_MS);
+  }
   if (!animate) {
     row.classList.add("instant", "go");
     comparison.classList.add("instant", "answered");
+    if (drainTo !== null) battery.style.setProperty("--level", drainTo);
     next.classList.add("shown");
     return;
   }
@@ -239,22 +347,48 @@ function playReveal(animate) {
     guessEl.style.transform = "translateX(0)";
     row.classList.add("go");
     comparison.classList.add("answered");
+    if (drainTo !== null) battery.style.setProperty("--level", drainTo);
     // The card jolts as the "Perfect Answer!" stamp lands.
     if (row.querySelector(".perfect-stamp")) card.classList.add("thud");
   });
 }
 
+// The electric end of the guess bar. The fill's own edge is jagged and snaps between three
+// shapes, each with a bright "hot" line along it.
+const ZAP_EDGES = [
+  "10,0 14,5 8,11 15,17 9,23 16,29 10,35 14,41 9,48",
+  "12,0 8,6 15,12 9,18 14,24 8,30 15,36 9,42 12,48",
+  "9,0 15,7 10,13 13,19 7,25 14,31 9,37 16,43 10,48"
+];
+const ZAP = `<svg class="zap" viewBox="0 0 26 48" preserveAspectRatio="none" aria-hidden="true">${ZAP_EDGES.map((edge, i) =>
+  `<g class="zap-frame zap-${i + 1}"><polygon points="0,0 ${edge} 0,48"/><polyline points="${edge}"/></g>`).join("")}</svg>`;
+
+function powerOut() {
+  const progress = progressFor();
+  document.body.classList.add("power-out");
+  lightsOutTimer = setTimeout(() => document.body.classList.add("lights-out"), LIGHTS_OUT_MS);
+  powerOutTimer = setTimeout(() => {
+    progress.revealed = progress.guesses.length;
+    save();
+    render();
+  }, POWER_OUT_MS);
+}
+
 function guessForm(guess) {
   return `<div class="guess-display"><input class="guess-input" id="guessInput" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="${Number(guess).toFixed(1)}" aria-label="Your percentage guess, from 0 to 100"><span class="percent-sign">%</span></div>
-    <div class="range-wrap"><input id="guessRange" type="range" min="0" max="100" step="0.1" value="${guess}" aria-label="Adjust your percentage guess from 0 to 100"><div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div></div>
+    <div class="range-wrap"><div class="battery bar-battery" id="guessBattery" style="--level:${guess}"><div class="battery-cell"><span class="battery-fill"></span>${ZAP}
+        <input class="battery-range" id="guessRange" type="range" min="0" max="100" step="0.1" value="${guess}" aria-label="Adjust your percentage guess from 0 to 100"></div></div>
+      <div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div></div>
     <button class="lock-button" id="lockButton">Lock in my guess <span aria-hidden="true">→</span></button>`;
 }
 
 function bindGuessControls(initial, index) {
   const input = document.querySelector("#guessInput");
   const range = document.querySelector("#guessRange");
+  const battery = document.querySelector("#guessBattery");
   let entry = guessEntryFrom(initial);
   const persistDraft = () => {
+    battery.style.setProperty("--level", input.value);
     progressFor().draft = Number(input.value);
     save();
   };
@@ -327,21 +461,24 @@ function reveal(question, guess, index) {
       <span class="reveal-num reveal-answer">${question.answer.toFixed(1)}<small>%</small></span>
       ${off === 0 ? '<span class="perfect-stamp" role="status">Perfect Answer!</span>' : ""}
     </div>
-    <div class="comparison" aria-hidden="true">
-      <div class="compare-track"><div class="compare-gap" style="left:${left}%;width:${width}%;transform-origin:${answerHigher ? "left" : "right"}"></div>
+    <div class="comparison ${answerHigher ? "too-low" : "too-high"}" data-answer="${answerX}" aria-hidden="true">
+      <div class="battery bar-battery" id="revealBattery" style="--level:${guessX}"><div class="battery-cell">
+        <span class="drained" style="left:${left}%;width:${width}%"></span><span class="battery-fill"></span>
         <span class="marker guess" style="left:${guessX}%;--closeness:${guessColor}"><span class="marker-caption">YOU</span></span>
-        <span class="marker answer" style="left:${answerX}%"><span class="marker-caption">ANSWER</span></span></div>
+        <span class="marker answer" style="left:${answerX}%"><span class="marker-caption">ANSWER</span></span></div></div>
       <div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div>
     </div>
     <p class="source-note">${escapeHtml(question.funFact)}</p>
-    <button class="next-button" id="nextButton">${index === 4 ? "See my score" : "Next question"} <span aria-hidden="true">→</span></button>`;
+    <button class="next-button" id="nextButton">${index === 4 ? "See my charge" : "Next question"} <span aria-hidden="true">→</span></button>`;
 }
 
 function bindNext(index) {
-  document.querySelector("#nextButton").addEventListener("click", () => {
+  // There's no Next button after a guess that ran the battery out.
+  document.querySelector("#nextButton")?.addEventListener("click", () => {
     const progress = progressFor();
     progress.revealed = index + 1;
     save();
+    animateResults = progress.revealed === currentQuestions.length;
     render();
   });
 }
@@ -349,7 +486,7 @@ function bindNext(index) {
 // Below the card on the results screen: every question with the player's guess, best to worst.
 function renderRecap(progress) {
   const recap = document.querySelector("#recap");
-  const rows = currentQuestions
+  const rows = currentQuestions.slice(0, progress.guesses.length)
     .map((question, index) => ({ question, guess: progress.guesses[index], off: pointsOff(progress.guesses[index], question.answer) }))
     // Ties (e.g. two "Perfect!" scores) go to whichever guess was actually closer.
     .sort((a, b) => a.off - b.off || Math.abs(a.guess - a.question.answer) - Math.abs(b.guess - b.question.answer));
@@ -357,26 +494,41 @@ function renderRecap(progress) {
     const { tone, strength } = closeness(off);
     const color = `color-mix(in oklab, var(--${tone}) ${(strength * 100).toFixed(1)}%, var(--ink))`;
     return `<article class="recap-item${rank === 0 ? " best" : ""}">
-      ${rank === 0 ? '<span class="recap-badge">Guess of the day</span>' : ""}
+      ${rank === 0 ? '<span class="recap-badge">Best guess</span>' : ""}
       <p class="recap-question">${escapeHtml(question.text)}</p>
       <p class="recap-numbers"><span style="color:${color}">You: ${guess.toFixed(1)}%</span><span>Answer: ${question.answer.toFixed(1)}%</span><span class="recap-off">${off === 0 ? "Perfect!" : `${off.toFixed(1)}% off`}</span></p>
     </article>`;
-  }).join("");
+  }).join("") + currentQuestions.slice(progress.guesses.length).map(question => `<article class="recap-item unreached">
+      <span class="recap-badge">Not reached</span>
+      <p class="recap-question">${escapeHtml(question.text)}</p>
+      <p class="recap-numbers"><span>Answer: ${question.answer.toFixed(1)}%</span></p>
+    </article>`).join("");
   recap.hidden = false;
 }
 
 function renderResults() {
   const progress = progressFor();
-  const score = Number(dailyTotal(progress.guesses, currentQuestions).toFixed(1));
-  stage.innerHTML = `<div class="final-score reveal"><span class="answer-label">YOUR ${currentDate === today ? "DAILY" : "PRACTICE"} SCORE</span><div class="score-number">${score.toFixed(1)}</div></div>
-    ${practiceMode ? "" : `<section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">Today's score line</h3><p class="crowd-copy">Your total is added anonymously. Never your guesses, name, or account.</p><p class="crowd-status">Placing you on today's score line…</p></section>`}
+  const answered = progress.guesses.length;
+  const out = isOutOfCharge(progress.guesses, currentQuestions);
+  const score = Number(dailyTotal(progress.guesses, currentQuestions.slice(0, answered)).toFixed(1));
+  const charge = chargeLeft(score);
+  const animate = animateResults && !out;
+  animateResults = false;
+  const headline = out
+    ? `<div class="final-score dead-score reveal"><div class="result-battery-wrap">${batteryMarkup("result-battery dead-battery", null, 0)}</div>
+      <h2 class="out-title">Out of charge</h2><p class="out-where">Died on question ${answered} of ${currentQuestions.length}</p></div>`
+    : `<div class="final-score reveal"><span class="answer-label">${currentDate === today ? "" : "PRACTICE "}CHARGE LEFT</span>
+      <div class="result-battery-wrap">${batteryMarkup("result-battery", "resultBattery", animate ? 100 : charge)}</div></div>`;
+  stage.innerHTML = `${headline}
+    ${practiceMode ? "" : `<section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">How you stack up</h3><p class="crowd-copy">Your charge is added anonymously. Never your guesses, name, or account.</p><p class="crowd-status">Seeing how you stack up…</p></section>`}
     <button class="share-button" id="shareButton">Share ${currentDate === today ? "today's" : "this"} result <span aria-hidden="true">↗</span></button>
-    ${practiceMode ? '<button class="next-button" id="replayButton" style="margin-top:9px;background:var(--paper);color:var(--ink)">Play this puzzle again</button><button class="next-button" id="todayButton" style="margin-top:9px;background:var(--paper);color:var(--ink)">Back to today\'s puzzle</button>' : ""}
-    <button class="next-button" id="statsInline" style="margin-top:9px;background:var(--paper);color:var(--ink)">Your stats &amp; archives <span aria-hidden="true">→</span></button>`;
-  document.querySelector("#questionCounter").textContent = "PUZZLE COMPLETE";
-  renderDots(5);
+    ${practiceMode ? '<button class="next-button secondary-button" id="replayButton">Play this puzzle again</button><button class="next-button secondary-button" id="todayButton">Back to today\'s puzzle</button>' : ""}
+    <button class="next-button secondary-button" id="statsInline">Your stats &amp; archives <span aria-hidden="true">→</span></button>`;
+  document.querySelector("#questionCounter").textContent = out ? "POWER LOST" : "PUZZLE COMPLETE";
+  renderDots(out ? answered : 5);
+  document.querySelector(".progress-dot.current")?.classList.remove("current");
   renderRecap(progress);
-  document.querySelector("#shareButton").addEventListener("click", () => shareResult(score, progress));
+  document.querySelector("#shareButton").addEventListener("click", () => shareResult(score, progress, out));
   document.querySelector("#replayButton")?.addEventListener("click", () => {
     state.progress[`practice:${currentDate}`] = { guesses: [], locked: [], revealed: 0, draft: null };
     save();
@@ -384,7 +536,15 @@ function renderResults() {
   });
   document.querySelector("#todayButton")?.addEventListener("click", returnToToday);
   document.querySelector("#statsInline").addEventListener("click", showStats);
-  if (!practiceMode) loadCrowd(score);
+  if (!practiceMode) loadCrowd(crowdRank(progress.guesses, currentQuestions), out);
+  if (!out) playResultDrain(charge, animate);
+}
+
+// The final battery drains from 100% to the charge left.
+async function playResultDrain(charge, animate) {
+  const battery = document.querySelector("#resultBattery");
+  if (animate && !(await animateBattery(battery, 100, charge, 2400))) return;
+  setBattery(battery, charge);
 }
 
 function returnToToday() {
@@ -423,7 +583,7 @@ function crowdToken() {
 // Used only when localStorage is unavailable, so retries in this tab reuse one ID.
 let fallbackCrowdId = null;
 
-async function loadCrowd(score) {
+async function loadCrowd(score, out) {
   const panel = document.querySelector("#crowdPanel");
   if (!panel) return;
   try {
@@ -431,37 +591,48 @@ async function loadCrowd(score) {
       method: "POST",
       body: { date: today, score, id: crowdToken() }
     });
-    renderCrowdSummary(panel, summary);
+    if (out) renderOutOfChargeCrowd(panel, summary);
+    else renderCrowdSummary(panel, summary);
   } catch (error) {
     console.error("Could not submit anonymous Percentle score.", error);
-    panel.querySelector(".crowd-status").innerHTML = `Today's score line is temporarily unavailable. <button class="crowd-action" id="crowdRetry">Try again</button>`;
-    panel.querySelector("#crowdRetry").addEventListener("click", () => loadCrowd(score));
+    panel.querySelector(".crowd-status").innerHTML = `Today's comparison is temporarily unavailable. <button class="crowd-action" id="crowdRetry">Try again</button>`;
+    panel.querySelector("#crowdRetry").addEventListener("click", () => loadCrowd(score, out));
   }
 }
 
+// After running out of charge, there's no line: just how many other players ran out too.
+function renderOutOfChargeCrowd(panel, summary) {
+  const share = summary.alsoRanOut;
+  const line = share === null
+    ? `Once at least ${summary.minimumComparisonPlayers} other players finish today's puzzle, you'll see how many of them ran out of charge.`
+    : share === 0 ? "Nobody else has run out of charge today. Yet."
+    : `<strong>${share.toFixed(1)}%</strong> of today's players ran out of charge.`;
+  panel.innerHTML = `<h3 class="crowd-title">Today's blackouts</h3><p class="crowd-position">${line}</p>`;
+}
+
 function renderCrowdSummary(panel, summary) {
-  const linePosition = summary.betterThan === null ? null : 100 - summary.betterThan;
+  const linePosition = summary.betterThan;
   const placement = summary.betterThan === null
     ? `<p class="crowd-position">Your marker appears once at least ${summary.minimumComparisonPlayers} other players have finished today's puzzle.</p>`
     : `<p class="crowd-position">You were better than <strong>${summary.betterThan.toFixed(1)}%</strong> of players today.</p>`;
-  panel.innerHTML = `<h3 class="crowd-title">Where you sit on today's line</h3>
+  panel.innerHTML = `<h3 class="crowd-title">How you stack up</h3>
     ${crowdLine(linePosition)}${placement}`;
 }
 
 function crowdLine(position) {
   const x = position === null ? null : 12 + position / 100 * 276;
-  return `<svg class="crowd-line" viewBox="0 0 300 64" role="img" aria-label="${position === null ? "Line from best daily scores to worst daily scores; your position is not available yet." : `Your marker is ${position.toFixed(1)} percent of the way from best to worst.`}">
+  return `<svg class="crowd-line" viewBox="0 0 300 42" role="img" aria-label="${position === null ? "Line from the lowest charge left today to the highest; your position is not available yet." : `Your marker is ${position.toFixed(1)} percent of the way from the lowest charge to the highest.`}">
       <line class="line-axis" x1="12" y1="31" x2="288" y2="31"/>
       ${x === null ? "" : `<circle class="you-marker" cx="${x}" cy="31" r="6"/><text class="you-label" x="${x}" y="13" text-anchor="middle">YOU</text>`}
-      <text x="12" y="55" text-anchor="start">BEST</text><text x="288" y="55" text-anchor="end">WORST</text>
     </svg>`;
 }
 
-function shareResult(score, progress) {
+function shareResult(score, progress, out) {
   // The real distance of the best guess (even one that scored a perfect 0), e.g. "0.2% away".
-  const closest = Math.min(...currentQuestions.map((question, i) => Math.abs(progress.guesses[i] - question.answer)));
+  const closest = Math.min(...progress.guesses.map((guess, i) => Math.abs(guess - currentQuestions[i].answer)));
+  const status = out ? `🪫 Out of charge on Q${progress.guesses.length}` : `🔋 ${formatCharge(chargeLeft(score))}`;
   const link = `${location.origin}${location.pathname}`;
-  const result = `Percentle #${currentNumber}\nScore: ${score.toFixed(1)}\nClosest guess - ${closest.toFixed(1)}% away\n${link}`;
+  const result = `${GAME_NAME} #${currentNumber}\n${status}\nClosest guess - ${closest.toFixed(1)}% away\n${link}`;
   if (navigator.share) {
     navigator.share({ text: result }).catch(error => {
       if (error.name !== "AbortError") copyResult(result);
@@ -491,19 +662,23 @@ function consecutiveStreak(games) {
   return streak;
 }
 
-// Bars for the 10 most recent games, oldest to newest. Taller bars mean more points off.
-// Clicking a bar shows that game's date and score underneath.
+// Bars for the 10 most recent games, oldest to newest. Taller bars mean more charge left.
+// Clicking a bar shows that game's date and charge underneath.
 function lastTenGames(games) {
   const recent = games.slice(-10);
   if (!recent.length) return "<p class=\"hist-empty\">Finish today's puzzle to start your history.</p>";
-  const tallest = Math.max(...recent.map(game => game.score), 1);
   const shortDate = date => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
   return `<div class="recent-games" role="group" aria-label="Your recent games, oldest to newest">${recent.map((game, i) => `
-      <button class="recent-bar${i === recent.length - 1 ? " selected" : ""}" data-date="${escapeAttr(game.date)}" data-score="${game.score.toFixed(1)}" aria-label="${longDate(game.date)}: score ${game.score.toFixed(1)}">
-        <span class="recent-bar-fill" style="height:${Math.max(4, game.score / tallest * 100).toFixed(1)}%"></span>
+      <button class="recent-bar${i === recent.length - 1 ? " selected" : ""}" data-date="${escapeAttr(game.date)}" data-charge="${chargeLabel(game.score)}" aria-label="${longDate(game.date)}: ${chargeLabel(game.score)}">
+        <span class="recent-bar-fill${chargeLeft(game.score) < 0 ? " negative" : ""}" style="height:${Math.max(4, Math.min(100, chargeLeft(game.score))).toFixed(1)}%"></span>
         <span class="recent-bar-date">${shortDate(game.date)}</span>
       </button>`).join("")}</div>
     <p class="recent-detail" id="recentDetail" aria-live="polite"></p>`;
+}
+
+function chargeLabel(score) {
+  const charge = chargeLeft(score);
+  return charge < 0 ? "Out of charge" : `${formatCharge(charge)} charge left`;
 }
 
 function longDate(date) {
@@ -515,7 +690,7 @@ function bindLastTenGames() {
   const bars = [...dialog.querySelectorAll(".recent-bar")];
   const select = bar => {
     bars.forEach(other => other.classList.toggle("selected", other === bar));
-    detail.innerHTML = `${longDate(bar.dataset.date)} · Score <strong>${bar.dataset.score}</strong>`;
+    detail.innerHTML = `${longDate(bar.dataset.date)} · <strong>${bar.dataset.charge}</strong>`;
   };
   bars.forEach(bar => bar.addEventListener("click", () => select(bar)));
   if (bars.length) select(bars.at(-1));
@@ -523,13 +698,14 @@ function bindLastTenGames() {
 
 function showStats() {
   const games = state.games;
-  const scores = games.map(game => game.score);
-  const average = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : null;
-  const best = scores.length ? Math.min(...scores) : null;
+  // A game that ran out of charge counts as 0% left.
+  const charges = games.map(game => Math.max(0, chargeLeft(game.score)));
+  const average = charges.length ? charges.reduce((a, b) => a + b, 0) / charges.length : null;
+  const best = charges.length ? Math.max(...charges) : null;
   openDialog("Your stats", `<div class="stat-cards">
     <div class="stat-card"><span>GAMES PLAYED</span><strong>${games.length}</strong></div>
-    <div class="stat-card"><span>AVERAGE SCORE</span><strong>${average === null ? "—" : average.toFixed(1)}</strong></div>
-    <div class="stat-card"><span>BEST SCORE</span><strong>${best === null ? "—" : best.toFixed(1)}</strong></div>
+    <div class="stat-card"><span>AVERAGE CHARGE</span><strong>${average === null ? "—" : formatCharge(average)}</strong></div>
+    <div class="stat-card"><span>BEST CHARGE</span><strong>${best === null ? "—" : formatCharge(best)}</strong></div>
     <div class="stat-card"><span>CURRENT STREAK</span><strong>${consecutiveStreak(games)} day${consecutiveStreak(games) === 1 ? "" : "s"}</strong></div></div>
     <h3 class="dialog-subtitle">Recent games</h3>${lastTenGames(games)}
     <h3 class="dialog-title">Past puzzles</h3><p>${isTodayFinished() ? "Replay any of the last 30 daily puzzles." : "Finish today's puzzle to unlock the archive."}</p>
@@ -589,7 +765,7 @@ function leaveStartScreen() {
 function showHowToPlay() {
   openDialog("How to play", `<ul class="rules">
       <li>Guess the percentage for each of 5 questions.</li>
-      <li>Your score is how far off you were, added up. <strong>Lower is better.</strong></li>
+      <li>${drainRule()}</li>
       <li>A new puzzle arrives every day at midnight Eastern.</li>
     </ul>
     <button class="share-button" data-close>Let's play</button>`);
@@ -611,8 +787,28 @@ function escapeAttr(value) { return escapeHtml(value); }
 
 document.querySelector("#howButton").addEventListener("click", showHowToPlay);
 document.querySelector("#startButton").addEventListener("click", () => {
-  leaveStartScreen();
-  window.scrollTo({ top: 0 });
+  const enterGame = () => {
+    leaveStartScreen();
+    window.scrollTo({ top: 0 });
+    // Coming back to a finished puzzle replays the battery draining to today's charge.
+    if (!practiceMode && isTodayFinished()) {
+      animateResults = true;
+      render();
+    }
+  };
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return enterGame();
+  if (document.querySelector(".charge-flash")) return;
+  // The whole screen floods with charge until it's solid. Only then does the game swap in
+  // underneath, and once it has painted, the glow fades off it, so the switch is never seen.
+  const flash = document.createElement("div");
+  flash.className = "charge-flash";
+  flash.setAttribute("aria-hidden", "true");
+  flash.addEventListener("animationend", () => {
+    if (flash.classList.contains("fading")) return flash.remove();
+    enterGame();
+    requestAnimationFrame(() => requestAnimationFrame(() => flash.classList.add("fading")));
+  });
+  document.body.append(flash);
 });
 document.querySelector("#statsButton").addEventListener("click", showStats);
 document.querySelector("#returnButton").addEventListener("click", () => {

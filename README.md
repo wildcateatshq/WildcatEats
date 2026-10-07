@@ -86,6 +86,16 @@ Percentle can also run on its own with `npm run percentle` (`node percentle/serv
 That server makes the game the home page and loads none of the Wildcat Eats pages, APIs,
 or database tables. Use it as the Render start command for a Percentle-only service.
 
+### How it plays (Chargle)
+
+Players see the game as **Chargle** (set by `GAME_NAME` in `public/percentle.mjs`); the code,
+URLs, storage keys, and database tables keep the Percentle name. The score is a battery that
+starts at 100% charge and drains by how far off each guess is (`DRAIN_RATE` in
+`public/percentle/game.mjs`; 1 means each point off costs 1% of charge). Higher is better.
+Games are saved as total points off, so changing `DRAIN_RATE` re-scores past games
+consistently. Dropping below 0% ends the game early: the alarms go off, the lights cut out, and
+the player sees an "Out of charge" screen. Exactly 0.0% survives.
+
 ### Daily puzzles come from an AI agent
 
 There is no fixed question bank. Every day a scheduled AI agent researches five new
@@ -149,13 +159,17 @@ No additional packages or build step are needed.
 ### Crowd comparison
 
 Player progress, streaks, and personal scores stay in the browser. When a player finishes
-today's puzzle, the page automatically sends their daily total to the crowd API anonymously
-(practice replays of past puzzles are never sent). Percentle never submits individual
-guesses, names, or account details. Random per-day IDs let the crowd module update a
+today's puzzle, the page automatically sends a single rank number to the crowd API
+anonymously (practice replays of past puzzles are never sent). Percentle never submits
+individual guesses, names, or account details. Random per-day IDs let the crowd module update a
 browser's score without linking scores across days. Your position appears only after at
-least five other players have contributed. The crowd line shows your ranked position from
-the best score to the worst, alongside the percent of players you scored better than. Tied
-scores share the midpoint of their rank.
+least five other players have contributed.
+
+The rank is the player's total points off if they finished, or 400 plus a little more the
+earlier they ran out of charge (`crowdRank` in `game.mjs`), so every finisher ranks above every
+player who ran out. Lower ranks better and tied ranks share the midpoint. Finishers see a line
+from the lowest charge to the highest and the percent of players they beat; players who ran
+out see what share of the other players also ran out (any rank of 400 or more).
 
 The crowd module stores scores in a separate `percentle_daily_scores` table when
 `DATABASE_URL` is configured. Without Postgres, it writes to `data/percentle-crowd.json`;

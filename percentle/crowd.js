@@ -5,6 +5,10 @@ const fs = require("node:fs/promises");
 const path = require("node:path");
 
 const MINIMUM_COMPARISON_PLAYERS = 5;
+// Players who ran out of charge submit a rank of at least this (keep in step with
+// OUT_OF_CHARGE_RANK in public/percentle/game.mjs);
+// everyone who finished submits their points off, which is always lower.
+const OUT_OF_CHARGE_RANK = 400;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function isUtcDate(value) {
@@ -30,9 +34,15 @@ function summarize(entries, ownId = null) {
     ? Number(((scores.filter(score => score > ownScore).length +
       scores.filter(score => score === ownScore).length / 2) / scores.length * 100).toFixed(1))
     : null;
+  // The share of the other players who also ran out of charge today.
+  const others = [...scoresById].filter(([id]) => id !== ownId).map(([, score]) => score);
+  const alsoRanOut = hasEnoughComparison
+    ? Number((others.filter(score => score >= OUT_OF_CHARGE_RANK).length / others.length * 100).toFixed(1))
+    : null;
   return {
     players: scoresById.size,
     betterThan,
+    alsoRanOut,
     minimumComparisonPlayers: MINIMUM_COMPARISON_PLAYERS
   };
 }

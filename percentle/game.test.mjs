@@ -2,13 +2,17 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   applyGuessKey,
+  chargeLeft,
   closeness,
+  crowdRank,
+  DRAIN_RATE,
   REACTIONS,
   reactionFor,
   dailyTotal,
   guessEntryFrom,
   guessEntryText,
   easternDate,
+  isOutOfCharge,
   pointsOff,
   scoreColor,
   viewForProgress,
@@ -37,6 +41,40 @@ test("daily total sums the five absolute differences", () => {
   // 1 + 2 + 0 (30.5 is within 0.5 of 30) + 2 + 5
   assert.equal(dailyTotal([11, 18, 30.5, 42, 45], questions), 10);
   assert.throws(() => dailyTotal([10], questions), RangeError);
+});
+
+test("charge left drains from 100 at the drain rate and can go negative", () => {
+  assert.equal(chargeLeft(0), 100);
+  assert.equal(chargeLeft(60, 0.5), 70);
+  assert.equal(chargeLeft(200, 0.5), 0);
+  assert.equal(chargeLeft(216.4, 0.5), -8.2);
+  assert.equal(chargeLeft(60, 1), 40);
+  assert.equal(chargeLeft(60), 100 - 60 * DRAIN_RATE, "defaults to DRAIN_RATE");
+});
+
+test("the game is over once the charge drops below zero, but exactly zero survives", () => {
+  const questions = [10, 20, 30, 40, 50].map(answer => ({ answer }));
+  assert.equal(isOutOfCharge([10, 20], questions, 1), false);
+  assert.equal(isOutOfCharge([100, 20], questions, 1), false, "90 off leaves 10% charge");
+  assert.equal(isOutOfCharge([100, 30], questions, 1), false, "exactly 0.0% survives");
+  assert.equal(isOutOfCharge([100, 30.6], questions, 1), true, "−0.6% is out");
+  assert.equal(isOutOfCharge([100, 100], questions, 0.5), false, "at half drain, 170 off still leaves charge");
+  // Out of charge after question 2: once it's revealed, the game jumps to results.
+  assert.deepEqual(viewForProgress({ guesses: [100, 100], revealed: 1 }, 5, true), { phase: "reveal", index: 1 });
+  assert.deepEqual(viewForProgress({ guesses: [100, 100], revealed: 2 }, 5, true), { phase: "results", index: 5 });
+});
+
+test("the crowd ranks every finisher above every player who ran out, and later deaths above earlier ones", () => {
+  const questions = [10, 20, 30, 40, 50].map(answer => ({ answer }));
+  const finishedBadly = crowdRank([60, 70, 30, 40, 50], questions, 1); // 100 off, 0.0% left
+  const diedOnQ5 = crowdRank([60, 70, 30, 40, 51], questions, 1);
+  const diedOnQ3 = crowdRank([60, 70, 31], questions, 1);
+  const diedOnQ3Worse = crowdRank([100, 100, 100], questions, 1);
+  assert.equal(finishedBadly, 100);
+  assert.ok(diedOnQ5 > finishedBadly);
+  assert.ok(diedOnQ3 > diedOnQ5);
+  assert.equal(diedOnQ3, diedOnQ3Worse, "same question ties");
+  assert.ok(crowdRank([100, 100, 100], questions, 0.5) <= 500, "fits the crowd store's limit");
 });
 
 test("the day rolls over at midnight Eastern in both EDT and EST", () => {

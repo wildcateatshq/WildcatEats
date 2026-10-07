@@ -1,78 +1,71 @@
-:root{color-scheme:light;--good:#17663a;--bad:#c62f22;--stamp:#145c34;--paper:#f6f6f0;--card:#fff;--ink:#242824;--muted:#777d75;--line:#e6e8df;--green:#3f785c;--lime:#dff0df;--orange:#e8a354;--red:#c66b57;--serif:"Playfair Display",Georgia,serif;--sans:"DM Sans",Arial,sans-serif;--mono:"DM Mono",monospace;--shadow:0 18px 60px #263b2c0b}
-:root[data-theme=dark]{color-scheme:dark;--good:#4fd27f;--bad:#ff5f4f;--stamp:#5fd38d;--paper:#171c19;--card:#222a25;--ink:#f3f3e9;--muted:#a7b0a8;--line:#38423b;--green:#83b994;--lime:#294b38;--orange:#efb66d;--red:#df8a75;--shadow:0 18px 60px #0003}
+:root{color-scheme:light;--good:#17663a;--bad:#c62f22;--stamp:#145c34;--paper:#f2f2f2;--card:#fff;--ink:#242824;--muted:#757a76;--line:#e3e5e3;--charge:#14c95c;--charge-glow:#14c95c59;--charge-ink:#04220f;--drained:#55595a;--shell:#b9bdba;--negative:#e5372b;--charge-yellow:#f0c000;--charge-orange:#ff8a1f;--green:#0e9f47;--lime:#dcf8e6;--orange:#e0a400;--red:#c66b57;--display:"Chakra Petch","Arial Narrow",sans-serif;--sans:"Space Grotesk",Arial,sans-serif;--mono:"JetBrains Mono",monospace;--shadow:0 18px 50px #0b2a1612}
+:root[data-theme=dark]{color-scheme:dark;--good:#4fd27f;--bad:#ff5f4f;--stamp:#5fd38d;--paper:#000;--card:#101412;--ink:#f3f3e9;--muted:#9aa39c;--line:#262d29;--charge:#39ff88;--charge-glow:#39ff8873;--charge-ink:#04220f;--drained:#3a3e3c;--shell:#3d4842;--negative:#ff4d4d;--charge-yellow:#ffd23f;--charge-orange:#ff9a2e;--green:#39ff88;--lime:#0f2a1b;--orange:#ffd23f;--red:#df8a75;--shadow:0 0 0 1px #39ff880d,0 24px 70px #000}
 *{box-sizing:border-box}
-body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);min-height:100vh;transition:background .25s,color .25s}
+body{margin:0;background:radial-gradient(ellipse 90% 340px at 50% -60px,color-mix(in srgb,var(--charge) 13%,transparent),transparent) no-repeat,var(--paper);color:var(--ink);font-family:var(--sans);min-height:100vh;transition:background .25s,color .25s}
 button,input{font:inherit}
 button{color:inherit}
 .site-shell{width:min(100% - 40px,720px);margin:auto}
 .topbar{position:relative;height:76px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
-.return-button{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid var(--line);border-radius:99px;background:var(--card);color:var(--ink);font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;transition:border-color .2s}
+.return-button{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid var(--line);border-radius:6px;text-transform:uppercase;letter-spacing:1px;font-family:var(--display);background:var(--card);color:var(--ink);font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;transition:border-color .2s}
 .return-button:hover{border-color:var(--green)}
 .return-short{display:none}
-.wordmark{text-decoration:none;color:var(--ink);font-size:20px;font-weight:800;letter-spacing:-1.2px;display:flex;align-items:center;gap:9px}
-.brand-mark{display:grid;place-items:center;width:28px;height:28px;border-radius:9px 9px 9px 3px;background:var(--green);color:white;font:500 18px var(--mono)}
-.brand-period{color:var(--green);margin-left:-9px}
+.wordmark{text-decoration:none;color:var(--ink);font:700 22px var(--display);letter-spacing:1.5px;text-transform:uppercase;display:flex;align-items:center;gap:10px}
+.brand-mark{display:grid;place-items:center;width:30px;height:30px;border-radius:7px;background:var(--charge);color:var(--charge-ink);box-shadow:0 0 14px var(--charge-glow)}
 .top-actions{display:flex;gap:8px}
-.icon-button{width:38px;height:38px;border:1px solid var(--line);background:var(--card);border-radius:50%;cursor:pointer;font-size:16px;display:grid;place-items:center;transition:transform .2s,border-color .2s}
-.icon-button:hover{transform:translateY(-2px);border-color:var(--green)}
+.icon-button{width:38px;height:38px;border:1px solid var(--line);background:var(--card);border-radius:8px;cursor:pointer;font-size:16px;display:grid;place-items:center;transition:transform .2s,border-color .2s}
+.icon-button:hover{transform:translateY(-2px);border-color:var(--charge);box-shadow:0 0 12px var(--charge-glow)}
 main{padding:47px 0 34px}
 .intro{text-align:center;margin-bottom:28px}
-.score-box{display:flex;flex-direction:column;align-items:center;min-height:118px;padding-top:16px;visibility:hidden}
-.score-box.active{visibility:visible;animation:rise .84s cubic-bezier(.2,.8,.2,1) both}
-.score-box-label{color:var(--muted);font:9px var(--mono);letter-spacing:1.2px}
-.score-box-value{font:500 clamp(52px,12vw,76px)/1 var(--mono);letter-spacing:-3px;color:var(--ink);font-variant-numeric:tabular-nums;margin:6px 0 8px}
-.score-box-note{color:var(--muted);font-size:12px;min-height:16px}
+.score-box{display:flex;flex-direction:column;align-items:center;min-height:118px;padding-top:16px}
+.score-box-label{color:var(--green);font:500 10px var(--mono);letter-spacing:3px}
+.score-box-note{color:var(--ink);font:500 13px var(--mono);letter-spacing:.5px;min-height:16px}
 .score-box-note.pop{animation:pop .84s cubic-bezier(.2,.8,.2,1) .3s both}
 @keyframes pop{from{opacity:0;transform:translateY(6px) scale(.96)}to{opacity:1;transform:none}}
-.date-line{display:flex;justify-content:center;align-items:center;gap:9px;color:var(--muted);font:10px var(--mono);letter-spacing:1.2px}
-.live-dot{width:6px;height:6px;background:#76a780;border-radius:50%;box-shadow:0 0 0 3px #76a78021}
+.date-line{display:flex;justify-content:center;align-items:center;gap:9px;color:var(--muted);font:500 10px var(--mono);letter-spacing:2.5px}
+.live-dot{width:7px;height:7px;background:var(--charge);border-radius:50%;box-shadow:0 0 8px var(--charge);animation:live 1.6s ease-in-out infinite}
+@keyframes live{50%{opacity:.35;box-shadow:0 0 2px var(--charge)}}
 .date-rule{width:24px;height:1px;background:var(--line)}
-.game-card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:22px clamp(20px,5vw,40px) 30px;min-height:400px;overflow:hidden}
+.game-card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:22px clamp(20px,5vw,40px) 30px;min-height:400px;overflow:hidden}
+.game-card::before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:linear-gradient(90deg,transparent,var(--charge) 30%,var(--charge) 70%,transparent);box-shadow:0 0 12px var(--charge)}
 .progress-row{display:flex;justify-content:space-between;align-items:center;padding-bottom:17px;border-bottom:1px solid var(--line)}
-.progress-label{display:flex;align-items:center;gap:10px;font:10px var(--mono);letter-spacing:1px;color:var(--muted)}
-.progress-dots{display:flex;gap:6px}
-.progress-dot{width:7px;height:7px;border:1px solid var(--line);border-radius:50%}
-.progress-dot.done{border-color:var(--green);background:var(--green)}
-.progress-dot.current{border-color:var(--green);box-shadow:0 0 0 3px color-mix(in srgb,var(--green) 16%,transparent)}
+.progress-label{display:flex;align-items:center;gap:10px;font:500 10px var(--mono);letter-spacing:2.5px;color:var(--green)}
+.progress-dots{display:flex;gap:4px}
+.progress-dot{width:16px;height:7px;border:1px solid var(--shell);border-radius:2px}
+.progress-dot.done{border-color:var(--charge);background:var(--charge);box-shadow:0 0 8px var(--charge-glow)}
+.progress-dot.current{border-color:var(--charge);animation:cell 1.2s ease-in-out infinite}
+@keyframes cell{50%{background:color-mix(in srgb,var(--charge) 45%,transparent)}}
 .question-body{padding:32px 0 8px}
-.question-text{font:700 clamp(22px,4.8vw,30px)/1.27 var(--serif);letter-spacing:-.5px;margin:0 0 12px;max-width:550px}
-.question-hint{color:var(--muted);font-size:12px;margin:0;line-height:1.55}
+.question-text{font:600 clamp(22px,4.8vw,29px)/1.25 var(--display);letter-spacing:0;margin:0 0 12px;max-width:550px}
+.question-hint{color:var(--muted);font:500 11px var(--mono);letter-spacing:1px;margin:0;line-height:1.55}
 .hint-row{display:grid;grid-template-columns:1fr auto 1fr;align-items:baseline;gap:8px}
-.reaction{color:var(--muted);font-size:13px;font-weight:600;white-space:nowrap;opacity:0}
+.reaction{color:var(--orange);font:700 13px var(--display);letter-spacing:1px;text-transform:uppercase;white-space:nowrap;opacity:0}
 .reaction.pop{animation:pop .84s cubic-bezier(.2,.8,.2,1) 1.3s both}
 .reaction.shown{opacity:1}
 .guess-display{display:flex;justify-content:center;align-items:baseline;gap:5px;margin:24px 0 3px}
-.guess-input{width:138px;border:0;border-bottom:2px solid var(--line);border-radius:0;background:transparent;color:var(--ink);text-align:center;font:500 49px/1.1 var(--mono);outline:none;padding:0 2px 7px;font-variant-numeric:tabular-nums}
-.guess-input:focus{border-color:var(--green)}
+.guess-input{width:150px;border:0;border-bottom:2px solid var(--line);border-radius:0;background:transparent;color:var(--ink);text-align:center;font:700 49px/1.1 var(--mono);letter-spacing:-2px;outline:none;padding:0 2px 7px;font-variant-numeric:tabular-nums}
+.guess-input:focus{border-color:var(--charge);box-shadow:0 8px 14px -12px var(--charge)}
 .percent-sign{font:400 27px var(--mono);color:var(--muted)}
-.range-labels{display:grid;grid-template-columns:1fr auto 1fr;color:var(--muted);font:10px var(--mono);margin-top:11px}.range-labels span:last-child{text-align:right}
+.range-labels{display:grid;grid-template-columns:1fr auto 1fr;color:var(--muted);font:500 10px var(--mono);letter-spacing:1px;margin-top:11px}.range-labels span:last-child{text-align:right}
 .range-wrap+.lock-button{margin-top:26px}
 .range-wrap{position:relative;padding:10px 0 2px}
-input[type=range]{display:block;width:100%;height:8px;margin:12px 0 0;appearance:none;border-radius:99px;background:var(--line);cursor:pointer;outline:none}
-input[type=range]::-webkit-slider-thumb{appearance:none;width:23px;height:23px;border:5px solid var(--card);border-radius:50%;background:var(--green);box-shadow:0 0 0 2px var(--green),0 2px 7px #0002}
-input[type=range]::-moz-range-thumb{width:13px;height:13px;border:5px solid var(--card);border-radius:50%;background:var(--green);box-shadow:0 0 0 2px var(--green),0 2px 7px #0002}
-input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(--card),0 0 0 6px var(--orange)}
-.lock-button,.next-button,.share-button{width:100%;border:0;border-radius:7px;background:var(--green);color:#fff;font-weight:700;font-size:14px;padding:15px 18px;cursor:pointer;transition:transform .18s,filter .18s}
-.lock-button:hover,.next-button:hover,.share-button:hover{filter:brightness(1.08);transform:translateY(-1px)}
+.lock-button,.next-button,.share-button{width:100%;border:0;border-radius:6px;background:var(--charge);color:var(--charge-ink);font:700 15px var(--display);letter-spacing:2px;text-transform:uppercase;padding:15px 18px;cursor:pointer;box-shadow:0 6px 22px var(--charge-glow);transition:transform .18s,filter .18s,box-shadow .18s}
+.lock-button:hover,.next-button:hover,.share-button:hover{filter:brightness(1.08);transform:translateY(-1px);box-shadow:0 8px 30px var(--charge-glow),0 0 0 1px var(--charge)}
 .lock-button:focus-visible,.next-button:focus-visible,.share-button:focus-visible,button:focus-visible{outline:3px solid var(--orange);outline-offset:3px}
 .reveal{animation:rise .84s cubic-bezier(.2,.8,.2,1) both}
 @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
-.answer-label{display:block;color:var(--muted);font:9px var(--mono);letter-spacing:1px;margin-bottom:4px}
-.comparison{padding:18px 0 2px}
-.compare-track{position:relative;height:10px;border-radius:8px;background:var(--line);margin:13px 7px 27px}
-.compare-gap{position:absolute;top:2px;height:6px;background:var(--green);opacity:.6;border-radius:5px;transform:scaleX(0);transition:transform 1.2s cubic-bezier(.3,.7,.2,1) .3s}
-.comparison.answered .compare-gap{transform:scaleX(1)}
+.answer-label{display:block;color:var(--green);font:500 10px var(--mono);letter-spacing:3px;margin-bottom:4px}
+.comparison{padding:30px 0 2px}
 .reveal-row{position:relative;display:flex;justify-content:center;align-items:baseline;gap:14px;margin:24px 0 3px}
 .reveal-guess{transition:color .9s ease}
 .reveal-row.go .reveal-guess{color:var(--closeness)}
-.perfect-stamp{position:absolute;left:50%;top:-6px;z-index:3;padding:5px 14px 4px;border:3px solid var(--stamp);border-radius:7px;background:var(--card);color:var(--stamp);font:800 20px/1.1 var(--serif);letter-spacing:.5px;text-transform:uppercase;white-space:nowrap;box-shadow:0 6px 18px #0002;opacity:0;transform:translate(-50%,-100%) rotate(-7deg);pointer-events:none}
+.perfect-stamp{position:absolute;left:50%;top:-6px;z-index:3;padding:5px 14px 4px;border:3px solid var(--charge);border-radius:4px;background:var(--card);color:var(--green);font:700 21px/1.1 var(--display);letter-spacing:2px;text-transform:uppercase;white-space:nowrap;box-shadow:0 0 22px var(--charge-glow),inset 0 0 10px var(--charge-glow);opacity:0;transform:translate(-50%,-100%) rotate(-7deg);pointer-events:none}
 .reveal-row.go .perfect-stamp{animation:stamp .5s cubic-bezier(.3,1.5,.5,1) 1.35s both}
 .reveal-row.instant .perfect-stamp{animation:none;opacity:1}
 @keyframes stamp{0%{opacity:0;transform:translate(-50%,-100%) rotate(-16deg) scale(2.8)}55%{opacity:1;transform:translate(-50%,-100%) rotate(-6deg) scale(.9)}78%{transform:translate(-50%,-100%) rotate(-7.5deg) scale(1.05)}100%{opacity:1;transform:translate(-50%,-100%) rotate(-7deg) scale(1)}}
 .game-card.thud{animation:thud .35s ease-out 1.6s}
 @keyframes thud{0%{transform:none}30%{transform:translateY(4px) scale(.995)}60%{transform:translateY(-1px)}100%{transform:none}}
 .reveal-row.lower{flex-direction:row-reverse}
-.reveal-num{font:500 44px/1.1 var(--mono);font-variant-numeric:tabular-nums;white-space:nowrap}
+.reveal-num{font:700 44px/1.1 var(--mono);letter-spacing:-2px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .reveal-num small{font:400 24px var(--mono);color:var(--muted);margin-left:2px}
 .reveal-answer,.reveal-answer small{color:var(--ink)}
 .reveal-answer{border-bottom:3px solid currentColor;padding-bottom:3px}
@@ -82,56 +75,148 @@ input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px var(-
 .reveal-row.lower .reveal-answer{transform:translateX(10px)}
 .reveal-row.go .reveal-arrow,.reveal-row.go .reveal-answer{opacity:1;transform:none}
 .instant,.instant *{transition:none!important}
-.marker{position:absolute;top:50%;width:13px;height:13px;border:3px solid var(--card);border-radius:50%;transform:translate(-50%,-50%);box-shadow:0 0 0 1.5px currentColor;z-index:2}
-.marker.guess{background:var(--ink);color:var(--ink);transition:background-color .9s ease,color .9s ease}
-.comparison.answered .marker.guess{background:var(--closeness);color:var(--closeness)}
-.marker.answer{background:var(--green);color:var(--green);opacity:0;transition:opacity .5s 1.2s}
+/* YOU and ANSWER are thin ticks across the battery bar: YOU's label sits above it, ANSWER's below. */
+.marker{position:absolute;top:-8px;bottom:-8px;width:3px;border-radius:2px;transform:translateX(-50%);z-index:3}
+.marker.guess{background:var(--ink);transition:background-color .9s ease}
+.comparison.answered .marker.guess{background:var(--closeness)}
+.marker.answer{background:var(--ink);opacity:0;transition:opacity .5s 1.2s}
 .comparison.answered .marker.answer{opacity:1}
-.marker-caption{position:absolute;top:17px;white-space:nowrap;transform:translateX(-50%);font:9px var(--mono);color:var(--muted)}
-/* YOU always sits above the track and ANSWER below, so they never collide. */
-.marker.guess .marker-caption{top:auto;bottom:17px}
-.source-note{background:var(--paper);padding:12px 14px;border-radius:7px;color:var(--muted);font-size:11px;line-height:1.55}
+.marker-caption{position:absolute;top:calc(100% + 4px);left:50%;white-space:nowrap;transform:translateX(-50%);font:9px var(--mono);color:var(--muted)}
+.marker.guess .marker-caption{top:auto;bottom:calc(100% + 4px)}
+.source-note{background:var(--paper);padding:12px 14px;border-radius:4px;border-left:3px solid var(--charge);color:var(--muted);font-size:11px;line-height:1.55}
 .source-note a{color:var(--green);font-weight:700;text-underline-offset:2px}
 .next-button{margin-top:17px}
-.archive-list{display:flex;gap:7px;flex-wrap:wrap}.archive-chip{border:1px solid var(--line);background:var(--card);border-radius:99px;padding:8px 12px;font:10px var(--mono);cursor:pointer}.archive-chip:hover{border-color:var(--green)}
-.final-score{text-align:center;padding:40px 0 22px}.final-score .score-number{font:500 clamp(56px,13vw,88px)/1 var(--mono);letter-spacing:-6px;color:var(--green);font-variant-numeric:tabular-nums}.final-score h2{font:700 27px var(--serif);margin:12px 0 6px}.final-score p{color:var(--muted);font-size:12px;margin:0}
-.share-button{background:var(--ink);color:var(--card)}
-.stat-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin:16px 0}.stat-card{padding:14px;background:var(--paper);border-radius:8px}.stat-card span{display:block;color:var(--muted);font:9px var(--mono);letter-spacing:.6px}.stat-card strong{display:block;font:500 24px var(--mono);margin-top:6px}
+.archive-list{display:flex;gap:7px;flex-wrap:wrap}.archive-chip{border:1px solid var(--line);background:var(--card);border-radius:4px;padding:8px 12px;font:10px var(--mono);cursor:pointer}.archive-chip:hover{border-color:var(--charge);box-shadow:0 0 10px var(--charge-glow)}
+.final-score{text-align:center;padding:40px 0 22px}.final-score h2{font:700 27px var(--display);margin:12px 0 6px}.final-score p{color:var(--muted);font-size:12px;margin:0}
+.secondary-button{margin-top:9px;background:transparent;color:var(--ink);border:1px solid var(--shell);box-shadow:none}
+.secondary-button:hover{border-color:var(--charge);box-shadow:0 0 14px var(--charge-glow)}
+.stat-cards{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin:16px 0}.stat-card{padding:14px;background:var(--paper);border-radius:6px;border-top:2px solid var(--charge)}.stat-card span{display:block;color:var(--muted);font:9px var(--mono);letter-spacing:.6px}.stat-card strong{display:block;font:700 24px var(--mono);letter-spacing:-1px;margin-top:6px}
 .hist-empty{color:var(--muted);font-size:12px;padding:20px 0}
-.crowd-panel{margin-top:17px;padding:19px;background:var(--paper);border:1px solid var(--line);border-radius:9px}.crowd-title{font:700 19px var(--serif);margin:0}.crowd-copy,.crowd-status{font-size:11px;line-height:1.6;color:var(--muted)}.crowd-copy{margin:7px 0 13px}.crowd-action{width:100%;padding:12px 14px;background:transparent;color:var(--green);border:1px solid var(--green);border-radius:6px;font-size:12px;font-weight:700;cursor:pointer}.crowd-action:hover{background:var(--lime)}.crowd-action:disabled{opacity:.6;cursor:wait}.crowd-position{margin:7px 0 12px;text-align:center;font-size:12px;color:var(--muted)}.crowd-position strong{color:var(--green);font:500 18px var(--mono)}.crowd-line{display:block;width:100%;height:auto;margin:12px 0 0;overflow:visible}.crowd-line .line-axis{stroke:var(--line);stroke-width:3}.crowd-line .you-marker{fill:var(--orange);stroke:var(--card);stroke-width:2}.crowd-line text{fill:var(--muted);font:9px var(--mono)}.crowd-line .you-label{fill:var(--green);font-weight:500}
-dialog{width:min(440px,calc(100% - 32px));border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--ink);padding:25px 27px 29px;box-shadow:0 24px 80px #0002}dialog::backdrop{background:#121a15a6;backdrop-filter:blur(3px)}.dialog-head{position:absolute;top:18px;right:18px}.close-button{font-size:21px}.dialog-title{font:700 29px var(--serif);margin:17px 0 12px}dialog h2{font:700 29px var(--serif);margin:4px 48px 12px 0}dialog p,dialog li{font-size:13px;line-height:1.7;color:var(--muted)}dialog p strong{color:var(--ink)}.dialog-actions{display:flex;gap:9px}.dialog-actions button{flex:1}
-.toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,15px);opacity:0;pointer-events:none;border-radius:99px;background:var(--ink);color:var(--card);padding:11px 16px;font-size:12px;transition:.2s;z-index:5}.toast.visible{opacity:1;transform:translate(-50%,0)}
+.crowd-panel{margin-top:17px;padding:19px;background:var(--paper);border:1px solid var(--line);border-radius:6px}.crowd-title{font:700 19px var(--display);letter-spacing:.5px;margin:0}.crowd-copy,.crowd-status{font-size:11px;line-height:1.6;color:var(--muted)}.crowd-copy{margin:7px 0 13px}.crowd-action{width:100%;padding:12px 14px;background:transparent;color:var(--green);border:1px solid var(--green);border-radius:6px;font-size:12px;font-weight:700;cursor:pointer}.crowd-action:hover{background:var(--lime)}.crowd-action:disabled{opacity:.6;cursor:wait}.crowd-position{margin:7px 0 12px;text-align:center;font-size:12px;color:var(--muted)}.crowd-position strong{color:var(--green);font:500 18px var(--mono)}.crowd-line{display:block;width:100%;max-width:400px;height:auto;margin:12px auto 0;overflow:visible}.crowd-line .line-axis{stroke:var(--line);stroke-width:3}.crowd-line .you-marker{fill:var(--orange);stroke:var(--card);stroke-width:2}.crowd-line text{fill:var(--muted);font:9px var(--mono)}.crowd-line .you-label{fill:var(--green);font-weight:500}
+dialog{width:min(440px,calc(100% - 32px));border:1px solid var(--line);border-top:2px solid var(--charge);border-radius:10px;background:var(--card);color:var(--ink);padding:25px 27px 29px;box-shadow:0 24px 80px #0002}dialog::backdrop{background:#000b;backdrop-filter:blur(3px)}.dialog-head{position:absolute;top:18px;right:18px}.close-button{font-size:21px}.dialog-title{font:700 29px var(--display);margin:17px 0 12px}dialog h2{font:700 29px var(--display);margin:4px 48px 12px 0}dialog p,dialog li{font-size:13px;line-height:1.7;color:var(--muted)}dialog p strong{color:var(--ink)}.dialog-actions{display:flex;gap:9px}.dialog-actions button{flex:1}
+.toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,15px);opacity:0;pointer-events:none;border-radius:6px;background:var(--charge);color:var(--charge-ink);font-weight:700;box-shadow:0 0 22px var(--charge-glow);padding:11px 16px;font-size:12px;transition:.2s;z-index:5}.toast.visible{opacity:1;transform:translate(-50%,0)}
 [hidden]{display:none!important}
 @media(max-width:520px){.site-shell{width:min(100% - 28px,720px)}.topbar{height:64px}.return-button{padding:7px 10px;font-size:11px;gap:4px}.return-full{display:none}.return-short{display:inline}main{padding:36px 0 20px}.intro{margin-bottom:25px}.game-card{padding:17px 19px 24px;border-radius:13px;min-height:380px}.question-body{padding-top:25px}.guess-input{font-size:44px}.reveal-num{font-size:36px}.reveal-num small{font-size:20px}.reveal-row{gap:10px}.dialog-actions{flex-direction:column}}
 /* Start screen: shown on every visit until the player taps into the game. */
 .start-screen{display:none;text-align:center;max-width:440px;margin:0 auto;padding:12px 0 20px;animation:rise .84s cubic-bezier(.2,.8,.2,1) both}
 body.starting .start-screen{display:block}
 body.starting .intro,body.starting #gameCard,body.starting #recap{display:none}
-.start-mark{display:inline-grid;place-items:center;width:64px;height:64px;border-radius:18px 18px 18px 6px;background:var(--green);color:#fff;font:800 34px var(--sans)}
-.start-title{font:800 clamp(40px,10vw,56px)/1 var(--serif);margin:18px 0 10px;letter-spacing:-1px}
+.start-mark{display:inline-grid;place-items:center;width:68px;height:68px;border-radius:12px;background:var(--charge);color:var(--charge-ink);box-shadow:0 0 22px var(--charge),0 0 54px var(--charge-glow)}
+.start-title{font:700 clamp(46px,13vw,72px)/1 var(--display);margin:20px 0 12px;letter-spacing:4px;text-transform:uppercase;text-shadow:0 0 28px var(--charge-glow)}
 .start-goal{color:var(--muted);font-size:15px;line-height:1.5;margin:0 auto 26px;max-width:340px}
-.start-rules{text-align:left;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 20px 12px 38px;margin:0 0 22px;font-size:14px;line-height:1.5}
-.start-button{font-size:15px;padding:17px 18px}
-.start-edition{color:var(--muted);font:10px var(--mono);letter-spacing:1.2px;text-transform:uppercase;margin:16px 0 0}
+.start-rules{text-align:left;background:var(--card);border:1px solid var(--line);border-left:3px solid var(--charge);border-radius:6px;padding:18px 20px 12px 18px;margin:0 0 22px;font-size:14px;line-height:1.5}
+.start-button{font-size:17px;padding:18px;box-shadow:0 0 18px var(--charge),0 6px 48px var(--charge-glow)}
+.start-button:hover{box-shadow:0 0 24px var(--charge),0 6px 56px var(--charge-glow)}
+/* Pressing Play floods the screen with charge, then the glow fades off the game. */
+.charge-flash{position:fixed;inset:0;z-index:50;pointer-events:none;background:radial-gradient(circle at 50% 58%,color-mix(in srgb,var(--charge) 55%,#fff) 0%,var(--charge) 45%,color-mix(in srgb,var(--charge) 82%,#000) 100%);opacity:0;animation:charge-in .4s ease-in both}
+.charge-flash.fading{animation:charge-out 1s ease-out both}
+@keyframes charge-in{from{opacity:0}to{opacity:1}}
+@keyframes charge-out{from{opacity:1}to{opacity:0}}
+.start-edition{color:var(--muted);font:500 10px var(--mono);letter-spacing:2.5px;text-transform:uppercase;margin:16px 0 0}
 /* The Next button waits until the answer has been on screen a moment, then fades in. */
-.next-button{opacity:0;visibility:hidden;transition:opacity .5s ease,visibility 0s .5s,transform .18s,filter .18s}
-.next-button.shown{opacity:1;visibility:visible;transition:opacity .5s ease,visibility 0s,transform .18s,filter .18s}
+#nextButton{opacity:0;visibility:hidden;transition:opacity .5s ease,visibility 0s .5s,transform .18s,filter .18s}
+#nextButton.shown{opacity:1;visibility:visible;transition:opacity .5s ease,visibility 0s,transform .18s,filter .18s}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
-.rules{margin:4px 0 20px;padding-left:18px}.rules li{margin:0 0 8px;padding-left:2px}.rules li strong{color:var(--ink)}
+.rules{margin:4px 0 20px;padding-left:0;list-style:none}.rules li{position:relative;margin:0 0 8px;padding-left:24px}.rules li::before{content:"";position:absolute;left:3px;top:3px;width:11px;height:15px;background:var(--charge);clip-path:polygon(60% 0,0 58%,45% 58%,30% 100%,100% 38%,55% 38%,75% 0);filter:drop-shadow(0 0 3px var(--charge))}.rules li strong{color:var(--ink)}
 .recap{display:flex;flex-direction:column;gap:9px;margin-top:18px}
-.recap-item{position:relative;padding:13px 16px;background:var(--card);border:1px solid var(--line);border-radius:11px}
-.recap-item.best{border-color:var(--good);box-shadow:0 0 0 1px var(--good) inset}
-.recap-badge{display:inline-block;margin-bottom:7px;padding:3px 8px;border-radius:99px;background:var(--good);color:var(--card);font:500 9px var(--mono);letter-spacing:1px;text-transform:uppercase}
+.recap-item{position:relative;padding:13px 16px;background:var(--card);border:1px solid var(--line);border-radius:6px}
+.recap-item.best{border-color:var(--charge);box-shadow:0 0 0 1px var(--charge) inset,0 0 22px var(--charge-glow)}
+.recap-badge{display:inline-block;margin-bottom:7px;padding:3px 8px;border-radius:3px;background:var(--charge);color:var(--charge-ink);font:700 9px var(--mono);letter-spacing:1px;text-transform:uppercase}
 .recap-question{margin:0 0 6px;font-size:13px;line-height:1.45;color:var(--ink)}
 .recap-numbers{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0;font:500 12px var(--mono);color:var(--muted)}
 .recap-off{margin-left:auto;color:var(--ink)}
-.dialog-subtitle{font:600 12px var(--sans);color:var(--ink);margin:6px 0 10px}
+.dialog-subtitle{font:500 10px var(--mono);letter-spacing:3px;text-transform:uppercase;color:var(--green);margin:6px 0 10px}
 .recent-games{display:flex;gap:6px;align-items:stretch;height:118px;padding-bottom:18px;border-bottom:1px solid var(--line)}
 .recent-bar{position:relative;flex:1;min-width:0;display:flex;align-items:flex-end;padding:0;border:0;background:none;cursor:pointer}
-.recent-bar-fill{display:block;width:100%;border-radius:4px 4px 0 0;background:color-mix(in srgb,var(--green) 55%,var(--card));transition:background-color .2s}
-.recent-bar:hover .recent-bar-fill{background:color-mix(in srgb,var(--green) 80%,var(--card))}
+.recent-bar-fill{display:block;width:100%;border-radius:2px 2px 0 0;background:color-mix(in srgb,var(--charge) 55%,var(--card));transition:background-color .2s}
+.recent-bar:hover .recent-bar-fill{background:var(--charge);box-shadow:0 0 10px var(--charge-glow)}
 .recent-bar.selected .recent-bar-fill{background:var(--orange)}
+.recent-bar-fill.negative{background:color-mix(in srgb,var(--negative) 70%,var(--card))}
 .recent-bar-date{position:absolute;left:50%;bottom:-18px;transform:translateX(-50%);font:9px var(--mono);color:var(--muted);white-space:nowrap}
 .recent-bar.selected .recent-bar-date{color:var(--ink)}
 .recent-detail{margin:12px 0 4px;text-align:center;font-size:13px;color:var(--muted);min-height:20px}
 .recent-detail strong{font:500 15px var(--mono);color:var(--ink)}
+/* ---------- Battery ---------- */
+/* Outline with a nub on the right; the cell inside holds the fill, set by --level (0–100). */
+.battery{--level:100;position:relative;border:3px solid var(--shell);border-radius:9px;padding:4px;margin-right:9px;background:var(--card)}
+.battery::after{content:"";position:absolute;left:100%;top:50%;width:6px;height:38%;margin-left:3px;transform:translateY(-50%);border-radius:0 4px 4px 0;background:var(--shell)}
+.battery-cell{position:relative;height:100%}
+.battery-fill{position:absolute;left:0;top:0;bottom:0;width:calc(var(--level) * 1%);border-radius:4px;background:var(--fill,var(--charge));box-shadow:0 0 16px color-mix(in srgb,var(--fill,var(--charge)) 45%,transparent),inset 0 0 8px #fff4;z-index:1}
+.battery-value{position:absolute;inset:0;display:grid;place-items:center;font:700 30px/1 var(--mono);letter-spacing:-1.5px;color:var(--ink);font-variant-numeric:tabular-nums;z-index:2;white-space:nowrap}
+/* A dark copy of the number, clipped to the green, so it stays readable on both sides of the fill. */
+.battery-value.lit{color:var(--charge-ink);clip-path:inset(0 calc(100% - var(--level) * 1%) 0 0)}
+/* Running score box */
+.score-battery{width:min(240px,64vw);height:76px;margin:8px 9px 10px 0}
+.drain-chip{position:absolute;right:-14px;top:-12px;padding:3px 7px;border-radius:99px;background:var(--drained);color:#fff;font:500 12px var(--mono);opacity:0;pointer-events:none;z-index:4}
+.drain-chip.fly{animation:chip-fly 1.8s cubic-bezier(.2,.8,.2,1) .5s both}
+@keyframes chip-fly{0%{opacity:0;transform:translateY(8px) scale(.8)}20%{opacity:1;transform:translateY(0) scale(1)}70%{opacity:1}100%{opacity:0;transform:translate(14px,-26px) scale(.9)}}
+/* Guess bar: the slider sits invisibly over the battery so the fill end is what you drag. */
+.bar-battery{height:50px;margin-right:9px}
+.bar-battery .battery-fill{transition:none}
+.battery-range{position:absolute;left:-12px;top:-10px;width:calc(100% + 24px);height:calc(100% + 20px);margin:0;appearance:none;-webkit-appearance:none;background:transparent;cursor:ew-resize;z-index:4;outline:none}
+.battery-range::-webkit-slider-runnable-track{background:transparent;height:100%}
+.battery-range::-moz-range-track{background:transparent}
+.battery-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:24px;height:100%;background:transparent;border:0}
+.battery-range::-moz-range-thumb{width:24px;height:100%;background:transparent;border:0}
+.bar-battery:has(.battery-range:focus-visible){outline:3px solid var(--orange);outline-offset:3px}
+/* The electric end of the guess bar: the fill's jagged edge (three shapes that snap in turn),
+   and a bright hot line along it. It overlaps the fill's end. */
+.bar-battery{--zap-core:color-mix(in srgb,var(--charge) 55%,#fff)}
+/* On the white light-mode card a white-hot tip just looks washed out, so it stays solid green. */
+:root:not([data-theme=dark]) .bar-battery{--zap-core:var(--charge)}
+/* The fill heats toward its tip, matching the white-hot jagged edge. */
+#guessBattery .battery-fill{border-radius:4px 0 0 4px;box-shadow:0 0 16px var(--charge-glow);background:linear-gradient(90deg,var(--charge) 0,var(--charge) calc(100% - 70px),var(--zap-core) calc(100% - 10px))}
+.zap{--zap-hot:#f2fff6;position:absolute;left:max(-4px,calc(var(--level) * 1% - 11px));top:0;width:26px;height:100%;overflow:visible;z-index:3;pointer-events:none}
+:root:not([data-theme=dark]) .zap{--zap-hot:#0a7a35}
+.zap polygon{fill:var(--zap-core)}
+.zap polyline{fill:none;stroke:var(--zap-hot);stroke-width:1.7;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 2px var(--charge)) drop-shadow(0 0 7px var(--charge))}
+.zap-frame{opacity:0;animation:zap-frame .24s steps(1) infinite}
+.zap-2{animation-delay:-.08s}.zap-3{animation-delay:-.16s}
+@keyframes zap-frame{0%{opacity:1}33.4%,100%{opacity:0}}
+/* Reveal: a guess that was too high drains back to the answer (gray shows where the charge was);
+   one that was too low grows a gray stretch from the guess out to the answer. */
+.drained{position:absolute;top:0;bottom:0;border-radius:6px;background:var(--drained);z-index:0}
+.comparison .battery-fill{transition:width 1.2s cubic-bezier(.3,.7,.2,1) .3s}
+.comparison.too-low .drained{transform:scaleX(0);transform-origin:left;transition:transform 1.2s cubic-bezier(.3,.7,.2,1) .3s}
+.comparison.too-low.answered .drained{transform:scaleX(1)}
+/* Results battery */
+.result-battery-wrap{display:flex;justify-content:center;margin:14px 0 4px}
+.result-battery{width:min(260px,54vw);height:104px}
+.result-battery .battery-value{font-size:clamp(32px,8vw,42px)}
+/* Small battery icon used in the wordmark and start screen. */
+.battery-glyph{position:relative;display:block;width:16px;height:10px;border:2px solid currentColor;border-radius:3px;margin-right:3px}
+.battery-glyph::before{content:"";position:absolute;left:1px;top:1px;bottom:1px;width:60%;border-radius:1px;background:currentColor}
+.battery-glyph::after{content:"";position:absolute;left:100%;top:50%;width:2px;height:4px;margin-left:1px;transform:translateY(-50%);border-radius:0 1px 1px 0;background:currentColor}
+.start-mark .battery-glyph{transform:scale(2)}
+@media(max-width:520px){.bar-battery{height:44px}.score-battery{height:66px}.result-battery{height:90px}.battery-value{font-size:26px}}
+/* Out of charge, step 1: the empty battery shows a blinking "!" and red alarm lights pulse round the screen. */
+.battery.alarm{animation:alarm-border .7s steps(1) infinite}
+@keyframes alarm-border{50%{border-color:var(--negative)}}
+.battery.alarm .battery-value{visibility:hidden}
+.battery.alarm .battery-cell::after{content:"!";position:absolute;inset:0;display:grid;place-items:center;z-index:3;font:700 46px/1 var(--display);color:var(--negative);animation:alarm-blink .7s steps(1) infinite}
+@keyframes alarm-blink{50%{opacity:.2}}
+.alarm-lights{position:fixed;inset:0;z-index:40;pointer-events:none}
+.alarm-glow{position:absolute;inset:0;box-shadow:inset 0 0 140px 36px color-mix(in srgb,var(--negative) 65%,transparent);animation:alarm-pulse 1.25s ease-in-out infinite}
+@keyframes alarm-pulse{0%,100%{opacity:.15}50%{opacity:1}}
+/* Step 2: the lights flicker like in the movies (one flicker, a beat, two quick ones) and go out. */
+.power-out .site-shell{animation:power-out 1.7s linear forwards}
+@keyframes power-out{0%{filter:none}0.5%,7%{filter:grayscale(1) brightness(.2)}7.5%,59%{filter:none}59.5%,63%{filter:grayscale(1) brightness(.2)}63.5%,67%{filter:none}67.5%,71%{filter:grayscale(1) brightness(.2)}71.5%,75%{filter:none}75.5%,100%{filter:grayscale(1) brightness(.2)}}
+/* The alarm keeps going through the flicker, but the red lights and the "!" cut out with every
+   flicker of the lights (same timings as power-out above) and stay out once the lights do. */
+.power-out .alarm-lights{animation:power-out-shown 1.7s linear forwards}
+.power-out .battery.alarm .battery-cell::after{animation:alarm-blink .7s steps(1) infinite,power-out-shown 1.7s linear forwards}
+@keyframes power-out-shown{0%,7%{visibility:hidden}7.5%,58.5%{visibility:visible}59%,63%{visibility:hidden}63.5%,66.5%{visibility:visible}67%,71%{visibility:hidden}71.5%,74.5%{visibility:visible}75%,100%{visibility:hidden}}
+/* Once the lights are out for good (body.lights-out, set from percentle.mjs), the outline stops flashing too. */
+.lights-out .battery.alarm{animation:none}
+/* The out-of-charge screen stays powered down: all gray, no glow, and it fades up out of the dark. */
+body.dead,body.power-out{background:var(--paper)}
+.dead .site-shell{filter:grayscale(1) brightness(.82);animation:power-dim .9s ease-out both}
+@keyframes power-dim{from{filter:grayscale(1) brightness(.3)}to{filter:grayscale(1) brightness(.82)}}
+.dead *{box-shadow:none!important;text-shadow:none!important}
+.dead .game-card::before{display:none}
+.dead-score{padding-top:34px}
+.dead-battery .battery-value{display:none}
+.out-title{font:700 clamp(34px,9vw,48px)/1 var(--display)!important;letter-spacing:3px;text-transform:uppercase;margin:22px 0 10px!important}
+.out-where{font:500 13px var(--mono)!important;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.recap-item.unreached{opacity:.6;border-style:dashed}
+.recap-item.unreached .recap-badge{background:var(--line);color:var(--muted)}

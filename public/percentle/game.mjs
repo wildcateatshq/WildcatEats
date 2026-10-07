@@ -17,11 +17,40 @@ export function dailyTotal(guesses, questions) {
   return guesses.reduce((total, guess, index) => total + pointsOff(guess, questions[index].answer), 0);
 }
 
-export function viewForProgress(progress, questionCount = PUZZLES_PER_DAY) {
+// The score is the battery charge left: it starts at 100% and every point off drains DRAIN_RATE
+// of a percent. 0.5 = half (200 points off empties the battery); 1 = full (100 off empties it).
+// Games are saved as total points off, so changing this re-scores every past game consistently.
+export const DRAIN_RATE = 1;
+
+export function chargeLeft(totalOff, rate = DRAIN_RATE) {
+  return Math.round((100 - totalOff * rate) * 10) / 10;
+}
+
+// Dropping below zero charge ends the game early. Landing on exactly 0.0% survives.
+export function isOutOfCharge(guesses, questions, rate = DRAIN_RATE) {
+  return chargeLeft(dailyTotal(guesses, questions.slice(0, guesses.length)), rate) < 0;
+}
+
+// The number sent to today's crowd line, where lower ranks better. Players who finished send
+// their points off (at most 100 / rate, so keep DRAIN_RATE above 0.25). Players who ran out send
+// OUT_OF_CHARGE_RANK plus a little more the earlier they ran out, so they rank below every
+// finisher, later deaths rank above earlier ones, and the server (percentle/crowd.js) can count
+// who ran out.
+export const OUT_OF_CHARGE_RANK = 400;
+
+export function crowdRank(guesses, questions, rate = DRAIN_RATE) {
+  const total = dailyTotal(guesses, questions.slice(0, guesses.length));
+  if (!isOutOfCharge(guesses, questions, rate)) return Number(total.toFixed(1));
+  return OUT_OF_CHARGE_RANK + (questions.length - guesses.length + 1) * 10;
+}
+
+// outOfCharge: the locked guesses have drained the battery below zero, so once the last of
+// them has been revealed, the game goes straight to results.
+export function viewForProgress(progress, questionCount = PUZZLES_PER_DAY, outOfCharge = false) {
   const lockedCount = progress.guesses.length;
   const hasPendingReveal = progress.revealed < lockedCount;
   const index = hasPendingReveal ? progress.revealed : lockedCount;
-  if (!hasPendingReveal && index >= questionCount) return { phase: "results", index: questionCount };
+  if (!hasPendingReveal && (index >= questionCount || outOfCharge)) return { phase: "results", index: questionCount };
   return { phase: hasPendingReveal ? "reveal" : "guess", index };
 }
 

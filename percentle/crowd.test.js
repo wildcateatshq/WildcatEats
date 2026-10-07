@@ -44,6 +44,21 @@ test("splits tied ranks evenly when calculating percent of players beaten", () =
   assert.equal(summarize(entries, ids[2]).betterThan, 58.3);
 });
 
+test("reports the share of other players who also ran out of charge", () => {
+  // Ranks of 400+ mean the player ran out of charge.
+  const entries = new Map([
+    [ids[0], 12.5],
+    [ids[1], 88],
+    [ids[2], 420],
+    [ids[3], 450],
+    [ids[4], 60],
+    [ids[5], 410]
+  ]);
+  assert.equal(summarize(entries, ids[2]).alsoRanOut, 40, "2 of the 5 others ran out");
+  assert.equal(summarize(entries, ids[0]).alsoRanOut, 60, "3 of the 5 others ran out");
+  assert.equal(summarize(new Map([[ids[0], 420]]), ids[0]).alsoRanOut, null, "withheld with too few players");
+});
+
 test("withholds a crowd percentile until five other players have submitted", () => {
   const entries = new Map(ids.slice(0, 5).map((id, index) => [id, (index + 1) * 10]));
   assert.equal(summarize(entries, ids[2]).betterThan, null);
