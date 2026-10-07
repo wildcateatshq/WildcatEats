@@ -100,8 +100,9 @@ function isTodayFinished() {
 }
 
 function recordTodayIfComplete(progress) {
-  if (currentDate !== today || progress.locked.length !== todayPuzzle.length || state.games.some(game => game.date === today)) return;
-  const score = Number(dailyTotal(progress.guesses, todayPuzzle).toFixed(1));
+  const questions = todayPuzzle.questions;
+  if (practiceMode || currentDate !== today || progress.guesses.length !== questions.length || state.games.some(game => game.date === today)) return;
+  const score = Number(dailyTotal(progress.guesses, questions).toFixed(1));
   state.games.push({ date: today, score });
   state.games.sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -579,6 +580,11 @@ try {
 const reloadIfNewDay = () => { if (easternDate() > today) location.reload(); };
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reloadIfNewDay(); });
 setInterval(reloadIfNewDay, 60_000);
+// Count a finished daily puzzle that a previous version of the page failed to record.
+if (state.progress[today]) {
+  recordTodayIfComplete(state.progress[today]);
+  save();
+}
 render();
 if (!readPreference("percentle.seenHow")) {
   showHowToPlay();
