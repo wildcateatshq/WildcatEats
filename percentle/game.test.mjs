@@ -20,6 +20,7 @@ import {
   lowBatteryTier,
   streakAchievements,
   easternDate,
+  endlessAchievements,
   endlessOrder,
   finalCharge,
   isOutOfCharge,
@@ -206,4 +207,14 @@ test("endless mode asks unseen questions first and counts the rounds survived", 
   const questions = [10, 20, 30, 40].map(answer => ({ answer }));
   assert.equal(roundsSurvived([15, 25, 30], questions, 1), 3, "still alive");
   assert.equal(roundsSurvived([60, 70, 31], questions, 1), 2, "the question that ran it out doesn't count");
+});
+
+test("hard mode and endless runs earn their own achievements", () => {
+  assert.deepEqual(achievementsForGame({ charge: 60, out: false, supercharged: 1, hard: true }),
+    ["first-charge", "supercharged", "devils-deal", "hard-supercharged", "hard-survivor", "hellproof"]);
+  assert.deepEqual(achievementsForGame({ charge: -4, out: true, hard: true }), ["first-charge", "devils-deal", "blackout"], "running out isn't surviving");
+  assert.deepEqual(streakAchievements(3, 7), ["devils-week"]);
+  assert.deepEqual(endlessAchievements({ rounds: 4 }), ["first-run"]);
+  assert.deepEqual(endlessAchievements({ rounds: 26, supercharged: 3, betterThan: 92 }), ["first-run", "ten-strong", "unplugged", "overclocked", "top-charger"]);
+  assert.deepEqual(endlessAchievements({ rounds: 12, betterThan: 89.9 }), ["first-run", "ten-strong"]);
 });

@@ -176,8 +176,8 @@ export function lowBatteryTier(charge) {
   return "fumes";
 }
 
-// Achievements, in the order they're listed. badge is the short text on the round badge
-// ("bolt" draws a lightning bolt instead).
+// Achievements, in the order they're listed, grouped into Daily, Hard mode, and Endless. badge is
+// the short text on the round badge ("bolt" draws a lightning bolt instead).
 export const ACHIEVEMENTS = [
   { id: "first-charge", name: "First Charge", description: "Finish your first daily puzzle.", badge: "1ST" },
   { id: "supercharged", name: "Supercharged", description: "Get a SUPERCHARGED answer.", badge: "bolt" },
@@ -190,15 +190,32 @@ export const ACHIEVEMENTS = [
   { id: "still-alive", name: "Still Alive", description: "Finish on exactly 0.0% charge.", badge: "0.0" },
   { id: "blackout", name: "Blackout", description: "Run out of charge.", badge: "!" },
   { id: "week-streak", name: "Week Streak", description: "Play 7 days in a row.", badge: "7", streak: 7 },
-  { id: "month-streak", name: "Month Streak", description: "Play 30 days in a row.", badge: "30", streak: 30 }
+  { id: "month-streak", name: "Month Streak", description: "Play 30 days in a row.", badge: "30", streak: 30 },
+  { id: "devils-deal", group: "Hard mode", name: "Devil's Deal", description: "Play a puzzle in hard mode.", badge: "H" },
+  { id: "hard-survivor", group: "Hard mode", name: "Hard Survivor", description: "Finish a hard mode puzzle without running out of charge.", badge: "H5" },
+  { id: "hellproof", group: "Hard mode", name: "Hellproof", description: "Finish hard mode with 50% charge or more.", badge: "50+" },
+  { id: "hard-supercharged", group: "Hard mode", name: "Supercharged in Hell", description: "Get a SUPERCHARGED answer in hard mode.", badge: "bolt" },
+  { id: "devils-week", group: "Hard mode", name: "Devil's Week", description: "Play hard mode 7 days in a row.", badge: "7H", hardStreak: 7 },
+  { id: "first-run", group: "Endless", name: "First Run", description: "Finish an endless run.", badge: "∞" },
+  { id: "ten-strong", group: "Endless", name: "Ten Strong", description: "Survive 10 rounds in one endless run.", badge: "10" },
+  { id: "unplugged", group: "Endless", name: "Unplugged", description: "Survive 25 rounds in one endless run.", badge: "25" },
+  { id: "overclocked", group: "Endless", name: "Overclocked", description: "Get 3 SUPERCHARGED answers in one endless run.", badge: "x3" },
+  { id: "top-charger", group: "Endless", name: "Top Charger", description: "Have a best endless run that beats 90% of players in its two-week period.", badge: "90%" }
 ];
+for (const achievement of ACHIEVEMENTS) achievement.group ??= "Daily";
 
 // The achievements one finished daily game earns: its final charge, whether it ran out of
-// charge, and how many SUPERCHARGED answers it had.
-export function achievementsForGame({ charge, out, supercharged = 0 }) {
+// charge, how many SUPERCHARGED answers it had, and whether it was played in hard mode.
+export function achievementsForGame({ charge, out, supercharged = 0, hard = false }) {
   const earned = ["first-charge"];
   if (supercharged >= 1) earned.push("supercharged");
   if (supercharged >= 2) earned.push("double-surge");
+  if (hard) {
+    earned.push("devils-deal");
+    if (supercharged >= 1) earned.push("hard-supercharged");
+    if (!out) earned.push("hard-survivor");
+    if (!out && charge >= 50) earned.push("hellproof");
+  }
   if (out) return [...earned, "blackout"];
   if (charge >= 90) earned.push("high-voltage");
   if (charge >= 100) earned.push("fully-charged");
@@ -221,8 +238,22 @@ export function longestStreak(dates) {
   return longest;
 }
 
-export function streakAchievements(streak) {
-  return ACHIEVEMENTS.filter(achievement => achievement.streak && streak >= achievement.streak).map(achievement => achievement.id);
+export function streakAchievements(streak, hardStreak = 0) {
+  return ACHIEVEMENTS.filter(achievement => (achievement.streak && streak >= achievement.streak) ||
+    (achievement.hardStreak && hardStreak >= achievement.hardStreak)).map(achievement => achievement.id);
+}
+
+// The achievements one finished endless run earns, and "Top Charger" once the player's best run
+// beats this share of players in its period.
+export const TOP_CHARGER_PERCENT = 90;
+
+export function endlessAchievements({ rounds, supercharged = 0, betterThan = null }) {
+  const earned = ["first-run"];
+  if (rounds >= 10) earned.push("ten-strong");
+  if (rounds >= 25) earned.push("unplugged");
+  if (supercharged >= 3) earned.push("overclocked");
+  if (betterThan !== null && betterThan >= TOP_CHARGER_PERCENT) earned.push("top-charger");
+  return earned;
 }
 
 // Which answered question was the player's best guess: the fewest points off, with ties (e.g.

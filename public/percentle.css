@@ -306,6 +306,7 @@ body.hard{--charge:#b85cff;--charge-glow:#b85cff73;--charge-ink:#1c0630;--green:
 .ach-bolt{display:block;width:12px;height:17px;background:currentColor;clip-path:polygon(60% 0,0 58%,45% 58%,30% 100%,100% 38%,55% 38%,75% 0)}
 .ach-count{margin:0 0 4px}
 .ach-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.ach-group{margin-top:20px}
 .ach{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
 .ach.locked{opacity:.55}
 .ach strong{display:block;font:700 14px var(--display);letter-spacing:.5px;color:var(--ink)}

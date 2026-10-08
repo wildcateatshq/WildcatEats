@@ -1,4 +1,4 @@
-import { achievementsForGame, ACHIEVEMENTS, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, reactionFor, easternDate, finalCharge, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { achievementsForGame, ACHIEVEMENTS, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, reactionFor, easternDate, finalCharge, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
 const GAME_NAME = "Chargle";
@@ -237,8 +237,8 @@ function recordTodayIfComplete(progress, notify = true) {
   state.games.sort((a, b) => a.date.localeCompare(b.date));
   const supercharged = progress.guesses.filter((guess, i) => pointsOff(guess, questions[i].answer) === 0).length;
   unlockAchievements([
-    ...achievementsForGame({ charge, out: charge < 0, supercharged }),
-    ...streakAchievements(longestStreak(state.games.map(game => game.date)))
+    ...achievementsForGame({ charge, out: charge < 0, supercharged, hard: Boolean(progress.hard) }),
+    ...streakAchievements(...gameStreaks())
   ], notify);
 }
 
@@ -250,6 +250,11 @@ const unannouncedAchievements = [];
 // their total points off, so their charge is worked out from that.
 function gameCharge(game) {
   return game.charge ?? chargeLeft(game.score);
+}
+
+// The longest run of daily games on consecutive days, and of hard-mode games.
+function gameStreaks() {
+  return [longestStreak(state.games.map(game => game.date)), longestStreak(state.games.filter(game => game.hard).map(game => game.date))];
 }
 
 function unlockAchievements(ids, notify) {
@@ -265,9 +270,9 @@ function unlockAchievements(ids, notify) {
 function creditPastAchievements() {
   for (const game of state.games) {
     const charge = gameCharge(game);
-    unlockAchievements(achievementsForGame({ charge, out: charge < 0 }), false);
+    unlockAchievements(achievementsForGame({ charge, out: charge < 0, hard: Boolean(game.hard) }), false);
   }
-  unlockAchievements(streakAchievements(longestStreak(state.games.map(game => game.date))), false);
+  unlockAchievements(streakAchievements(...gameStreaks()), false);
 }
 
 function showToast(message) {
@@ -737,9 +742,13 @@ function showLowBatteryAlert(charge, onClose) {
 }
 
 // New achievements slide in from the top one after another.
+let announcing = false;
+
 function announceAchievements() {
+  if (announcing) return;
   const id = unannouncedAchievements.shift();
   if (!id) return;
+  announcing = true;
   const achievement = ACHIEVEMENTS.find(item => item.id === id);
   document.body.insertAdjacentHTML("beforeend", `<div class="ach-toast" role="status">${achievementBadge(achievement)}
       <span><small>Achievement unlocked</small><strong>${escapeHtml(achievement.name)}</strong></span></div>`);
@@ -749,6 +758,7 @@ function announceAchievements() {
     toast.classList.remove("shown");
     setTimeout(() => {
       toast.remove();
+      announcing = false;
       announceAchievements();
     }, 450);
   }, 3200);
@@ -761,13 +771,18 @@ function achievementBadge(achievement) {
 function showAchievements() {
   const unlocked = ACHIEVEMENTS.filter(achievement => state.achievements[achievement.id]).length;
   const streak = consecutiveStreak(state.games);
+  const hardStreak = consecutiveStreak(state.games.filter(game => game.hard));
+  const groups = [...new Set(ACHIEVEMENTS.map(achievement => achievement.group))];
   openDialog("Achievements", `<p class="ach-count">${unlocked} of ${ACHIEVEMENTS.length} unlocked</p>
-    <div class="ach-list">${ACHIEVEMENTS.map(achievement => {
+    ${groups.map(group => `<h3 class="dialog-subtitle ach-group">${group}</h3><div class="ach-list">${ACHIEVEMENTS.filter(achievement => achievement.group === group).map(achievement => {
       const date = state.achievements[achievement.id];
-      const meta = date ? `Unlocked ${longDate(date)}` : achievement.streak ? `Current streak: ${Math.min(streak, achievement.streak)} / ${achievement.streak}` : "Locked";
+      const meta = date ? `Unlocked ${longDate(date)}`
+        : achievement.streak ? `Current streak: ${Math.min(streak, achievement.streak)} / ${achievement.streak}`
+        : achievement.hardStreak ? `Current hard streak: ${Math.min(hardStreak, achievement.hardStreak)} / ${achievement.hardStreak}`
+        : "Locked";
       return `<div class="ach ${date ? "unlocked" : "locked"}">${achievementBadge(achievement)}
         <div><strong>${escapeHtml(achievement.name)}</strong><p>${escapeHtml(achievement.description)}</p><span class="ach-meta">${meta}</span></div></div>`;
-    }).join("")}</div>`);
+    }).join("")}</div>`).join("")}`);
 }
 
 function returnToToday() {
@@ -1039,6 +1054,8 @@ function renderEndlessResults() {
     state.endless.runs++;
     state.endless.best[period] = Math.max(previousBest, rounds);
     state.endless.allTime = Math.max(state.endless.allTime, rounds);
+    const supercharged = progress.guesses.filter((guess, i) => pointsOff(guess, currentQuestions[i].answer) === 0).length;
+    unlockAchievements(endlessAchievements({ rounds, supercharged }), true);
     save();
   }
   const { newBest } = progress.recorded;
@@ -1087,6 +1104,12 @@ async function loadEndlessCrowd(startsOn, best) {
       ? `Once at least ${summary.minimumComparisonPlayers} other players have finished a run this period, you'll see how your best compares.`
       : `Your best run (${best} round${best === 1 ? "" : "s"}) beats <strong>${summary.betterThan.toFixed(1)}%</strong> of players this period.`;
     panel.innerHTML = `<h3 class="crowd-title">How you stack up · Endless</h3><p class="crowd-position">${line}</p>`;
+    // "Top Charger": the best run beats most of this period's players.
+    if (summary.betterThan !== null) {
+      unlockAchievements(endlessAchievements({ rounds: best, betterThan: summary.betterThan }), true);
+      save();
+      announceAchievements();
+    }
   } catch (error) {
     console.error("Could not submit the endless run.", error);
     panel.querySelector(".crowd-status").textContent = "The endless comparison is temporarily unavailable.";
