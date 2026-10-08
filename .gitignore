@@ -6,3 +6,5 @@ server.log
 /data/percentle-crowd.json.*.tmp
 /data/percentle-puzzles.json
 /data/percentle-puzzles.json.*.tmp
+/data/percentle-endless.json
+/data/percentle-endless.json.*.tmp

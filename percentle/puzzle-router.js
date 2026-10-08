@@ -7,14 +7,13 @@ const { MAX_DAYS_AHEAD, addDays, daysBetween, easternDate, isCalendarDate, puzzl
 const ARCHIVE_DAYS = 30;
 const MAX_NOTES_LENGTH = 20_000;
 
-function createPuzzleRouter(store, options = {}) {
-  const router = express.Router();
-  const today = options.today || (() => easternDate());
+// The publish token check, shared by the puzzle and endless-bank routes. Only the daily agent
+// holds the token.
+function publisherAuth(options = {}) {
   // Pasted secrets often pick up invisible spaces, line breaks, or quotes; ignore those.
   const cleanToken = value => (value || "").trim().replace(/^(["'])(.*)\1$/, "$2").trim();
   const publishToken = () => cleanToken(options.publishToken ?? process.env.PERCENTLE_PUBLISH_TOKEN);
 
-  // Only the daily agent holds this token; it can publish and read unreleased puzzles.
   function isPublisher(req) {
     const expected = publishToken();
     const match = /^Bearer (.+)$/.exec(req.get("authorization") || "");
@@ -32,6 +31,14 @@ function createPuzzleRouter(store, options = {}) {
     if (!isPublisher(req)) return res.status(401).json({ error: "A valid publish token is required." });
     next();
   }
+
+  return { isPublisher, requirePublisher };
+}
+
+function createPuzzleRouter(store, options = {}) {
+  const router = express.Router();
+  const today = options.today || (() => easternDate());
+  const { isPublisher, requirePublisher } = publisherAuth(options);
 
   // A special also carries its theme (e.g. "World Series Special"); normal days leave it out.
   const send = (res, date, { questions, theme }) => res.json({ date, number: puzzleNumber(date), ...(theme ? { theme } : {}), questions });
@@ -158,4 +165,4 @@ function createPuzzleRouter(store, options = {}) {
   return router;
 }
 
-module.exports = { createPuzzleRouter };
+module.exports = { createPuzzleRouter, publisherAuth };

@@ -71,6 +71,13 @@ function validatePuzzle(questions) {
   if (!Array.isArray(questions) || questions.length !== QUESTIONS_PER_PUZZLE) {
     throw new RangeError(`A puzzle needs exactly ${QUESTIONS_PER_PUZZLE} questions.`);
   }
+  return validateQuestions(questions);
+}
+
+// Checks a list of questions (a daily puzzle's or a batch for the endless bank) and reports every
+// problem at once. Returns the cleaned questions.
+function validateQuestions(questions) {
+  if (!Array.isArray(questions) || !questions.length) throw new RangeError("questions must be a non-empty list.");
   const problems = [];
   const cleaned = questions.map((question, index) => {
     const label = `Question ${index + 1}`;
@@ -248,5 +255,6 @@ module.exports = {
   isCalendarDate,
   puzzleNumber,
   validatePuzzle,
+  validateQuestions,
   validateTheme
 };
