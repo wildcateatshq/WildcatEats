@@ -32,6 +32,18 @@ function createEndlessRouter(store, options = {}) {
     return null;
   }
 
+  // A tiny check the start screen uses to show the Endless button as live or "coming soon",
+  // without downloading the whole bank.
+  router.get("/availability", async (req, res, next) => {
+    try {
+      const bank = await liveBank();
+      res.set("Cache-Control", "public, max-age=300");
+      res.json({ live: Boolean(bank), needed: MIN_LIVE_QUESTIONS });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get("/bank", async (req, res, next) => {
     try {
       const bank = await liveBank();

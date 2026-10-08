@@ -1127,7 +1127,21 @@ function showStartScreen() {
   special.hidden = !todayPuzzle.theme;
   special.querySelector("span").textContent = todayPuzzle.theme || "";
   updateHardSwitch();
+  updateEndlessButton();
   document.body.classList.add("starting");
+}
+
+// Until the first endless bank is big enough, the button shows as "coming soon" and can't be pressed.
+async function updateEndlessButton() {
+  const button = document.querySelector("#endlessButton");
+  try {
+    const { live } = await (await fetch(`${ENDLESS_URL}/availability`)).json();
+    button.disabled = !live;
+    button.classList.toggle("coming-soon", !live);
+    button.innerHTML = live ? "Endless mode <span aria-hidden=\"true\">∞</span>" : "Endless mode · Coming soon";
+  } catch (error) {
+    console.error("Could not check whether endless mode is live.", error);
+  }
 }
 
 // Hard mode turns every green purple.

@@ -41,6 +41,7 @@ test("the endless API fills banks in batches, goes live at 250 questions, and co
   const post = (pathname, body, headers = auth) => fetch(url + pathname, { method: "POST", headers, body: JSON.stringify(body) });
 
   assert.equal((await fetch(`${url}/bank`)).status, 404, "warming up with no questions");
+  assert.deepEqual(await (await fetch(`${url}/availability`)).json(), { live: false, needed: 250 });
   assert.equal((await post("/banks/2026-10-06/questions", { questions: [question(1)] }, { "Content-Type": "application/json" })).status, 401, "only the agent adds questions");
   assert.equal((await post("/banks/2026-09-22/questions", { questions: [question(1)] })).status, 400, "past periods are closed");
   assert.equal((await post("/banks/2026-10-06/questions", { questions: Array.from({ length: 51 }, (_, i) => question(i)) })).status, 400, "batches are at most 50");
@@ -53,6 +54,7 @@ test("the endless API fills banks in batches, goes live at 250 questions, and co
   const duplicate = await (await post("/banks/2026-10-06/questions", { questions: [question(3)] })).json();
   assert.deepEqual(duplicate, { added: 0, count: 250 }, "repeats are skipped");
 
+  assert.equal((await (await fetch(`${url}/availability`)).json()).live, true);
   const bank = await (await fetch(`${url}/bank`)).json();
   assert.equal(bank.startsOn, "2026-10-06");
   assert.equal(bank.endsOn, "2026-10-19");

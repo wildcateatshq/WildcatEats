@@ -287,6 +287,7 @@ body.hard{--charge:#b85cff;--charge-glow:#b85cff73;--charge-ink:#1c0630;--green:
 .recent-bar-fill.hard{background:color-mix(in srgb,#b85cff 70%,var(--card))}
 /* Endless mode: the start-screen button and the end-of-run personal best line. */
 .endless-button{margin-top:10px}
+.endless-button.coming-soon{opacity:.5;border-style:dashed;cursor:not-allowed;transform:none;box-shadow:none}
 .final-score .endless-best{margin:12px 0 0;font:700 12px var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
 .final-score .endless-best.new{color:var(--ink)}
 /* Finishing alive on a low battery: a phone-style "Low Battery" alert. */
