@@ -11,7 +11,7 @@ const { LAUNCH_DATE, addDays, daysBetween, easternDate, isCalendarDate, validate
 
 const PERIOD_DAYS = 14;
 // A bank goes live once it has this many questions; before that, the previous period's bank is used.
-const MIN_LIVE_QUESTIONS = 100;
+const MIN_LIVE_QUESTIONS = 250;
 const MAX_BANK_QUESTIONS = 600;
 const MAX_BATCH = 50;
 const MINIMUM_COMPARISON_PLAYERS = 5;

@@ -163,7 +163,7 @@ curl -X PUT -H "Authorization: Bearer $PERCENTLE_PUBLISH_TOKEN" \
 Players answer questions until their battery runs out (same drain and recharge as the daily),
 from a bank of up to 500 questions per two-week period (periods start on launch day). The
 agent adds up to 40 sourced questions each night (`percentle/AGENT_PROMPT.md`, Step 3b) and
-emails the editor a 25-question sample when a bank reaches 500. A bank goes live once it has 100
+emails the editor a 25-question sample when a bank reaches 500. A bank goes live once it has 250
 questions; until then the previous period's is used, and before any exists the game says endless
 mode is warming up. Unseen questions are asked first. Best runs are compared anonymously within
 the period. Routes are under `/api/percentle/endless`: `GET /bank` (players), `POST /runs`
