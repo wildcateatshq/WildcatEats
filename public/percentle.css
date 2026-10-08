@@ -1,5 +1,4 @@
-:root{color-scheme:light;--paper:#f2f2f2;--card:#fff;--ink:#242824;--muted:#757a76;--line:#e3e5e3;--charge:#14c95c;--charge-glow:#14c95c59;--charge-ink:#04220f;--drained:#55595a;--shell:#b9bdba;--negative:#e5372b;--charge-yellow:#f0c000;--charge-orange:#ff8a1f;--lit:#0b8f3f;--unlit:#b3b8b5;--green:#0e9f47;--lime:#dcf8e6;--orange:#e0a400;--red:#c66b57;--display:"Chakra Petch","Arial Narrow",sans-serif;--sans:"Space Grotesk",Arial,sans-serif;--mono:"JetBrains Mono",monospace;--shadow:0 18px 50px #0b2a1612}
-:root[data-theme=dark]{color-scheme:dark;--paper:#000;--card:#101412;--ink:#f3f3e9;--muted:#9aa39c;--line:#262d29;--charge:#39ff88;--charge-glow:#39ff8873;--charge-ink:#04220f;--drained:#3a3e3c;--shell:#3d4842;--negative:#ff4d4d;--charge-yellow:#ffd23f;--charge-orange:#ff9a2e;--lit:#effff4;--unlit:#4d544f;--green:#39ff88;--lime:#0f2a1b;--orange:#ffd23f;--red:#df8a75;--shadow:0 0 0 1px #39ff880d,0 24px 70px #000}
+:root{color-scheme:dark;--paper:#000;--card:#101412;--ink:#f3f3e9;--muted:#9aa39c;--line:#262d29;--charge:#39ff88;--charge-glow:#39ff8873;--charge-ink:#04220f;--drained:#3a3e3c;--shell:#3d4842;--negative:#ff4d4d;--charge-yellow:#ffd23f;--charge-orange:#ff9a2e;--lit:#effff4;--unlit:#4d544f;--green:#39ff88;--lime:#0f2a1b;--orange:#ffd23f;--red:#df8a75;--display:"Chakra Petch","Arial Narrow",sans-serif;--sans:"Space Grotesk",Arial,sans-serif;--mono:"JetBrains Mono",monospace;--shadow:0 0 0 1px #39ff880d,0 24px 70px #000}
 *{box-sizing:border-box}
 body{margin:0;background:radial-gradient(ellipse 90% 340px at 50% -60px,color-mix(in srgb,var(--charge) 13%,transparent),transparent) no-repeat,var(--paper);color:var(--ink);font-family:var(--sans);min-height:100vh;transition:background .25s,color .25s}
 button,input{font:inherit}
@@ -63,7 +62,6 @@ main{padding:47px 0 34px}
    cracks down from the top of the card and flickers, the card flashes and jolts, the numbers flare
    white-hot, and "SUPERCHARGED" lands above them. */
 .strike{--strike-core:#fff;position:absolute;left:50%;bottom:50%;width:210px;height:min(330px,62vw);transform:translateX(-50%);overflow:visible;pointer-events:none;z-index:4;opacity:0}
-:root:not([data-theme=dark]) .strike{--strike-core:#0a7a35}
 .strike polyline{fill:none;stroke-linejoin:miter;stroke-linecap:round;vector-effect:non-scaling-stroke}
 .strike-glow{stroke:var(--charge);stroke-width:16;opacity:.6;filter:blur(5px)}
 .strike-core{stroke:var(--strike-core);stroke-width:5}
@@ -78,7 +76,6 @@ main{padding:47px 0 34px}
 .reveal-row.struck.go .reveal-num{animation:white-hot .8s ease-out 1.38s}
 @keyframes white-hot{0%{filter:brightness(2.2) drop-shadow(0 0 12px var(--charge))}100%{filter:none}}
 .supercharged{--glow-core:#effff4;position:absolute;left:50%;top:-12px;z-index:3;transform:translate(-50%,-100%);font:700 clamp(20px,5.6vw,30px)/1 var(--display);letter-spacing:clamp(3px,1vw,6px);text-transform:uppercase;white-space:nowrap;color:var(--glow-core);text-shadow:0 0 3px var(--charge),0 0 10px var(--charge),0 0 24px var(--charge),0 0 46px var(--charge-glow);opacity:0;pointer-events:none}
-:root:not([data-theme=dark]) .supercharged{--glow-core:var(--green)}
 .supercharged::before{content:"";position:absolute;inset:-22px -46px;z-index:-1;background:radial-gradient(closest-side,var(--charge-glow),transparent)}
 .reveal-row.go .supercharged{animation:land .4s cubic-bezier(.3,1.5,.5,1) 1.42s both}
 .reveal-row.instant .supercharged{opacity:1;animation:none}
@@ -182,11 +179,9 @@ body.starting .intro,body.starting #gameCard,body.starting #recap{display:none}
    and a bright hot line along it. It overlaps the fill's end. */
 .bar-battery{--zap-core:color-mix(in srgb,var(--charge) 55%,#fff)}
 /* On the white light-mode card a white-hot tip just looks washed out, so it stays solid green. */
-:root:not([data-theme=dark]) .bar-battery{--zap-core:var(--charge)}
 /* The fill heats toward its tip, matching the white-hot jagged edge. */
 #guessBattery .battery-fill{border-radius:4px 0 0 4px;box-shadow:0 0 16px var(--charge-glow);background:linear-gradient(90deg,var(--charge) 0,var(--charge) calc(100% - 70px),var(--zap-core) calc(100% - 10px))}
 .zap{--zap-hot:#f2fff6;position:absolute;left:max(-4px,calc(var(--level) * 1% - 11px));top:0;width:26px;height:100%;overflow:visible;z-index:3;pointer-events:none}
-:root:not([data-theme=dark]) .zap{--zap-hot:#0a7a35}
 .zap polygon{fill:var(--zap-core)}
 .zap polyline{fill:none;stroke:var(--zap-hot);stroke-width:1.7;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 2px var(--charge)) drop-shadow(0 0 7px var(--charge))}
 .zap-frame{opacity:0;animation:zap-frame .24s steps(1) infinite}
@@ -269,3 +264,30 @@ body.dead,body.power-out{background:var(--paper)}
 .mini-gap{position:absolute;top:0;bottom:0;background:var(--drained)}
 .mini-tick{position:absolute;top:-5px;bottom:-5px;width:2px;transform:translateX(-50%);border-radius:1px}
 .mini-tick.answer{background:var(--ink)}
+/* Finishing alive on a low battery: a phone-style "Low Battery" alert. */
+.low-alert-backdrop{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:16px;background:#0008;animation:log-fade .25s ease-out both}
+.low-alert{width:min(280px,100%);overflow:hidden;border-radius:14px;background:#2c2c2ef0;backdrop-filter:blur(20px);color:#fff;text-align:center;font-family:-apple-system,"SF Pro Text",system-ui,sans-serif;box-shadow:0 20px 60px #000;animation:alert-pop .35s cubic-bezier(.2,1.3,.4,1) both}
+@keyframes alert-pop{from{opacity:0;transform:scale(1.15)}to{opacity:1;transform:none}}
+.low-alert-battery{position:relative;display:block;width:34px;height:16px;margin:20px auto 0;border:2px solid #fffa;border-radius:4px}
+.low-alert-battery::before{content:"";position:absolute;left:2px;top:2px;bottom:2px;width:calc((100% - 4px) * var(--level) / 100);border-radius:1px;background:var(--fill)}
+.low-alert-battery::after{content:"";position:absolute;left:100%;top:50%;width:3px;height:6px;margin-left:1px;transform:translateY(-50%);border-radius:0 2px 2px 0;background:#fffa}
+.low-alert h3{margin:10px 16px 4px;font-size:17px;font-weight:600}
+.low-alert p{margin:0 16px 18px;font-size:13px;line-height:1.4;color:#fff}
+.low-alert button{display:block;width:100%;padding:12px;border:0;border-top:1px solid #ffffff2e;background:none;color:#0a84ff;font:400 17px -apple-system,system-ui,sans-serif;cursor:pointer}
+.low-alert button:hover{background:#ffffff0d}
+/* Achievements: round badges, the list in the dialog, and the pop-up when one is unlocked. */
+.ach-badge{flex:none;display:grid;place-items:center;width:42px;height:42px;border:2px solid var(--shell);border-radius:50%;font:700 12px var(--mono);color:var(--muted)}
+.ach.unlocked .ach-badge,.ach-toast .ach-badge{border-color:var(--charge);background:var(--charge);color:var(--charge-ink);box-shadow:0 0 12px var(--charge-glow)}
+.ach-bolt{display:block;width:12px;height:17px;background:currentColor;clip-path:polygon(60% 0,0 58%,45% 58%,30% 100%,100% 38%,55% 38%,75% 0)}
+.ach-count{margin:0 0 4px}
+.ach-list{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.ach{display:flex;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:var(--paper)}
+.ach.locked{opacity:.55}
+.ach strong{display:block;font:700 14px var(--display);letter-spacing:.5px;color:var(--ink)}
+dialog .ach p{margin:1px 0 0;font-size:12px;line-height:1.4}
+.ach-meta{display:block;margin-top:3px;font:500 10px var(--mono);letter-spacing:1px;color:var(--green)}
+.ach.locked .ach-meta{color:var(--muted)}
+.ach-toast{position:fixed;top:14px;left:50%;z-index:70;display:flex;align-items:center;gap:10px;padding:9px 18px 9px 10px;border:1px solid var(--charge);border-radius:10px;background:var(--card);color:var(--ink);box-shadow:0 0 26px var(--charge-glow);transform:translate(-50%,-160%);transition:transform .45s cubic-bezier(.2,1.2,.4,1)}
+.ach-toast.shown{transform:translate(-50%,0)}
+.ach-toast small{display:block;font:500 9px var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--green)}
+.ach-toast strong{display:block;font:700 15px var(--display);letter-spacing:1px;text-transform:uppercase}

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  achievementsForGame,
   applyGuessKey,
   chargeLeft,
   crowdRank,
@@ -11,6 +12,9 @@ import {
   guessEntryFrom,
   guessEntryText,
   litLevel,
+  longestStreak,
+  lowBatteryTier,
+  streakAchievements,
   easternDate,
   isOutOfCharge,
   pointsOff,
@@ -134,4 +138,29 @@ test("result colors respect their point-off thresholds", () => {
   assert.equal(scoreColor(15), "yellow");
   assert.equal(scoreColor(30), "orange");
   assert.equal(scoreColor(30.1), "red");
+});
+
+test("finishing alive on 20% or less gets a low-battery tier", () => {
+  assert.equal(lowBatteryTier(20.1), null);
+  assert.equal(lowBatteryTier(20), "fumes");
+  assert.equal(lowBatteryTier(9.9), "clutch");
+  assert.equal(lowBatteryTier(0.6), "last-drop");
+  assert.equal(lowBatteryTier(0), "zero");
+  assert.equal(lowBatteryTier(-3), null, "ran out of charge");
+});
+
+test("a finished game earns achievements for its charge, supercharged answers, or running out", () => {
+  assert.deepEqual(achievementsForGame({ charge: 55, out: false }), ["first-charge"]);
+  assert.deepEqual(achievementsForGame({ charge: 100, out: false, supercharged: 5 }), ["first-charge", "supercharged", "double-surge", "high-voltage", "fully-charged"]);
+  assert.deepEqual(achievementsForGame({ charge: 0, out: false }), ["first-charge", "fumes", "clutch", "last-drop", "still-alive"]);
+  assert.deepEqual(achievementsForGame({ charge: -8, out: true, supercharged: 1 }), ["first-charge", "supercharged", "blackout"]);
+});
+
+test("streak achievements count the longest run of consecutive days", () => {
+  const week = ["2026-10-01", "2026-10-02", "2026-10-03", "2026-10-04", "2026-10-05", "2026-10-06", "2026-10-07"];
+  assert.equal(longestStreak(week), 7);
+  assert.equal(longestStreak(["2026-10-01", "2026-10-03", "2026-10-04"]), 2, "a missed day breaks the run");
+  assert.equal(longestStreak(["2026-10-31", "2026-11-01"]), 2, "runs across months");
+  assert.deepEqual(streakAchievements(7), ["week-streak"]);
+  assert.deepEqual(streakAchievements(6), []);
 });

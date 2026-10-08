@@ -1,4 +1,4 @@
-import { applyGuessKey, chargeLeft, crowdRank, dailyTotal, DRAIN_RATE, reactionFor, easternDate, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, pointsOff, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { achievementsForGame, ACHIEVEMENTS, applyGuessKey, chargeLeft, crowdRank, dailyTotal, DRAIN_RATE, reactionFor, easternDate, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
 const GAME_NAME = "Chargle";
@@ -25,8 +25,6 @@ if (location.hostname === "localhost" && new URLSearchParams(location.search).ha
   try { localStorage.removeItem(STORAGE_KEY); } catch {}
   history.replaceState(null, "", location.pathname);
 }
-const savedTheme = readPreference("percentle.theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
-document.documentElement.dataset.theme = savedTheme;
 document.title = `${GAME_NAME} — a little game of big percentages`;
 document.querySelectorAll("[data-game-name]").forEach(element => {
   element.textContent = element.dataset.gameName === "lower" ? GAME_NAME.toLowerCase() : GAME_NAME;
@@ -94,6 +92,7 @@ function readState() {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
     if (!Array.isArray(stored.games)) stored.games = [];
     if (!stored.progress || typeof stored.progress !== "object") stored.progress = {};
+    if (!stored.achievements || typeof stored.achievements !== "object") stored.achievements = {};
     for (const progress of Object.values(stored.progress)) {
       if (!Array.isArray(progress.guesses)) progress.guesses = [];
       if (!Array.isArray(progress.locked)) progress.locked = [];
@@ -103,7 +102,7 @@ function readState() {
     return stored;
   } catch (error) {
     console.error("Could not read Percentle save data.", error);
-    return { games: [], progress: {} };
+    return { games: [], progress: {}, achievements: {} };
   }
 }
 
@@ -144,6 +143,11 @@ function setBattery(battery, charge) {
   if (label) {
     label.style.color = chargeColor(charge);
     label.textContent = charge <= LOW_BATTERY ? "WARNING: LOW BATTERY" : "YOUR CHARGE";
+  }
+  // The results battery's "CHARGE LEFT" label takes its colour too (its wording stays the same).
+  if (battery.id === "resultBattery") {
+    const resultLabel = document.querySelector("#resultLabel");
+    if (resultLabel) resultLabel.style.color = chargeColor(charge);
   }
 }
 
@@ -201,13 +205,40 @@ function isTodayFinished() {
     state.games.some(game => game.date === today);
 }
 
-function recordTodayIfComplete(progress) {
+function recordTodayIfComplete(progress, notify = true) {
   const questions = todayPuzzle.questions;
   const finished = progress.guesses.length === questions.length || isOutOfCharge(progress.guesses, questions);
   if (practiceMode || currentDate !== today || !finished || state.games.some(game => game.date === today)) return;
   const score = Number(dailyTotal(progress.guesses, questions.slice(0, progress.guesses.length)).toFixed(1));
   state.games.push({ date: today, score });
   state.games.sort((a, b) => a.date.localeCompare(b.date));
+  const supercharged = progress.guesses.filter((guess, i) => pointsOff(guess, questions[i].answer) === 0).length;
+  unlockAchievements([
+    ...achievementsForGame({ charge: chargeLeft(score), out: isOutOfCharge(progress.guesses, questions), supercharged }),
+    ...streakAchievements(longestStreak(state.games.map(game => game.date)))
+  ], notify);
+}
+
+// Achievements earned in this visit that haven't been announced yet; they pop up once the
+// results are on screen.
+const unannouncedAchievements = [];
+
+function unlockAchievements(ids, notify) {
+  for (const id of ids) {
+    if (state.achievements[id]) continue;
+    state.achievements[id] = today;
+    if (notify) unannouncedAchievements.push(id);
+  }
+}
+
+// Games from before achievements existed (or saved by an older version) still count. Their
+// supercharged answers aren't known, so only charge, running out, and streaks are credited.
+function creditPastAchievements() {
+  for (const game of state.games) {
+    const charge = chargeLeft(game.score);
+    unlockAchievements(achievementsForGame({ charge, out: charge < 0 }), false);
+  }
+  unlockAchievements(streakAchievements(longestStreak(state.games.map(game => game.date))), false);
 }
 
 function showToast(message) {
@@ -601,7 +632,7 @@ function renderResults() {
   const headline = out
     ? `<div class="final-score dead-score reveal"><div class="result-battery-wrap">${batteryMarkup("result-battery dead-battery", null, 0)}</div>
       <h2 class="out-title">Out of charge</h2><p class="out-where">Died on question ${answered} of ${currentQuestions.length}</p></div>`
-    : `<div class="final-score reveal"><span class="answer-label">${currentDate === today ? "" : "PRACTICE "}CHARGE LEFT</span>
+    : `<div class="final-score reveal"><span class="answer-label" id="resultLabel">${currentDate === today ? "" : "PRACTICE "}CHARGE LEFT</span>
       <div class="result-battery-wrap">${batteryMarkup("result-battery", "resultBattery", animate ? 100 : charge)}</div></div>`;
   stage.innerHTML = `${headline}
     ${practiceMode ? "" : `<section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">How you stack up</h3><p class="crowd-copy">Your charge is added anonymously. Never your guesses, name, or account.</p><p class="crowd-status">Seeing how you stack up…</p></section>`}
@@ -621,14 +652,81 @@ function renderResults() {
   document.querySelector("#todayButton")?.addEventListener("click", returnToToday);
   document.querySelector("#statsInline").addEventListener("click", showStats);
   if (!practiceMode) loadCrowd(crowdRank(progress.guesses, currentQuestions), out);
-  if (!out) playResultDrain(charge, animate);
+  if (out) setTimeout(announceAchievements, 1200);
+  else playResultDrain(charge, animate).then(finished => {
+    if (!finished) return;
+    if (animate && lowBatteryTier(charge)) showLowBatteryAlert(charge, announceAchievements);
+    else announceAchievements();
+  });
 }
 
-// The final battery drains from 100% to the charge left.
+// The final battery drains from 100% to the charge left. Resolves false if it was interrupted.
 async function playResultDrain(charge, animate) {
   const battery = document.querySelector("#resultBattery");
-  if (animate && !(await animateBattery(battery, 100, charge, 2400))) return;
+  if (animate && !(await animateBattery(battery, 100, charge, 2400))) return false;
   setBattery(battery, charge);
+  return true;
+}
+
+// Finishing alive on a low battery: a pop-up like a phone's "Low Battery" warning.
+const LOW_BATTERY_LINES = {
+  fumes: "Running on fumes.",
+  clutch: "Clutch.",
+  "last-drop": "That was the last drop.",
+  zero: "Still alive."
+};
+
+function showLowBatteryAlert(charge, onClose) {
+  const color = chargeColor(charge);
+  document.body.insertAdjacentHTML("beforeend", `<div class="low-alert-backdrop">
+      <div class="low-alert" role="alertdialog" aria-labelledby="lowAlertTitle" aria-describedby="lowAlertText">
+        <span class="low-alert-battery" style="--level:${Math.max(4, charge)};--fill:${color}" aria-hidden="true"></span>
+        <h3 id="lowAlertTitle">Low Battery</h3>
+        <p id="lowAlertText">${formatCharge(charge)} battery remaining. <strong style="color:${color}">${LOW_BATTERY_LINES[lowBatteryTier(charge)]}</strong></p>
+        <button type="button">Close</button>
+      </div>
+    </div>`);
+  const backdrop = document.querySelector(".low-alert-backdrop");
+  const close = backdrop.querySelector("button");
+  close.focus();
+  close.addEventListener("click", () => {
+    backdrop.remove();
+    onClose();
+  });
+}
+
+// New achievements slide in from the top one after another.
+function announceAchievements() {
+  const id = unannouncedAchievements.shift();
+  if (!id) return;
+  const achievement = ACHIEVEMENTS.find(item => item.id === id);
+  document.body.insertAdjacentHTML("beforeend", `<div class="ach-toast" role="status">${achievementBadge(achievement)}
+      <span><small>Achievement unlocked</small><strong>${escapeHtml(achievement.name)}</strong></span></div>`);
+  const toast = document.body.lastElementChild;
+  requestAnimationFrame(() => requestAnimationFrame(() => toast.classList.add("shown")));
+  setTimeout(() => {
+    toast.classList.remove("shown");
+    setTimeout(() => {
+      toast.remove();
+      announceAchievements();
+    }, 450);
+  }, 3200);
+}
+
+function achievementBadge(achievement) {
+  return `<span class="ach-badge" aria-hidden="true">${achievement.badge === "bolt" ? '<span class="ach-bolt"></span>' : escapeHtml(achievement.badge)}</span>`;
+}
+
+function showAchievements() {
+  const unlocked = ACHIEVEMENTS.filter(achievement => state.achievements[achievement.id]).length;
+  const streak = consecutiveStreak(state.games);
+  openDialog("Achievements", `<p class="ach-count">${unlocked} of ${ACHIEVEMENTS.length} unlocked</p>
+    <div class="ach-list">${ACHIEVEMENTS.map(achievement => {
+      const date = state.achievements[achievement.id];
+      const meta = date ? `Unlocked ${longDate(date)}` : achievement.streak ? `Current streak: ${Math.min(streak, achievement.streak)} / ${achievement.streak}` : "Locked";
+      return `<div class="ach ${date ? "unlocked" : "locked"}">${achievementBadge(achievement)}
+        <div><strong>${escapeHtml(achievement.name)}</strong><p>${escapeHtml(achievement.description)}</p><span class="ach-meta">${meta}</span></div></div>`;
+    }).join("")}</div>`);
 }
 
 function returnToToday() {
@@ -714,7 +812,8 @@ function crowdLine(position) {
 function shareResult(score, progress, out) {
   // The real distance of the best guess (even one that scored a perfect 0), e.g. "0.2% away".
   const closest = Math.min(...progress.guesses.map((guess, i) => Math.abs(guess - currentQuestions[i].answer)));
-  const status = out ? `🪫 Out of charge on Q${progress.guesses.length}` : `🔋 ${formatCharge(chargeLeft(score))}`;
+  const charge = chargeLeft(score);
+  const status = out ? `🪫 Out of charge on Q${progress.guesses.length}` : lowBatteryTier(charge) ? `🪫 Survived on ${formatCharge(charge)}` : `🔋 ${formatCharge(charge)}`;
   const link = `${location.origin}${location.pathname}`;
   const result = `${GAME_NAME} #${currentNumber}\n${status}\nClosest guess - ${closest.toFixed(1)}% away\n${link}`;
   if (navigator.share) {
@@ -899,17 +998,7 @@ document.querySelector("#returnButton").addEventListener("click", () => {
   returnToToday();
   showStats();
 });
-document.querySelector("#themeButton").addEventListener("click", () => {
-  const root = document.documentElement;
-  const theme = root.dataset.theme === "dark" ? "light" : "dark";
-  root.dataset.theme = theme;
-  try {
-    localStorage.setItem("percentle.theme", theme);
-  } catch (error) {
-    showToast("Your theme setting couldn't be saved.");
-    console.error("Could not save Percentle theme preference.", error);
-  }
-});
+document.querySelector("#achievementsButton").addEventListener("click", showAchievements);
 document.querySelectorAll("[data-close]").forEach(button => button.addEventListener("click", () => dialog.close()));
 dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
 // Anonymous crowd IDs (and consent flags from older versions) are per-day; drop earlier days' so they can't accumulate.
@@ -926,9 +1015,8 @@ const reloadIfNewDay = () => { if (easternDate() > today) location.reload(); };
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") reloadIfNewDay(); });
 setInterval(reloadIfNewDay, 60_000);
 // Count a finished daily puzzle that a previous version of the page failed to record.
-if (state.progress[today]) {
-  recordTodayIfComplete(state.progress[today]);
-  save();
-}
+if (state.progress[today]) recordTodayIfComplete(state.progress[today], false);
+creditPastAchievements();
+save();
 render();
 showStartScreen();

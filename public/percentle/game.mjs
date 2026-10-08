@@ -136,3 +136,64 @@ export function applyGuessKey(entry, key) {
 export function guessEntryText(entry) {
   return `${entry.whole || "0"}.${entry.tenth || "0"}`;
 }
+
+// Finishing alive on a low battery (this much charge or less) earns a phone-style "Low Battery"
+// alert, worded by how close it was.
+export const LOW_BATTERY_FINISH = 20;
+
+export function lowBatteryTier(charge) {
+  if (charge < 0 || charge > LOW_BATTERY_FINISH) return null;
+  if (charge === 0) return "zero";
+  if (charge < 1) return "last-drop";
+  if (charge < 10) return "clutch";
+  return "fumes";
+}
+
+// Achievements, in the order they're listed. badge is the short text on the round badge
+// ("bolt" draws a lightning bolt instead).
+export const ACHIEVEMENTS = [
+  { id: "first-charge", name: "First Charge", description: "Finish your first daily puzzle.", badge: "1ST" },
+  { id: "supercharged", name: "Supercharged", description: "Get a SUPERCHARGED answer.", badge: "bolt" },
+  { id: "double-surge", name: "Double Surge", description: "Get two SUPERCHARGED answers in one puzzle.", badge: "x2" },
+  { id: "high-voltage", name: "High Voltage", description: "Finish with 90% charge or more.", badge: "90+" },
+  { id: "fully-charged", name: "Fully Charged", description: "Finish with 100% charge.", badge: "100" },
+  { id: "fumes", name: "Running on Fumes", description: "Finish with 20% charge or less.", badge: "20" },
+  { id: "clutch", name: "Clutch", description: "Finish below 10% charge.", badge: "<10" },
+  { id: "last-drop", name: "Last Drop", description: "Finish below 1% charge.", badge: "<1" },
+  { id: "still-alive", name: "Still Alive", description: "Finish on exactly 0.0% charge.", badge: "0.0" },
+  { id: "blackout", name: "Blackout", description: "Run out of charge.", badge: "!" },
+  { id: "week-streak", name: "Week Streak", description: "Play 7 days in a row.", badge: "7", streak: 7 },
+  { id: "month-streak", name: "Month Streak", description: "Play 30 days in a row.", badge: "30", streak: 30 }
+];
+
+// The achievements one finished daily game earns: its final charge, whether it ran out of
+// charge, and how many SUPERCHARGED answers it had.
+export function achievementsForGame({ charge, out, supercharged = 0 }) {
+  const earned = ["first-charge"];
+  if (supercharged >= 1) earned.push("supercharged");
+  if (supercharged >= 2) earned.push("double-surge");
+  if (out) return [...earned, "blackout"];
+  if (charge >= 90) earned.push("high-voltage");
+  if (charge >= 100) earned.push("fully-charged");
+  if (charge <= LOW_BATTERY_FINISH) earned.push("fumes");
+  if (charge < 10) earned.push("clutch");
+  if (charge < 1) earned.push("last-drop");
+  if (charge === 0) earned.push("still-alive");
+  return earned;
+}
+
+// The most days in a row with a daily game, from a list of YYYY-MM-DD dates.
+export function longestStreak(dates) {
+  const days = [...new Set(dates)].sort().map(date => Date.parse(`${date}T00:00:00Z`) / 86_400_000);
+  let longest = 0;
+  let run = 0;
+  days.forEach((day, i) => {
+    run = i > 0 && day - days[i - 1] === 1 ? run + 1 : 1;
+    longest = Math.max(longest, run);
+  });
+  return longest;
+}
+
+export function streakAchievements(streak) {
+  return ACHIEVEMENTS.filter(achievement => achievement.streak && streak >= achievement.streak).map(achievement => achievement.id);
+}
