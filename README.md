@@ -158,6 +158,20 @@ curl -X PUT -H "Authorization: Bearer $PERCENTLE_PUBLISH_TOKEN" \
   http://localhost:3000/api/percentle/puzzles/2026-10-06
 ```
 
+### Endless mode
+
+Players answer questions until their battery runs out (same drain and recharge as the daily),
+from a bank of up to 500 questions per two-week period (periods start on launch day). The
+agent adds up to 40 sourced questions each night (`percentle/AGENT_PROMPT.md`, Step 3b) and
+emails the editor a 25-question sample when a bank reaches 500. A bank goes live once it has 100
+questions; until then the previous period's is used, and before any exists the game says endless
+mode is warming up. Unseen questions are asked first. Best runs are compared anonymously within
+the period. Routes are under `/api/percentle/endless`: `GET /bank` (players), `POST /runs`
+(players, rate-limited), and, with the publish token, `GET /status`,
+`POST /banks/:startsOn/questions` (batches of up to 50) and `POST /banks/:startsOn/remove`.
+Banks and runs are stored in `percentle_endless_banks` / `percentle_endless_runs` with Postgres,
+otherwise in `data/percentle-endless.json`.
+
 ### Tests
 
 Run the scoring, Eastern-date, puzzle-validation, puzzle API, and crowd tests with `npm test`.

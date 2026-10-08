@@ -11,6 +11,7 @@ import {
   drainRateFor,
   REACTIONS,
   reactionFor,
+  roundsSurvived,
   dailyTotal,
   guessEntryFrom,
   guessEntryText,
@@ -19,9 +20,11 @@ import {
   lowBatteryTier,
   streakAchievements,
   easternDate,
+  endlessOrder,
   finalCharge,
   isOutOfCharge,
   pointsOff,
+  questionKey,
   scoreColor,
   viewForProgress,
 } from "../public/percentle/game.mjs";
@@ -191,4 +194,16 @@ test("hard mode drains twice as fast, so 50 points off empties the battery", () 
   assert.equal(drainRateFor(false), DRAIN_RATE);
   assert.deepEqual(chargeTrack([35, 45], questions, drainRateFor(true)), [50, 0], "25 off twice: 50 points off in total");
   assert.equal(isOutOfCharge([35, 45.1], questions, drainRateFor(true)), true);
+});
+
+test("endless mode asks unseen questions first and counts the rounds survived", () => {
+  const bank = ["Alpha?", "Bravo?", "Charlie?", "Delta?"].map(text => ({ text, answer: 50 }));
+  const seen = [questionKey("Bravo?"), questionKey("delta?")];
+  const order = endlessOrder(bank, seen, () => 0.5);
+  assert.deepEqual(new Set(order.slice(0, 2)), new Set([questionKey("Alpha?"), questionKey("Charlie?")]), "unseen first");
+  assert.equal(order.length, 4, "seen ones still come, after");
+  assert.equal(questionKey("Bravo?"), questionKey("BRAVO?"), "keys ignore case");
+  const questions = [10, 20, 30, 40].map(answer => ({ answer }));
+  assert.equal(roundsSurvived([15, 25, 30], questions, 1), 3, "still alive");
+  assert.equal(roundsSurvived([60, 70, 31], questions, 1), 2, "the question that ran it out doesn't count");
 });

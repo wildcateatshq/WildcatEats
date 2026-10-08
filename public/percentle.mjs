@@ -1,4 +1,4 @@
-import { achievementsForGame, ACHIEVEMENTS, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, reactionFor, easternDate, finalCharge, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { achievementsForGame, ACHIEVEMENTS, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, reactionFor, easternDate, finalCharge, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
 const GAME_NAME = "Chargle";
@@ -15,6 +15,7 @@ const CHARGE_COLORS = [
   { at: 5, color: "var(--negative)" }
 ];
 const PUZZLES_URL = "/api/percentle/puzzles";
+const ENDLESS_URL = "/api/percentle/endless";
 // v2: puzzles now come from the daily agent, so v1 progress (from the old bank) no longer matches.
 const STORAGE_KEY = "percentle.v2";
 const stage = document.querySelector("#questionStage");
@@ -57,6 +58,9 @@ const today = todayPuzzle.date;
 let state = readState();
 let currentDate = today;
 let currentNumber = todayPuzzle.number;
+// Endless mode: playing through the current two-week bank until the battery runs out.
+let endlessMode = false;
+let endlessBank = null;
 // Hard mode as chosen on the start screen. Each puzzle takes it on its first guess and keeps it.
 let hardPreferred = readPreference("percentle.hard") === "1";
 // A special's title, like "World Series Special" (null on a normal day).
@@ -97,6 +101,7 @@ function readState() {
     if (!Array.isArray(stored.games)) stored.games = [];
     if (!stored.progress || typeof stored.progress !== "object") stored.progress = {};
     if (!stored.achievements || typeof stored.achievements !== "object") stored.achievements = {};
+    if (!stored.endless || typeof stored.endless !== "object") stored.endless = { best: {}, allTime: 0, runs: 0 };
     for (const progress of Object.values(stored.progress)) {
       if (!Array.isArray(progress.guesses)) progress.guesses = [];
       if (!Array.isArray(progress.locked)) progress.locked = [];
@@ -106,7 +111,7 @@ function readState() {
     return stored;
   } catch (error) {
     console.error("Could not read Percentle save data.", error);
-    return { games: [], progress: {}, achievements: {} };
+    return { games: [], progress: {}, achievements: {}, endless: { best: {}, allTime: 0, runs: 0 } };
   }
 }
 
@@ -191,6 +196,7 @@ function animateBattery(battery, from, to, duration) {
 
 // Whether a puzzle is (or will be) played in hard mode: locked in once it has a guess.
 function isHard(progress = progressFor()) {
+  if (endlessMode) return false;
   return progress.guesses.length ? Boolean(progress.hard) : hardPreferred;
 }
 
@@ -208,7 +214,7 @@ function readPreference(key) {
 }
 
 function progressFor(date = currentDate) {
-  const key = practiceMode ? `practice:${date}` : date;
+  const key = endlessMode ? `endless:${endlessBank.startsOn}` : practiceMode ? `practice:${date}` : date;
   if (!state.progress[key]) state.progress[key] = { guesses: [], locked: [], revealed: 0, draft: null };
   return state.progress[key];
 }
@@ -219,6 +225,8 @@ function isTodayFinished() {
 }
 
 function recordTodayIfComplete(progress, notify = true) {
+  // Only the daily puzzle counts here; endless runs keep their own records.
+  if (endlessMode) return;
   const questions = todayPuzzle.questions;
   const rate = rateOf(progress);
   const finished = progress.guesses.length === questions.length || isOutOfCharge(progress.guesses, questions, rate);
@@ -287,10 +295,11 @@ function render() {
   document.querySelector(".alarm-lights")?.remove();
   // Only shown while replaying an archived puzzle, so players can leave it at any time.
   document.querySelector("#returnButton").hidden = !practiceMode;
-  if (practiceMode) leaveStartScreen();
-  document.querySelector("#puzzleNumber").textContent = `NO. ${currentNumber}`;
-  document.querySelector("#puzzleDate").textContent = currentDate === today ? (currentTheme || "Today's edition").toUpperCase() : `${currentDate} · PRACTICE`;
-  renderDots(Math.min(index, 4));
+  if (practiceMode || endlessMode) leaveStartScreen();
+  document.querySelector("#puzzleNumber").textContent = endlessMode ? "∞" : `NO. ${currentNumber}`;
+  document.querySelector("#puzzleDate").textContent = endlessMode ? "ENDLESS MODE" : currentDate === today ? (currentTheme || "Today's edition").toUpperCase() : `${currentDate} · PRACTICE`;
+  if (endlessMode) document.querySelector("#progressDots").innerHTML = "";
+  else renderDots(Math.min(index, 4));
   const animate = justLocked;
   justLocked = false;
   // Reloading part-way through a power-out goes straight to the out-of-charge screen.
@@ -306,7 +315,7 @@ function render() {
     return;
   }
   const question = currentQuestions[index];
-  document.querySelector("#questionCounter").textContent = `QUESTION ${String(index + 1).padStart(2, "0")}`;
+  document.querySelector("#questionCounter").textContent = `${endlessMode ? "ROUND" : "QUESTION"} ${String(index + 1).padStart(2, "0")}`;
   const guess = progress.draft ?? 50;
   stage.innerHTML = `
     <div class="question-body">
@@ -328,7 +337,7 @@ function renderScoreBox(progress, view, animate) {
   const battery = document.querySelector("#scoreBattery");
   const chip = document.querySelector("#drainChip");
   const note = document.querySelector("#scoreNote");
-  const key = `${practiceMode ? "practice" : "daily"}:${currentDate}`;
+  const key = endlessMode ? `endless:${endlessBank.startsOn}:${state.endless.runs}` : `${practiceMode ? "practice" : "daily"}:${currentDate}`;
   const locked = progress.guesses.length;
   // The results screen shows the final battery inside the card, so the box above it steps aside.
   box.hidden = view.phase === "results";
@@ -495,6 +504,7 @@ function bindGuessControls(initial, index) {
     }
     const progress = progressFor();
     if (!progress.guesses.length) progress.hard = hardPreferred;
+    if (endlessMode) markEndlessSeen(currentQuestions[index]);
     progress.guesses[index] = Math.round(value * 10) / 10;
     progress.locked.push(true);
     progress.draft = null;
@@ -558,7 +568,7 @@ function reveal(question, guess, index) {
       <div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div>
     </div>
     <p class="source-note">${escapeHtml(question.funFact)}</p>
-    <button class="next-button" id="nextButton">${index === 4 ? "Battery report" : "Next question"} <span aria-hidden="true">→</span></button>`;
+    <button class="next-button" id="nextButton">${index === currentQuestions.length - 1 ? "Battery report" : "Next question"} <span aria-hidden="true">→</span></button>`;
 }
 
 function bindNext(index) {
@@ -583,7 +593,7 @@ function renderRecap(progress) {
   const best = bestGuessIndex(progress.guesses, currentQuestions);
   recap.innerHTML = `<section class="log" aria-label="Drain by question: your charge after each question">
       <h3 class="log-title">Drain by question</h3>
-      ${dischargeGraph(charges)}
+      ${dischargeGraph(charges, endlessMode ? Math.max(charges.length, 1) : currentQuestions.length)}
     </section>
     <div id="logDetail" aria-live="polite"></div>`;
   recap.hidden = false;
@@ -607,8 +617,7 @@ function renderRecap(progress) {
 // The stepped line: flat at the charge going into each question, then a drop at the question to
 // the charge after it. The battery never shows below empty; any questions after it ran out are a
 // dashed "not reached" stretch.
-function dischargeGraph(charges) {
-  const count = currentQuestions.length;
+function dischargeGraph(charges, count = currentQuestions.length) {
   const x = step => 6 + step * (288 / count);
   const y = charge => 8 + (100 - Math.max(0, Math.min(100, charge))) * 1.04;
   let line = `M${x(0)},${y(100)}`;
@@ -621,7 +630,7 @@ function dischargeGraph(charges) {
     ? `<path class="log-unreached" d="M${lastX},${y(0)} H${x(count)}"/>` : "";
   const at = (step, charge) => `left:${(x(step + 1) / 300 * 100).toFixed(2)}%;top:${(y(charge) / 120 * 100).toFixed(2)}%`;
   const steps = charges.map((charge, i) => `<button class="log-step" data-step="${i}" style="${at(i, charge)};--fill:${chargeColor(charge)}" aria-label="Question ${i + 1}: ${charge < 0 ? "out of charge" : `${formatCharge(charge)} left`}">${i + 1}</button>`).join("") +
-    currentQuestions.slice(charges.length).map((_, n) => `<button class="log-step unreached-step" data-step="${charges.length + n}" style="${at(charges.length + n, 0)}" aria-label="Question ${charges.length + n + 1}: not reached">${charges.length + n + 1}</button>`).join("");
+    Array.from({ length: count - charges.length }, (_, n) => `<button class="log-step unreached-step" data-step="${charges.length + n}" style="${at(charges.length + n, 0)}" aria-label="Question ${charges.length + n + 1}: not reached">${charges.length + n + 1}</button>`).join("");
   return `<div class="log-graph">
       <svg viewBox="0 0 300 120" preserveAspectRatio="none" aria-hidden="true">
         <defs><linearGradient id="logFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--charge)" stop-opacity=".35"/><stop offset="1" stop-color="var(--charge)" stop-opacity="0"/></linearGradient></defs>
@@ -652,6 +661,7 @@ function logRow(question, guess, off, i, isBest, change, rate) {
 }
 
 function renderResults() {
+  if (endlessMode) return renderEndlessResults();
   const progress = progressFor();
   const answered = progress.guesses.length;
   const rate = rateOf(progress);
@@ -766,6 +776,7 @@ function returnToToday() {
   currentTheme = todayPuzzle.theme || null;
   currentQuestions = todayPuzzle.questions;
   practiceMode = false;
+  endlessMode = false;
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -920,7 +931,9 @@ function showStats() {
     <div class="stat-card"><span>GAMES PLAYED</span><strong>${games.length}</strong></div>
     <div class="stat-card"><span>AVERAGE CHARGE</span><strong>${average === null ? "—" : formatCharge(average)}</strong></div>
     <div class="stat-card"><span>BEST CHARGE</span><strong>${best === null ? "—" : formatCharge(best)}</strong></div>
-    <div class="stat-card"><span>CURRENT STREAK</span><strong>${consecutiveStreak(games)} day${consecutiveStreak(games) === 1 ? "" : "s"}</strong></div></div>
+    <div class="stat-card"><span>CURRENT STREAK</span><strong>${consecutiveStreak(games)} day${consecutiveStreak(games) === 1 ? "" : "s"}</strong></div>
+    <div class="stat-card"><span>ENDLESS BEST</span><strong>${state.endless.allTime} round${state.endless.allTime === 1 ? "" : "s"}</strong></div>
+    <div class="stat-card"><span>ENDLESS RUNS</span><strong>${state.endless.runs}</strong></div></div>
     <h3 class="dialog-subtitle">Recent games</h3>${lastTenGames(games)}
     <h3 class="dialog-title">Past puzzles</h3><p>${isTodayFinished() ? "Replay any of the last 30 daily puzzles." : "Finish today's puzzle to unlock the archive."}</p>
     <div class="archive-list" id="archiveList">${isTodayFinished() ? "<span class='hist-empty'>Loading past puzzles…</span>" : "<span class='hist-empty'>The archive unlocks after today's five questions.</span>"}</div>`);
@@ -961,6 +974,123 @@ async function loadArchive() {
       button.disabled = false;
     }
   }));
+}
+
+// ---------- Endless mode ----------
+// Questions this browser has already been asked from a period's bank, so new runs ask fresh ones first.
+function endlessSeenKey(startsOn) {
+  return `percentle.endlessSeen.${startsOn}`;
+}
+
+function markEndlessSeen(question) {
+  try {
+    const key = endlessSeenKey(endlessBank.startsOn);
+    const seen = new Set(JSON.parse(localStorage.getItem(key) || "[]"));
+    seen.add(questionKey(question.text));
+    localStorage.setItem(key, JSON.stringify([...seen]));
+  } catch (error) {
+    console.error("Could not save seen endless questions.", error);
+  }
+}
+
+// Starts an endless run (or carries on an unfinished one) from the live bank.
+async function startEndless() {
+  let bank;
+  try {
+    const response = await fetch(`${ENDLESS_URL}/bank`);
+    bank = await response.json();
+    if (response.status === 404) return showToast("Endless mode is warming up. Check back soon!");
+    if (!response.ok) throw new Error(bank.error || `Endless bank request failed (${response.status}).`);
+  } catch (error) {
+    console.error("Could not load the endless bank.", error);
+    return showToast("Endless mode couldn't load. Try again.");
+  }
+  endlessBank = { startsOn: bank.startsOn, questions: withRoundedAnswers(bank.questions) };
+  const byKey = new Map(endlessBank.questions.map(question => [questionKey(question.text), question]));
+  const key = `endless:${bank.startsOn}`;
+  let run = state.progress[key];
+  const finished = run && (run.recorded || run.revealed >= (run.order?.length ?? 0));
+  if (!run || finished || !Array.isArray(run.order)) {
+    let seen = [];
+    try {
+      seen = JSON.parse(localStorage.getItem(endlessSeenKey(bank.startsOn)) || "[]");
+    } catch {}
+    run = state.progress[key] = { guesses: [], locked: [], revealed: 0, draft: null, order: endlessOrder(endlessBank.questions, seen) };
+    save();
+  }
+  // Questions removed from the bank since the run started are skipped.
+  currentQuestions = run.order.map(key => byKey.get(key)).filter(Boolean);
+  endlessMode = true;
+  practiceMode = false;
+  currentDate = today;
+  currentTheme = null;
+  return true;
+}
+
+// End of a run: rounds survived, personal bests, and how the best compares this period.
+function renderEndlessResults() {
+  const progress = progressFor();
+  const out = isOutOfCharge(progress.guesses, currentQuestions);
+  const rounds = roundsSurvived(progress.guesses, currentQuestions);
+  const period = endlessBank.startsOn;
+  const previousBest = state.endless.best[period] ?? 0;
+  if (!progress.recorded) {
+    progress.recorded = { rounds, newBest: rounds > previousBest };
+    state.endless.runs++;
+    state.endless.best[period] = Math.max(previousBest, rounds);
+    state.endless.allTime = Math.max(state.endless.allTime, rounds);
+    save();
+  }
+  const { newBest } = progress.recorded;
+  const best = state.endless.best[period];
+  stage.innerHTML = `<div class="final-score dead-score reveal"><div class="result-battery-wrap">${batteryMarkup("result-battery dead-battery", null, 0)}</div>
+      <h2 class="out-title">${out ? "Run over" : "Bank cleared"}</h2><p class="out-where">Survived ${rounds} round${rounds === 1 ? "" : "s"}</p>
+      <p class="endless-best${newBest ? " new" : ""}">${newBest ? "New personal best!" : `Personal best this period: ${best}`}</p></div>
+    <section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">How you stack up · Endless</h3><p class="crowd-status">Comparing your best run…</p></section>
+    <button class="lock-button" id="againButton">Play again <span aria-hidden="true">∞</span></button>
+    <button class="next-button secondary-button" id="shareButton">Share this run <span aria-hidden="true">↗</span></button>
+    <button class="next-button secondary-button" id="todayButton">Back to today's puzzle</button>`;
+  document.querySelector("#questionCounter").textContent = "RUN OVER";
+  document.querySelector("#progressDots").innerHTML = "";
+  renderRecap(progress);
+  document.querySelector("#againButton").addEventListener("click", async () => {
+    if (await startEndless()) render();
+  });
+  document.querySelector("#shareButton").addEventListener("click", () => {
+    const text = `${GAME_NAME} Endless\n⚡ Survived ${rounds} round${rounds === 1 ? "" : "s"}${newBest ? " (new best!)" : ""}\n${location.origin}${location.pathname}`;
+    if (navigator.share) navigator.share({ text }).catch(error => { if (error.name !== "AbortError") copyResult(text); });
+    else copyResult(text);
+  });
+  document.querySelector("#todayButton").addEventListener("click", returnToToday);
+  loadEndlessCrowd(period, best);
+  setTimeout(announceAchievements, 1200);
+}
+
+// One anonymous ID per period, so a player's best run counts once.
+function endlessRunId(startsOn) {
+  const key = `percentle.endlessId.${startsOn}`;
+  let id = readPreference(key);
+  if (!id && crypto.randomUUID) {
+    id = crypto.randomUUID();
+    try {
+      localStorage.setItem(key, id);
+    } catch {}
+  }
+  return id;
+}
+
+async function loadEndlessCrowd(startsOn, best) {
+  const panel = document.querySelector("#crowdPanel");
+  try {
+    const summary = await crowdRequest(`${ENDLESS_URL}/runs`, { method: "POST", body: { startsOn, id: endlessRunId(startsOn), best } });
+    const line = summary.betterThan === null
+      ? `Once at least ${summary.minimumComparisonPlayers} other players have finished a run this period, you'll see how your best compares.`
+      : `Your best run (${best} round${best === 1 ? "" : "s"}) beats <strong>${summary.betterThan.toFixed(1)}%</strong> of players this period.`;
+    panel.innerHTML = `<h3 class="crowd-title">How you stack up · Endless</h3><p class="crowd-position">${line}</p>`;
+  } catch (error) {
+    console.error("Could not submit the endless run.", error);
+    panel.querySelector(".crowd-status").textContent = "The endless comparison is temporarily unavailable.";
+  }
 }
 
 // Every visit opens on the rules and a button into today's game, rather than straight onto question 1.
@@ -1049,6 +1179,14 @@ function escapeHtml(value) {
 function escapeAttr(value) { return escapeHtml(value); }
 
 document.querySelector("#howButton").addEventListener("click", showHowToPlay);
+document.querySelector("#endlessButton").addEventListener("click", async () => {
+  if (!(await startEndless())) return;
+  playChargeFlash(() => {
+    leaveStartScreen();
+    window.scrollTo({ top: 0 });
+    render();
+  });
+});
 document.querySelector("#startButton").addEventListener("click", () => {
   const enterGame = () => {
     leaveStartScreen();
@@ -1059,20 +1197,24 @@ document.querySelector("#startButton").addEventListener("click", () => {
       render();
     }
   };
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return enterGame();
+  playChargeFlash(enterGame);
+});
+
+// The whole screen floods with charge until it's solid. Only then does the game swap in
+// underneath, and once it has painted, the glow fades off it, so the switch is never seen.
+function playChargeFlash(swap) {
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return swap();
   if (document.querySelector(".charge-flash")) return;
-  // The whole screen floods with charge until it's solid. Only then does the game swap in
-  // underneath, and once it has painted, the glow fades off it, so the switch is never seen.
   const flash = document.createElement("div");
   flash.className = "charge-flash";
   flash.setAttribute("aria-hidden", "true");
   flash.addEventListener("animationend", () => {
     if (flash.classList.contains("fading")) return flash.remove();
-    enterGame();
+    swap();
     requestAnimationFrame(() => requestAnimationFrame(() => flash.classList.add("fading")));
   });
   document.body.append(flash);
-});
+}
 document.querySelector("#statsButton").addEventListener("click", showStats);
 document.querySelector("#returnButton").addEventListener("click", () => {
   returnToToday();

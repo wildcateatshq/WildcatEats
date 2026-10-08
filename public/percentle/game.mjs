@@ -237,3 +237,30 @@ export function bestGuessIndex(guesses, questions) {
   });
   return best;
 }
+
+// Endless mode: a short, stable key for a question (so a player's seen questions survive the bank
+// changing order), the order to ask a bank's questions in (unseen ones first, each group shuffled),
+// and how many rounds a run survived (the question that ran the battery out doesn't count).
+export function questionKey(text) {
+  let hash = 5381;
+  for (const character of text.toLowerCase()) hash = ((hash * 33) ^ character.charCodeAt(0)) >>> 0;
+  return hash.toString(36);
+}
+
+export function endlessOrder(questions, seenKeys, random = Math.random) {
+  const shuffle = items => {
+    const shuffled = [...items];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
+  const seen = new Set(seenKeys);
+  const keys = questions.map(question => questionKey(question.text));
+  return [...shuffle(keys.filter(key => !seen.has(key))), ...shuffle(keys.filter(key => seen.has(key)))];
+}
+
+export function roundsSurvived(guesses, questions, rate = DRAIN_RATE) {
+  return isOutOfCharge(guesses, questions, rate) ? guesses.length - 1 : guesses.length;
+}

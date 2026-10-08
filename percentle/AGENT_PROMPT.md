@@ -31,7 +31,8 @@ steps in order:
 2. Handle any new replies from the editor (Step 2).
 3. Check for upcoming big events and suggest specials (Step 2b).
 4. Write any puzzles that are missing, publish them, and email them to the editor (Step 3).
-5. Report (Step 7).
+5. On the last run of the night only, add questions to the endless bank (Step 3b).
+6. Report (Step 7).
 
 Most runs only have Step 2 to do, or nothing at all. That's normal: finish quickly.
 
@@ -89,6 +90,9 @@ For each thread that needs handling, read every message from the editor since yo
   puzzle is already published but not live yet, rewrite it as the special now (Step 3) and send
   it as a new puzzle email. If they say no, record that it was declined and reply with one line.
   Never make a special the editor hasn't approved.
+- **They reply to an endless bank email** (Step 3b): remove every question they name, using the
+  remove call in Step 3b; if they asked for a fix, remove it and add a corrected version. Reply
+  with one line saying what you removed or changed.
 
 Then **update your notes** with what this feedback says about the editor's taste. What do they
 like or dislike, in topics, eras, difficulty, and wording? Merge it into the existing notes instead
@@ -145,6 +149,61 @@ in the format below.
   a team or artist doesn't apply to the event's own teams or artists.
 - Add `"theme": "<Event> Special"` to `puzzle.json` (3–40 characters, for example
   `"World Series Special"`). Only ever add a theme to an approved special.
+
+## Step 3b: Fill the endless bank (10:45 PM Eastern or later only)
+
+Endless mode has players answer question after question until their battery runs out. It draws
+from a **bank of up to 500 questions that changes every two weeks**. You fill it a batch at a time:
+**on runs at 10:45 PM Eastern or later**, after any daily puzzles are done, add **up to 40** new
+questions. Earlier runs skip this step.
+
+Check the banks:
+
+```sh
+curl -sS --max-time 120 -H "Authorization: Bearer $PERCENTLE_PUBLISH_TOKEN" \
+  "$PERCENTLE_SITE_URL/api/percentle/endless/status"
+```
+
+It returns `previous`, `current`, and `next` periods, each with `startsOn`, `count`, and every
+question's `texts`. Add to `current` if it has fewer than 500 questions, otherwise to `next` if it
+has fewer than 500; if both are full, skip this step.
+
+Write the questions with every rule in Steps 4 and 5, **including opening a source for every
+answer**. Also:
+- Mix all five categories freely, leaning toward sports and music, with a wide spread of answers.
+- Each question must stand on its own (players see them in random order) and must not repeat or
+  closely match any text in the three banks or in the daily puzzle history.
+- Use only facts that won't change during the two weeks the bank is live.
+
+Send them in batches of up to 50, replacing `START` with the bank's `startsOn`:
+
+```sh
+curl -sS --max-time 120 -X POST \
+  -H "Authorization: Bearer $PERCENTLE_PUBLISH_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data @batch.json \
+  "$PERCENTLE_SITE_URL/api/percentle/endless/banks/START/questions"
+```
+
+`batch.json` is `{"questions": [ ... ]}`, each question in the same shape as a daily puzzle's.
+**201** returns `{"added": N, "count": total}` (repeats are skipped). **400** lists the problems:
+fix them and resend.
+
+**When a bank reaches 500** for the first time, email the editor a **new** email with the subject
+`[Chargle] Endless bank for <Month D>–<Month D> is ready (<count> questions)`. Include how many
+questions each category has, then **25 questions picked at random**, each with its answer and
+source, and ask them to reply with any to remove or fix, quoting the question. Add
+`Endless bank <startsOn> ready, emailed` to your notes so you only send it once.
+
+To remove questions (for the editor's fixes), send their exact texts:
+
+```sh
+curl -sS --max-time 120 -X POST \
+  -H "Authorization: Bearer $PERCENTLE_PUBLISH_TOKEN" \
+  -H "Content-Type: application/json" \
+  --data '{"texts": ["<exact question text>"]}' \
+  "$PERCENTLE_SITE_URL/api/percentle/endless/banks/START/remove"
+```
 
 ## Step 4: Choose the topics
 
@@ -308,6 +367,7 @@ Finish with a short summary of the run:
 - the notes you updated;
 - each puzzle you published: its date, the HTTP result, and for each question its category, text,
   answer, and how you checked it (the source, plus the arithmetic if you calculated it);
+- the endless bank: how many questions you added, to which bank, and its new count;
 - the emails you sent.
 
 If nothing needed doing, say so in one line.
