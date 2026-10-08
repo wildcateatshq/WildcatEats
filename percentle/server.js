@@ -29,6 +29,12 @@ app.get(["/", "/percentle.html"], (req, res) => res.sendFile(path.join(publicDir
 app.get("/percentle.css", (req, res) => res.sendFile(path.join(publicDir, "percentle.css"), asset));
 app.get("/percentle.mjs", (req, res) => res.sendFile(path.join(publicDir, "percentle.mjs"), asset));
 app.use("/percentle", express.static(path.join(publicDir, "percentle"), asset));
+// For search engines: the game's public address, what to crawl (not the API), and a sitemap.
+const SITE_URL = "https://chargle.io";
+app.get("/robots.txt", (req, res) => res.type("text/plain").send(`User-agent: *\nAllow: /\nDisallow: /api/\nSitemap: ${SITE_URL}/sitemap.xml\n`));
+app.get("/sitemap.xml", (req, res) => res.type("application/xml").send(
+  `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n  <url><loc>${SITE_URL}/</loc><changefreq>daily</changefreq></url>\n</urlset>\n`
+));
 app.use("/api/percentle/crowd", createCrowdRouter(crowd));
 app.use("/api/percentle/puzzles", createPuzzleRouter(puzzles));
 app.use((req, res) => res.redirect("/"));
