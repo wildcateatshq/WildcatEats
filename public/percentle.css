@@ -278,7 +278,6 @@ body.hard{--charge:#b85cff;--charge-glow:#b85cff73;--charge-ink:#1c0630;--green:
 .hard-switch:disabled{cursor:not-allowed;opacity:.6}
 .hard-label{font:700 14px var(--display);letter-spacing:2px;text-transform:uppercase;cursor:pointer}
 .hard-switch:disabled+.hard-label{cursor:default}
-.hard-note{font:500 10px var(--mono);letter-spacing:1px;color:var(--muted)}
 .mode-flash{position:fixed;inset:0;z-index:55;display:grid;place-items:center;pointer-events:none;opacity:0;animation:charge-in .4s ease-in both}
 .mode-flash.to-hard{background:radial-gradient(circle at 50% 50%,#ecd4ff 0%,#b85cff 42%,#3d0b66 100%)}
 .mode-flash.to-normal{background:radial-gradient(circle at 50% 58%,#c8ffe0 0%,#39ff88 45%,#0f5a2e 100%)}

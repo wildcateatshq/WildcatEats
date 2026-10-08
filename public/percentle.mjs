@@ -1120,7 +1120,7 @@ function updateHardSwitch() {
   const button = document.querySelector("#hardSwitch");
   button.setAttribute("aria-checked", String(on));
   button.disabled = locked;
-  document.querySelector("#hardNote").textContent = locked ? "Locked for today's puzzle" : "Drains twice as fast";
+  button.title = locked ? "Locked for today's puzzle" : "";
   document.querySelectorAll("[data-drain-rule]").forEach(element => { element.innerHTML = drainRule(drainRateFor(on)); });
   applyHardLook();
 }
