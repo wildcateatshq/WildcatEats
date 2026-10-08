@@ -1,4 +1,4 @@
-import { achievementsForGame, ACHIEVEMENTS, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, reactionFor, easternDate, finalCharge, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { achievementsForGame, ACHIEVEMENTS, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, reactionFor, easternDate, finalCharge, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
 const GAME_NAME = "Chargle";
@@ -30,7 +30,7 @@ document.querySelectorAll("[data-game-name]").forEach(element => {
   element.textContent = element.dataset.gameName === "lower" ? GAME_NAME.toLowerCase() : GAME_NAME;
 });
 document.querySelector(".wordmark").setAttribute("aria-label", `${GAME_NAME} home`);
-document.querySelectorAll("[data-drain-rule]").forEach(element => { element.innerHTML = drainRule(); });
+
 
 let todayPuzzle;
 try {
@@ -57,6 +57,8 @@ const today = todayPuzzle.date;
 let state = readState();
 let currentDate = today;
 let currentNumber = todayPuzzle.number;
+// Hard mode as chosen on the start screen. Each puzzle takes it on its first guess and keeps it.
+let hardPreferred = readPreference("percentle.hard") === "1";
 // A special's title, like "World Series Special" (null on a normal day).
 let currentTheme = todayPuzzle.theme || null;
 let currentQuestions = todayPuzzle.questions;
@@ -117,9 +119,9 @@ function save() {
   }
 }
 
-// The scoring rule in words, kept in step with DRAIN_RATE.
-function drainRule() {
-  const amount = DRAIN_RATE === 1 ? "" : DRAIN_RATE === 0.5 ? "half of " : `${DRAIN_RATE}× `;
+// The scoring rule in words, kept in step with the drain rate (hard mode's is double).
+function drainRule(rate = DRAIN_RATE) {
+  const amount = rate === 1 ? "" : rate === 2 ? "twice " : rate === 0.5 ? "half of " : `${rate}× `;
   return `Every miss drains your battery by ${amount}how far off you were. <strong>Finish with as much charge as you can.</strong>`;
 }
 
@@ -187,6 +189,15 @@ function animateBattery(battery, from, to, duration) {
   });
 }
 
+// Whether a puzzle is (or will be) played in hard mode: locked in once it has a guess.
+function isHard(progress = progressFor()) {
+  return progress.guesses.length ? Boolean(progress.hard) : hardPreferred;
+}
+
+function rateOf(progress = progressFor()) {
+  return drainRateFor(isHard(progress));
+}
+
 function readPreference(key) {
   try {
     return localStorage.getItem(key);
@@ -209,11 +220,12 @@ function isTodayFinished() {
 
 function recordTodayIfComplete(progress, notify = true) {
   const questions = todayPuzzle.questions;
-  const finished = progress.guesses.length === questions.length || isOutOfCharge(progress.guesses, questions);
+  const rate = rateOf(progress);
+  const finished = progress.guesses.length === questions.length || isOutOfCharge(progress.guesses, questions, rate);
   if (practiceMode || currentDate !== today || !finished || state.games.some(game => game.date === today)) return;
   const score = Number(dailyTotal(progress.guesses, questions.slice(0, progress.guesses.length)).toFixed(1));
-  const charge = finalCharge(progress.guesses, questions);
-  state.games.push({ date: today, score, charge });
+  const charge = finalCharge(progress.guesses, questions, rate);
+  state.games.push({ date: today, score, charge, ...(progress.hard ? { hard: true } : {}) });
   state.games.sort((a, b) => a.date.localeCompare(b.date));
   const supercharged = progress.guesses.filter((guess, i) => pointsOff(guess, questions[i].answer) === 0).length;
   unlockAchievements([
@@ -265,8 +277,9 @@ function renderDots(index) {
 
 function render() {
   const progress = progressFor();
-  const out = isOutOfCharge(progress.guesses, currentQuestions);
+  const out = isOutOfCharge(progress.guesses, currentQuestions, rateOf(progress));
   const view = viewForProgress(progress, currentQuestions.length, out);
+  applyHardLook();
   const index = view.index;
   clearTimeout(powerOutTimer);
   clearTimeout(lightsOutTimer);
@@ -329,8 +342,9 @@ function renderScoreBox(progress, view, animate) {
     note.textContent = "";
     return;
   }
-  const charge = finalCharge(progress.guesses, currentQuestions);
-  const previous = finalCharge(progress.guesses.slice(0, -1), currentQuestions);
+  const rate = rateOf(progress);
+  const charge = finalCharge(progress.guesses, currentQuestions, rate);
+  const previous = finalCharge(progress.guesses.slice(0, -1), currentQuestions, rate);
   const lastOff = pointsOff(progress.guesses[locked - 1], currentQuestions[locked - 1].answer);
   // What a supercharge added (nothing if the battery was already full).
   const gain = Math.round((charge - previous) * 10) / 10;
@@ -344,7 +358,7 @@ function renderScoreBox(progress, view, animate) {
     note.classList.add("pop");
     // A supercharge recharges the battery, so a green "+5%" chip pops off instead.
     chip.classList.toggle("no-drain", lastOff === 0);
-    chip.textContent = lastOff === 0 ? gain > 0 ? `+${gain.toFixed(1)}%` : "FULL" : `−${(lastOff * DRAIN_RATE).toFixed(1)}%`;
+    chip.textContent = lastOff === 0 ? gain > 0 ? `+${gain.toFixed(1)}%` : "FULL" : `−${(lastOff * rate).toFixed(1)}%`;
     chip.getBoundingClientRect();
     chip.classList.add("fly");
   }
@@ -378,7 +392,7 @@ function playReveal(animate) {
   card.classList.remove("struck");
   document.querySelector(".reaction")?.classList.add(animate ? "pop" : "shown");
   clearTimeout(nextButtonTimer);
-  if (isOutOfCharge(progressFor().guesses, currentQuestions)) {
+  if (isOutOfCharge(progressFor().guesses, currentQuestions, rateOf())) {
     next.remove();
     powerOutTimer = setTimeout(powerOut, POWER_OUT_DELAY_MS);
   }
@@ -480,6 +494,7 @@ function bindGuessControls(initial, index) {
       return;
     }
     const progress = progressFor();
+    if (!progress.guesses.length) progress.hard = hardPreferred;
     progress.guesses[index] = Math.round(value * 10) / 10;
     progress.locked.push(true);
     progress.draft = null;
@@ -564,7 +579,7 @@ function bindNext(index) {
 function renderRecap(progress) {
   const recap = document.querySelector("#recap");
   const offs = progress.guesses.map((guess, i) => pointsOff(guess, currentQuestions[i].answer));
-  const charges = chargeTrack(progress.guesses, currentQuestions);
+  const charges = chargeTrack(progress.guesses, currentQuestions, rateOf(progress));
   const best = bestGuessIndex(progress.guesses, currentQuestions);
   recap.innerHTML = `<section class="log" aria-label="Drain by question: your charge after each question">
       <h3 class="log-title">Drain by question</h3>
@@ -579,7 +594,7 @@ function renderRecap(progress) {
       button.setAttribute("aria-pressed", Number(button.dataset.step) === step);
     });
     const question = currentQuestions[step];
-    detail.innerHTML = step < progress.guesses.length ? logRow(question, progress.guesses[step], offs[step], step, step === best, charges[step] - (step ? charges[step - 1] : 100)) : `<article class="recap-item log-row unreached">
+    detail.innerHTML = step < progress.guesses.length ? logRow(question, progress.guesses[step], offs[step], step, step === best, charges[step] - (step ? charges[step - 1] : 100), rateOf(progress)) : `<article class="recap-item log-row unreached">
       <div class="log-row-head"><span class="log-q">Q${step + 1}</span><span class="recap-badge">Not reached</span></div>
       <p class="recap-question">${escapeHtml(question.text)}</p>
       <p class="recap-numbers"><span>Answer: ${question.answer.toFixed(1)}%</span></p>
@@ -622,13 +637,13 @@ function dischargeGraph(charges) {
 
 // One answered question: what it cost, the question, a mini reveal bar (green up to the lower of
 // guess and answer, gray across the gap, a YOU tick and an ANSWER tick), and the two numbers.
-function logRow(question, guess, off, i, isBest, change) {
+function logRow(question, guess, off, i, isBest, change, rate) {
   const lit = litStyle(off);
   const guessX = Math.max(0, Math.min(100, guess));
   const answerX = Math.max(0, Math.min(100, question.answer));
   const low = Math.min(guessX, answerX);
   return `<article class="recap-item log-row">
-      <div class="log-row-head"><span class="log-q">Q${i + 1}</span>${isBest ? '<span class="recap-badge">Best guess</span>' : ""}<span class="log-cost">${off === 0 ? `${noDrainNote()}${change > 0 ? ` +${change.toFixed(1)}%` : ""}` : `−${(off * DRAIN_RATE).toFixed(1)}%`}</span></div>
+      <div class="log-row-head"><span class="log-q">Q${i + 1}</span>${isBest ? '<span class="recap-badge">Best guess</span>' : ""}<span class="log-cost">${off === 0 ? `${noDrainNote()}${change > 0 ? ` +${change.toFixed(1)}%` : ""}` : `−${(off * rate).toFixed(1)}%`}</span></div>
       <p class="recap-question">${escapeHtml(question.text)}</p>
       <div class="mini-bar" aria-hidden="true"><span class="mini-fill" style="width:${low}%"></span><span class="mini-gap" style="left:${low}%;width:${Math.abs(guessX - answerX)}%"></span>
         <span class="mini-tick" style="left:${guessX}%;background:${lit.color};box-shadow:${lit.glow}"></span><span class="mini-tick answer" style="left:${answerX}%"></span></div>
@@ -639,17 +654,19 @@ function logRow(question, guess, off, i, isBest, change) {
 function renderResults() {
   const progress = progressFor();
   const answered = progress.guesses.length;
-  const out = isOutOfCharge(progress.guesses, currentQuestions);
-  const charge = finalCharge(progress.guesses, currentQuestions);
+  const rate = rateOf(progress);
+  const hard = isHard(progress);
+  const out = isOutOfCharge(progress.guesses, currentQuestions, rate);
+  const charge = finalCharge(progress.guesses, currentQuestions, rate);
   const animate = animateResults && !out;
   animateResults = false;
   const headline = out
     ? `<div class="final-score dead-score reveal"><div class="result-battery-wrap">${batteryMarkup("result-battery dead-battery", null, 0)}</div>
       <h2 class="out-title">Out of charge</h2><p class="out-where">Died on question ${answered} of ${currentQuestions.length}</p></div>`
-    : `<div class="final-score reveal"><span class="answer-label" id="resultLabel">${currentDate === today ? "" : "PRACTICE "}CHARGE LEFT</span>
+    : `<div class="final-score reveal"><span class="answer-label" id="resultLabel">${hard ? "HARD MODE · " : ""}${currentDate === today ? "" : "PRACTICE "}CHARGE LEFT</span>
       <div class="result-battery-wrap">${batteryMarkup("result-battery", "resultBattery", animate ? 100 : charge)}</div></div>`;
   stage.innerHTML = `${headline}
-    ${practiceMode ? "" : `<section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">How you stack up</h3><p class="crowd-copy">Your charge is added anonymously. Never your guesses, name, or account.</p><p class="crowd-status">Seeing how you stack up…</p></section>`}
+    ${practiceMode ? "" : `<section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">How you stack up${hard ? " · Hard mode" : ""}</h3><p class="crowd-copy">Your charge is added anonymously. Never your guesses, name, or account.</p><p class="crowd-status">Seeing how you stack up…</p></section>`}
     <button class="share-button" id="shareButton">Share ${currentDate === today ? "today's" : "this"} result <span aria-hidden="true">↗</span></button>
     ${practiceMode ? '<button class="next-button secondary-button" id="replayButton">Play this puzzle again</button><button class="next-button secondary-button" id="todayButton">Back to today\'s puzzle</button>' : ""}
     <button class="next-button secondary-button" id="statsInline">Your stats &amp; archives <span aria-hidden="true">→</span></button>`;
@@ -665,7 +682,7 @@ function renderResults() {
   });
   document.querySelector("#todayButton")?.addEventListener("click", returnToToday);
   document.querySelector("#statsInline").addEventListener("click", showStats);
-  if (!practiceMode) loadCrowd(crowdRank(progress.guesses, currentQuestions), out);
+  if (!practiceMode) loadCrowd(crowdRank(progress.guesses, currentQuestions, rate), out, hard);
   if (out) setTimeout(announceAchievements, 1200);
   else playResultDrain(charge, animate).then(finished => {
     if (!finished) return;
@@ -780,39 +797,39 @@ function crowdToken() {
 // Used only when localStorage is unavailable, so retries in this tab reuse one ID.
 let fallbackCrowdId = null;
 
-async function loadCrowd(score, out) {
+async function loadCrowd(score, out, hard) {
   const panel = document.querySelector("#crowdPanel");
   if (!panel) return;
   try {
     const summary = await crowdRequest("/api/percentle/crowd", {
       method: "POST",
-      body: { date: today, score, id: crowdToken() }
+      body: { date: today, score, id: crowdToken(), mode: hard ? "hard" : "normal" }
     });
-    if (out) renderOutOfChargeCrowd(panel, summary);
-    else renderCrowdSummary(panel, summary);
+    if (out) renderOutOfChargeCrowd(panel, summary, hard);
+    else renderCrowdSummary(panel, summary, hard);
   } catch (error) {
     console.error("Could not submit anonymous Percentle score.", error);
     panel.querySelector(".crowd-status").innerHTML = `Today's comparison is temporarily unavailable. <button class="crowd-action" id="crowdRetry">Try again</button>`;
-    panel.querySelector("#crowdRetry").addEventListener("click", () => loadCrowd(score, out));
+    panel.querySelector("#crowdRetry").addEventListener("click", () => loadCrowd(score, out, hard));
   }
 }
 
 // After running out of charge, there's no line: just how many other players ran out too.
-function renderOutOfChargeCrowd(panel, summary) {
+function renderOutOfChargeCrowd(panel, summary, hard) {
   const share = summary.alsoRanOut;
   const line = share === null
     ? `Once at least ${summary.minimumComparisonPlayers} other players finish today's puzzle, you'll see how many of them ran out of charge.`
     : share === 0 ? "Nobody else has run out of charge today. Yet."
     : `<strong>${share.toFixed(1)}%</strong> of today's players ran out of charge.`;
-  panel.innerHTML = `<h3 class="crowd-title">Today's blackouts</h3><p class="crowd-position">${line}</p>`;
+  panel.innerHTML = `<h3 class="crowd-title">Today's blackouts${hard ? " · Hard mode" : ""}</h3><p class="crowd-position">${line}</p>`;
 }
 
-function renderCrowdSummary(panel, summary) {
+function renderCrowdSummary(panel, summary, hard) {
   const linePosition = summary.betterThan;
   const placement = summary.betterThan === null
     ? `<p class="crowd-position">Your marker appears once at least ${summary.minimumComparisonPlayers} other players have finished today's puzzle.</p>`
     : `<p class="crowd-position">You were better than <strong>${summary.betterThan.toFixed(1)}%</strong> of players today.</p>`;
-  panel.innerHTML = `<h3 class="crowd-title">How you stack up</h3>
+  panel.innerHTML = `<h3 class="crowd-title">How you stack up${hard ? " · Hard mode" : ""}</h3>
     ${crowdLine(linePosition)}${placement}`;
 }
 
@@ -829,7 +846,7 @@ function shareResult(charge, progress, out) {
   const closest = Math.min(...progress.guesses.map((guess, i) => Math.abs(guess - currentQuestions[i].answer)));
   const status = out ? `🪫 Out of charge on Q${progress.guesses.length}` : lowBatteryTier(charge) ? `🪫 Survived on ${formatCharge(charge)}` : `🔋 ${formatCharge(charge)}`;
   const link = `${location.origin}${location.pathname}`;
-  const result = `${GAME_NAME} #${currentNumber}${currentTheme ? ` · ${currentTheme}` : ""}\n${status}\nClosest guess - ${closest.toFixed(1)}% away\n${link}`;
+  const result = `${GAME_NAME} #${currentNumber}${currentTheme ? ` · ${currentTheme}` : ""}${isHard(progress) ? " · Hard mode 😈" : ""}\n${status}\nClosest guess - ${closest.toFixed(1)}% away\n${link}`;
   if (navigator.share) {
     navigator.share({ text: result }).catch(error => {
       if (error.name !== "AbortError") copyResult(result);
@@ -866,8 +883,8 @@ function lastTenGames(games) {
   if (!recent.length) return "<p class=\"hist-empty\">Finish today's puzzle to start your history.</p>";
   const shortDate = date => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
   return `<div class="recent-games" role="group" aria-label="Your recent games, oldest to newest">${recent.map((game, i) => `
-      <button class="recent-bar${i === recent.length - 1 ? " selected" : ""}" data-date="${escapeAttr(game.date)}" data-charge="${chargeLabel(game)}" aria-label="${longDate(game.date)}: ${chargeLabel(game.score)}">
-        <span class="recent-bar-fill${gameCharge(game) < 0 ? " negative" : ""}" style="height:${Math.max(4, Math.min(100, gameCharge(game))).toFixed(1)}%"></span>
+      <button class="recent-bar${i === recent.length - 1 ? " selected" : ""}" data-date="${escapeAttr(game.date)}" data-charge="${chargeLabel(game)}"${game.hard ? " data-hard" : ""} aria-label="${longDate(game.date)}: ${chargeLabel(game.score)}">
+        <span class="recent-bar-fill${gameCharge(game) < 0 ? " negative" : game.hard ? " hard" : ""}" style="height:${Math.max(4, Math.min(100, gameCharge(game))).toFixed(1)}%"></span>
         <span class="recent-bar-date">${shortDate(game.date)}</span>
       </button>`).join("")}</div>
     <p class="recent-detail" id="recentDetail" aria-live="polite"></p>`;
@@ -887,7 +904,7 @@ function bindLastTenGames() {
   const bars = [...dialog.querySelectorAll(".recent-bar")];
   const select = bar => {
     bars.forEach(other => other.classList.toggle("selected", other === bar));
-    detail.innerHTML = `${longDate(bar.dataset.date)} · <strong>${bar.dataset.charge}</strong>`;
+    detail.innerHTML = `${longDate(bar.dataset.date)} · <strong>${bar.dataset.charge}</strong>${"hard" in bar.dataset ? " · Hard mode 😈" : ""}`;
   };
   bars.forEach(bar => bar.addEventListener("click", () => select(bar)));
   if (bars.length) select(bars.at(-1));
@@ -956,7 +973,52 @@ function showStartScreen() {
   const special = document.querySelector("#startSpecial");
   special.hidden = !todayPuzzle.theme;
   special.querySelector("span").textContent = todayPuzzle.theme || "";
+  updateHardSwitch();
   document.body.classList.add("starting");
+}
+
+// Hard mode turns every green purple.
+function applyHardLook() {
+  document.body.classList.toggle("hard", isHard());
+}
+
+// The switch shows today's mode. Once today's puzzle has a guess, it's locked to that puzzle's mode.
+function updateHardSwitch() {
+  const todays = state.progress[today];
+  const locked = Boolean(todays?.guesses.length);
+  const on = locked ? Boolean(todays.hard) : hardPreferred;
+  const button = document.querySelector("#hardSwitch");
+  button.setAttribute("aria-checked", String(on));
+  button.disabled = locked;
+  document.querySelector("#hardNote").textContent = locked ? "Locked for today's puzzle" : "Drains twice as fast";
+  document.querySelectorAll("[data-drain-rule]").forEach(element => { element.innerHTML = drainRule(drainRateFor(on)); });
+  applyHardLook();
+}
+
+// Switching modes floods the screen: purple with a black devil going into hard mode, green coming
+// back out. The look changes while the screen is covered.
+const DEVIL = `<svg class="devil" viewBox="0 0 120 120" aria-hidden="true"><path fill="#000" d="M18 10c3 20 11 32 23 38a40 40 0 0 0-5 20c0 26 11 44 24 44s24-18 24-44a40 40 0 0 0-5-20c12-6 20-18 23-38-9 10-19 16-30 17a32 32 0 0 0-24 0C37 26 27 20 18 10z"/><path fill="#b85cff" d="M40 60l17 8-15 4zM80 60l-17 8 15 4z"/><path d="M45 88q15 12 30 0" fill="none" stroke="#b85cff" stroke-width="4.5" stroke-linecap="round"/></svg>`;
+
+function toggleHardMode() {
+  if (document.querySelector(".mode-flash") || state.progress[today]?.guesses.length) return;
+  hardPreferred = !hardPreferred;
+  try {
+    localStorage.setItem("percentle.hard", hardPreferred ? "1" : "0");
+  } catch (error) {
+    console.error("Could not save the hard mode setting.", error);
+  }
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return updateHardSwitch();
+  const flash = document.createElement("div");
+  flash.className = `mode-flash ${hardPreferred ? "to-hard" : "to-normal"}`;
+  flash.setAttribute("aria-hidden", "true");
+  flash.innerHTML = hardPreferred ? DEVIL : "";
+  flash.addEventListener("animationend", event => {
+    if (event.target !== flash) return;
+    if (flash.classList.contains("fading")) return flash.remove();
+    updateHardSwitch();
+    setTimeout(() => flash.classList.add("fading"), hardPreferred ? 650 : 80);
+  });
+  document.body.append(flash);
 }
 
 function leaveStartScreen() {
@@ -966,7 +1028,7 @@ function leaveStartScreen() {
 function showHowToPlay() {
   openDialog("How to play", `<ul class="rules">
       <li>Guess the percentage for each of 5 questions.</li>
-      <li>${drainRule()}</li>
+      <li>${drainRule(rateOf())}</li>
       <li>A new puzzle arrives every day at midnight Eastern.</li>
     </ul>
     <button class="share-button" data-close>Let's play</button>`);
@@ -1017,6 +1079,7 @@ document.querySelector("#returnButton").addEventListener("click", () => {
   showStats();
 });
 document.querySelector("#achievementsButton").addEventListener("click", showAchievements);
+document.querySelector("#hardSwitch").addEventListener("click", toggleHardMode);
 document.querySelectorAll("[data-close]").forEach(button => button.addEventListener("click", () => dialog.close()));
 dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
 // Anonymous crowd IDs (and consent flags from older versions) are per-day; drop earlier days' so they can't accumulate.

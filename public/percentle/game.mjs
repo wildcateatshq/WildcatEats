@@ -22,6 +22,13 @@ export function dailyTotal(guesses, questions) {
 // Games are saved as total points off, so changing this re-scores every past game consistently.
 export const DRAIN_RATE = 1;
 
+// Hard mode drains twice as fast, so 50 points off in total empties the battery.
+export const HARD_DRAIN_RATE = DRAIN_RATE * 2;
+
+export function drainRateFor(hard) {
+  return hard ? HARD_DRAIN_RATE : DRAIN_RATE;
+}
+
 export function chargeLeft(totalOff, rate = DRAIN_RATE) {
   return Math.round((100 - totalOff * rate) * 10) / 10;
 }

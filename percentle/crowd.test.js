@@ -100,3 +100,23 @@ test("the crowd rate limit allows a burst per address, then resets each minute",
   now = 60_000;
   assert.equal(allow("a"), true, "a new minute starts fresh");
 });
+
+test("hard-mode scores form their own crowd line and survive a restart", async () => {
+  const folder = await fs.mkdtemp(path.join(os.tmpdir(), "percentle-hard-crowd-"));
+  try {
+    const file = path.join(folder, "crowd.json");
+    const store = createCrowdStore(file);
+    await store.init();
+    for (const [i, score] of [10, 20, 30, 40, 50, 60].entries()) await store.submit(date, ids[i], score);
+    await store.submit(date, ids[6], 70, "hard");
+    assert.equal((await store.getSummary(date)).players, 6, "normal line");
+    assert.equal((await store.getSummary(date, "hard")).players, 1, "hard line");
+    await assert.rejects(store.submit(date, ids[7], 10, "expert"), RangeError);
+    const reopened = createCrowdStore(file);
+    await reopened.init();
+    assert.equal((await reopened.getSummary(date, "hard")).players, 1);
+    assert.equal((await reopened.getSummary(date)).players, 6);
+  } finally {
+    await fs.rm(folder, { recursive: true, force: true });
+  }
+});

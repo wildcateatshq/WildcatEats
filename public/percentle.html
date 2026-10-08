@@ -66,6 +66,11 @@
           <li data-drain-rule>Every miss drains your battery by how far off you were. <strong>Finish with as much charge as you can.</strong></li>
           <li>A new puzzle arrives every day at midnight Eastern.</li>
         </ul>
+        <div class="hard-row">
+          <button class="hard-switch" id="hardSwitch" type="button" role="switch" aria-checked="false" aria-describedby="hardNote"><span class="hard-knob"></span></button>
+          <label class="hard-label" for="hardSwitch">Hard mode</label>
+          <span class="hard-note" id="hardNote">Drains twice as fast</span>
+        </div>
         <button class="lock-button start-button" id="startButton">Play today's game <span aria-hidden="true">→</span></button>
         <p class="start-edition" id="startEdition"></p>
       </section>

@@ -17,6 +17,14 @@ function isUtcDate(value) {
   return Number.isFinite(timestamp) && new Date(timestamp).toISOString().slice(0, 10) === value;
 }
 
+// Hard-mode players have their own crowd line, so they're only compared with each other.
+const MODES = ["normal", "hard"];
+
+function validateMode(mode = "normal") {
+  if (!MODES.includes(mode)) throw new RangeError('mode must be "normal" or "hard".');
+  return mode;
+}
+
 function validateSubmission(date, id, score) {
   if (!isUtcDate(date)) throw new RangeError("Date must be a UTC calendar date.");
   if (typeof id !== "string" || !UUID_PATTERN.test(id)) throw new RangeError("A valid anonymous submission ID is required.");
@@ -67,17 +75,20 @@ function createCrowdStore(options = {}) {
       ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } })
       : null;
   const dailyScores = new Map();
+  // dailyScores is keyed by date for normal mode and "hard:<date>" for hard mode.
+  const keyFor = (date, mode) => (mode === "hard" ? `hard:${date}` : date);
   let writes = Promise.resolve();
 
   async function persist() {
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     const tempPath = `${filePath}.${process.pid}.${crypto.randomUUID()}.tmp`;
     try {
-      const data = JSON.stringify(
-        Object.fromEntries([...dailyScores].map(([date, entries]) => [date, Object.fromEntries(entries)])),
-        null,
-        2
-      );
+      const saved = {};
+      for (const [key, entries] of dailyScores) {
+        if (key.startsWith("hard:")) (saved.hard ??= {})[key.slice(5)] = Object.fromEntries(entries);
+        else saved[key] = Object.fromEntries(entries);
+      }
+      const data = JSON.stringify(saved, null, 2);
       await fs.writeFile(tempPath, data, { encoding: "utf8", flag: "wx" });
       await fs.rename(tempPath, filePath);
     } catch (error) {
@@ -99,13 +110,18 @@ function createCrowdStore(options = {}) {
           primary key (puzzle_date, anonymous_id)
         )
       `);
-      await pool.query("create index if not exists percentle_daily_scores_date_score on percentle_daily_scores (puzzle_date, score)");
+      await pool.query("alter table percentle_daily_scores add column if not exists mode text not null default 'normal'");
+      await pool.query("create index if not exists percentle_daily_scores_date_mode_score on percentle_daily_scores (puzzle_date, mode, score)");
       return;
     }
     try {
       const loaded = JSON.parse(await fs.readFile(filePath, "utf8"));
       if (!loaded || typeof loaded !== "object" || Array.isArray(loaded)) throw new Error("Crowd data must be a date-keyed object.");
-      for (const [date, entries] of Object.entries(loaded)) {
+      const days = [
+        ...Object.entries(loaded).filter(([date]) => date !== "hard").map(([date, entries]) => [date, entries, "normal"]),
+        ...Object.entries(loaded.hard || {}).map(([date, entries]) => [date, entries, "hard"])
+      ];
+      for (const [date, entries, mode] of days) {
         if (!isUtcDate(date) || !entries || typeof entries !== "object" || Array.isArray(entries)) {
           throw new Error(`Invalid Percentle crowd data for ${date}.`);
         }
@@ -114,7 +130,7 @@ function createCrowdStore(options = {}) {
           validateSubmission(date, id, score);
           cleaned.set(id, score);
         }
-        dailyScores.set(date, cleaned);
+        dailyScores.set(keyFor(date, mode), cleaned);
       }
     } catch (error) {
       if (error.code === "ENOENT") return;
@@ -122,40 +138,42 @@ function createCrowdStore(options = {}) {
     }
   }
 
-  async function getSummary(date) {
+  async function getSummary(date, mode = "normal") {
     if (!isUtcDate(date)) throw new RangeError("Date must be a UTC calendar date.");
+    validateMode(mode);
     if (pool) {
-      const { rows } = await pool.query("select count(*)::int as players from percentle_daily_scores where puzzle_date = $1", [date]);
+      const { rows } = await pool.query("select count(*)::int as players from percentle_daily_scores where puzzle_date = $1 and mode = $2", [date, mode]);
       return summaryFromCounts(rows[0], false);
     }
-    const entries = dailyScores.get(date) || new Map();
+    const entries = dailyScores.get(keyFor(date, mode)) || new Map();
     return summarize(entries);
   }
 
-  async function submit(date, id, score) {
+  async function submit(date, id, score, mode = "normal") {
     validateSubmission(date, id, score);
+    validateMode(mode);
     if (pool) {
       await pool.query(
-        `insert into percentle_daily_scores (puzzle_date, anonymous_id, score)
-         values ($1, $2, $3)
+        `insert into percentle_daily_scores (puzzle_date, anonymous_id, score, mode)
+         values ($1, $2, $3, $4)
          on conflict (puzzle_date, anonymous_id)
-         do update set score = excluded.score, submitted_at = now()`,
-        [date, id, score]
+         do update set score = excluded.score, mode = excluded.mode, submitted_at = now()`,
+        [date, id, score, mode]
       );
       const { rows } = await pool.query(
         `select count(*)::int as players,
                 coalesce(sum(case when score > $2 then 1 else 0 end), 0)::int as worse,
                 coalesce(sum(case when score = $2 then 1 else 0 end), 0)::int as tied,
                 coalesce(sum(case when score >= $4 and anonymous_id <> $3 then 1 else 0 end), 0)::int as "othersRanOut"
-         from percentle_daily_scores where puzzle_date = $1`,
-        [date, score, id, OUT_OF_CHARGE_RANK]
+         from percentle_daily_scores where puzzle_date = $1 and mode = $5`,
+        [date, score, id, OUT_OF_CHARGE_RANK, mode]
       );
       return summaryFromCounts(rows[0], true);
     }
     const operation = writes.then(async () => {
-      const entries = dailyScores.get(date) || new Map();
+      const entries = dailyScores.get(keyFor(date, mode)) || new Map();
       entries.set(id, score);
-      dailyScores.set(date, entries);
+      dailyScores.set(keyFor(date, mode), entries);
       await persist();
       return summarize(entries, id);
     });

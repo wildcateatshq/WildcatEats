@@ -94,7 +94,10 @@ starts at 100% charge and drains by how far off each guess is (`DRAIN_RATE` in
 `public/percentle/game.mjs`; 1 means each point off costs 1% of charge). Higher is better.
 A SUPERCHARGED answer (within 0.5) recharges the battery by 5% (`SUPERCHARGE_BONUS`), never above
 100%; because of that cap, charge is worked out question by question (`chargeTrack`), and each
-saved game keeps its final charge (older games are re-scored from their total points off). Dropping below 0% ends the game early: the alarms go off, the lights cut out, and
+saved game keeps its final charge (older games are re-scored from their total points off). **Hard mode** (a switch on the start screen) drains twice as fast (`HARD_DRAIN_RATE`), turns the
+greens purple, and locks in once a puzzle's first guess is made; hard players get their own crowd
+line (`mode` on crowd submissions) and their games are marked in stats and sharing.
+Dropping below 0% ends the game early: the alarms go off, the lights cut out, and
 the player sees an "Out of charge" screen. Exactly 0.0% survives.
 
 ### Daily puzzles come from an AI agent

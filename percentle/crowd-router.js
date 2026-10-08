@@ -46,7 +46,7 @@ function createCrowdRouter(store, currentDate = () => easternDate(), options = {
 
   router.get("/", async (req, res, next) => {
     try {
-      res.json(await store.getSummary(req.query.date));
+      res.json(await store.getSummary(req.query.date, req.query.mode));
     } catch (error) {
       if (error instanceof RangeError) return res.status(400).json({ error: error.message });
       next(error);
@@ -57,12 +57,12 @@ function createCrowdRouter(store, currentDate = () => easternDate(), options = {
     if (!allow(clientAddress(req))) {
       return res.status(429).json({ error: "Too many scores from this network right now. Try again in a minute." });
     }
-    const { date, id, score } = req.body || {};
+    const { date, id, score, mode } = req.body || {};
     if (date !== currentDate()) {
       return res.status(400).json({ error: "Only today's puzzle accepts crowd scores." });
     }
     try {
-      res.json(await store.submit(date, id, score));
+      res.json(await store.submit(date, id, score, mode));
     } catch (error) {
       if (error instanceof RangeError) return res.status(400).json({ error: error.message });
       next(error);

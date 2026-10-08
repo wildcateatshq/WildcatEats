@@ -8,6 +8,7 @@ import {
   chargeLeft,
   crowdRank,
   DRAIN_RATE,
+  drainRateFor,
   REACTIONS,
   reactionFor,
   dailyTotal,
@@ -182,4 +183,12 @@ test("the best guess has the fewest points off, with ties going to the guess tha
   assert.equal(bestGuessIndex([15, 30, 32, 60, 90], questions), 2, "Q3 was only 2 off");
   assert.equal(bestGuessIndex([10.4, 20.1, 50], questions), 1, "both within 0.5 score 0; Q2 was closer");
   assert.equal(bestGuessIndex([12, 22], questions), 0, "an exact tie keeps the earlier one");
+});
+
+test("hard mode drains twice as fast, so 50 points off empties the battery", () => {
+  const questions = [10, 20, 30, 40, 50].map(answer => ({ answer }));
+  assert.equal(drainRateFor(true), DRAIN_RATE * 2);
+  assert.equal(drainRateFor(false), DRAIN_RATE);
+  assert.deepEqual(chargeTrack([35, 45], questions, drainRateFor(true)), [50, 0], "25 off twice: 50 points off in total");
+  assert.equal(isOutOfCharge([35, 45.1], questions, drainRateFor(true)), true);
 });
