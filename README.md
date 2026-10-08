@@ -92,8 +92,9 @@ Players see the game as **Chargle** (set by `GAME_NAME` in `public/percentle.mjs
 URLs, storage keys, and database tables keep the Percentle name. The score is a battery that
 starts at 100% charge and drains by how far off each guess is (`DRAIN_RATE` in
 `public/percentle/game.mjs`; 1 means each point off costs 1% of charge). Higher is better.
-Games are saved as total points off, so changing `DRAIN_RATE` re-scores past games
-consistently. Dropping below 0% ends the game early: the alarms go off, the lights cut out, and
+A SUPERCHARGED answer (within 0.5) recharges the battery by 5% (`SUPERCHARGE_BONUS`), never above
+100%; because of that cap, charge is worked out question by question (`chargeTrack`), and each
+saved game keeps its final charge (older games are re-scored from their total points off). Dropping below 0% ends the game early: the alarms go off, the lights cut out, and
 the player sees an "Out of charge" screen. Exactly 0.0% survives.
 
 ### Daily puzzles come from an AI agent

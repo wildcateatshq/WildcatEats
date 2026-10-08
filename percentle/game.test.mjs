@@ -4,6 +4,7 @@ import {
   achievementsForGame,
   applyGuessKey,
   bestGuessIndex,
+  chargeTrack,
   chargeLeft,
   crowdRank,
   DRAIN_RATE,
@@ -17,6 +18,7 @@ import {
   lowBatteryTier,
   streakAchievements,
   easternDate,
+  finalCharge,
   isOutOfCharge,
   pointsOff,
   scoreColor,
@@ -71,15 +73,24 @@ test("the game is over once the charge drops below zero, but exactly zero surviv
 
 test("the crowd ranks every finisher above every player who ran out, and later deaths above earlier ones", () => {
   const questions = [10, 20, 30, 40, 50].map(answer => ({ answer }));
-  const finishedBadly = crowdRank([60, 70, 30, 40, 50], questions, 1); // 100 off, 0.0% left
-  const diedOnQ5 = crowdRank([60, 70, 30, 40, 51], questions, 1);
+  const finishedLow = crowdRank([60, 70, 30, 40, 50], questions, 1); // 50, 0, then three supercharges: 15% left
+  const diedOnQ5 = crowdRank([50, 60, 35, 45, 61], questions, 1);
   const diedOnQ3 = crowdRank([60, 70, 31], questions, 1);
-  const diedOnQ3Worse = crowdRank([100, 100, 100], questions, 1);
-  assert.equal(finishedBadly, 100);
-  assert.ok(diedOnQ5 > finishedBadly);
+  const diedOnQ3Worse = crowdRank([55, 65, 41], questions, 1);
+  assert.equal(finishedLow, 85, "finishers send the charge they used up");
+  assert.equal(crowdRank([10, 20, 30, 40, 50], questions, 1), 0, "a full battery ranks best");
+  assert.ok(diedOnQ5 > finishedLow);
   assert.ok(diedOnQ3 > diedOnQ5);
   assert.equal(diedOnQ3, diedOnQ3Worse, "same question ties");
-  assert.ok(crowdRank([100, 100, 100], questions, 0.5) <= 500, "fits the crowd store's limit");
+  assert.ok(crowdRank([100, 100], questions, 1) <= 500, "fits the crowd store's limit");
+});
+
+test("a SUPERCHARGED answer recharges the battery by 5%, never above 100%", () => {
+  const questions = [10, 20, 30, 40, 50].map(answer => ({ answer }));
+  assert.deepEqual(chargeTrack([15, 20, 30], questions, 1), [95, 100, 100], "95 + 5 = 100, then stays full");
+  assert.deepEqual(chargeTrack([60, 70, 30], questions, 1), [50, 0, 5], "a supercharge at 0% brings it back to 5%");
+  assert.equal(finalCharge([], questions), 100);
+  assert.equal(isOutOfCharge([60, 70, 30.4], questions, 1), false, "30.4 is within 0.5, so it recharges instead");
 });
 
 test("the day rolls over at midnight Eastern in both EDT and EST", () => {

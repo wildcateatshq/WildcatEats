@@ -26,21 +26,41 @@ export function chargeLeft(totalOff, rate = DRAIN_RATE) {
   return Math.round((100 - totalOff * rate) * 10) / 10;
 }
 
+// A SUPERCHARGED answer (within the perfect margin) recharges the battery by this much, never
+// above 100%.
+export const SUPERCHARGE_BONUS = 5;
+
+// The charge after each answered question, in order: a miss drains its points off times the
+// rate, and a SUPERCHARGED answer adds SUPERCHARGE_BONUS (capped at 100). Because of the cap the
+// order matters, so charge is worked out step by step rather than from the total points off.
+export function chargeTrack(guesses, questions, rate = DRAIN_RATE) {
+  let charge = 100;
+  return guesses.map((guess, i) => {
+    const off = pointsOff(guess, questions[i].answer);
+    charge = off === 0 ? Math.min(100, charge + SUPERCHARGE_BONUS) : Math.round((charge - off * rate) * 10) / 10;
+    return charge;
+  });
+}
+
+export function finalCharge(guesses, questions, rate = DRAIN_RATE) {
+  return chargeTrack(guesses, questions, rate).at(-1) ?? 100;
+}
+
 // Dropping below zero charge ends the game early. Landing on exactly 0.0% survives.
 export function isOutOfCharge(guesses, questions, rate = DRAIN_RATE) {
-  return chargeLeft(dailyTotal(guesses, questions.slice(0, guesses.length)), rate) < 0;
+  return finalCharge(guesses, questions, rate) < 0;
 }
 
 // The number sent to today's crowd line, where lower ranks better. Players who finished send
-// their points off (at most 100 / rate, so keep DRAIN_RATE above 0.25). Players who ran out send
+// the charge they used up (100 minus their final charge, so 0 to 100). Players who ran out send
 // OUT_OF_CHARGE_RANK plus a little more the earlier they ran out, so they rank below every
 // finisher, later deaths rank above earlier ones, and the server (percentle/crowd.js) can count
 // who ran out.
 export const OUT_OF_CHARGE_RANK = 400;
 
 export function crowdRank(guesses, questions, rate = DRAIN_RATE) {
-  const total = dailyTotal(guesses, questions.slice(0, guesses.length));
-  if (!isOutOfCharge(guesses, questions, rate)) return Number(total.toFixed(1));
+  const charge = finalCharge(guesses, questions, rate);
+  if (charge >= 0) return Number((100 - charge).toFixed(1));
   return OUT_OF_CHARGE_RANK + (questions.length - guesses.length + 1) * 10;
 }
 

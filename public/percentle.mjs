@@ -1,4 +1,4 @@
-import { achievementsForGame, ACHIEVEMENTS, applyGuessKey, bestGuessIndex, chargeLeft, crowdRank, dailyTotal, DRAIN_RATE, reactionFor, easternDate, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { achievementsForGame, ACHIEVEMENTS, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, reactionFor, easternDate, finalCharge, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
 const GAME_NAME = "Chargle";
@@ -210,11 +210,12 @@ function recordTodayIfComplete(progress, notify = true) {
   const finished = progress.guesses.length === questions.length || isOutOfCharge(progress.guesses, questions);
   if (practiceMode || currentDate !== today || !finished || state.games.some(game => game.date === today)) return;
   const score = Number(dailyTotal(progress.guesses, questions.slice(0, progress.guesses.length)).toFixed(1));
-  state.games.push({ date: today, score });
+  const charge = finalCharge(progress.guesses, questions);
+  state.games.push({ date: today, score, charge });
   state.games.sort((a, b) => a.date.localeCompare(b.date));
   const supercharged = progress.guesses.filter((guess, i) => pointsOff(guess, questions[i].answer) === 0).length;
   unlockAchievements([
-    ...achievementsForGame({ charge: chargeLeft(score), out: isOutOfCharge(progress.guesses, questions), supercharged }),
+    ...achievementsForGame({ charge, out: charge < 0, supercharged }),
     ...streakAchievements(longestStreak(state.games.map(game => game.date)))
   ], notify);
 }
@@ -222,6 +223,12 @@ function recordTodayIfComplete(progress, notify = true) {
 // Achievements earned in this visit that haven't been announced yet; they pop up once the
 // results are on screen.
 const unannouncedAchievements = [];
+
+// A saved game's final charge. Games saved before supercharges recharged the battery only have
+// their total points off, so their charge is worked out from that.
+function gameCharge(game) {
+  return game.charge ?? chargeLeft(game.score);
+}
 
 function unlockAchievements(ids, notify) {
   for (const id of ids) {
@@ -235,7 +242,7 @@ function unlockAchievements(ids, notify) {
 // supercharged answers aren't known, so only charge, running out, and streaks are credited.
 function creditPastAchievements() {
   for (const game of state.games) {
-    const charge = chargeLeft(game.score);
+    const charge = gameCharge(game);
     unlockAchievements(achievementsForGame({ charge, out: charge < 0 }), false);
   }
   unlockAchievements(streakAchievements(longestStreak(state.games.map(game => game.date))), false);
@@ -320,23 +327,28 @@ function renderScoreBox(progress, view, animate) {
     note.textContent = "";
     return;
   }
-  const charge = chargeLeft(dailyTotal(progress.guesses, currentQuestions.slice(0, locked)));
+  const charge = finalCharge(progress.guesses, currentQuestions);
+  const previous = finalCharge(progress.guesses.slice(0, -1), currentQuestions);
   const lastOff = pointsOff(progress.guesses[locked - 1], currentQuestions[locked - 1].answer);
-  // Blank while answering; "X% off" pops in with each reveal.
-  note.textContent = view.phase === "reveal" ? lastOff === 0 ? "NO CHARGE LOST!" : `${lastOff.toFixed(1)}% off` : "";
+  // What a supercharge added (nothing if the battery was already full).
+  const gain = Math.round((charge - previous) * 10) / 10;
+  // Blank while answering; "X% off" (or the recharge) pops in with each reveal.
+  note.textContent = view.phase === "reveal"
+    ? lastOff === 0 ? gain > 0 ? `+${gain.toFixed(1)}% CHARGE!` : "NO CHARGE LOST!" : `${lastOff.toFixed(1)}% off`
+    : "";
   note.classList.remove("pop");
   if (animate && view.phase === "reveal") {
     note.getBoundingClientRect();
     note.classList.add("pop");
-    // A perfect answer costs nothing, so a green "NO DRAIN" chip pops off instead.
+    // A supercharge recharges the battery, so a green "+5%" chip pops off instead.
     chip.classList.toggle("no-drain", lastOff === 0);
-    chip.textContent = lastOff === 0 ? "NO DRAIN" : `−${(lastOff * DRAIN_RATE).toFixed(1)}%`;
+    chip.textContent = lastOff === 0 ? gain > 0 ? `+${gain.toFixed(1)}%` : "FULL" : `−${(lastOff * DRAIN_RATE).toFixed(1)}%`;
     chip.getBoundingClientRect();
     chip.classList.add("fly");
   }
   // The battery never shows below empty.
   const shown = Math.max(0, charge);
-  const from = shownScore?.key === key ? shownScore.value : animate ? chargeLeft(dailyTotal(progress.guesses.slice(0, -1), currentQuestions.slice(0, locked - 1))) : shown;
+  const from = shownScore?.key === key ? shownScore.value : animate ? Math.max(0, previous) : shown;
   shownScore = { key, value: shown };
   // Only the reveal of a guess that runs the battery out sounds the alarm, once it has drained to empty.
   const alarm = animate && view.phase === "reveal" && charge < 0;
@@ -550,7 +562,7 @@ function bindNext(index) {
 function renderRecap(progress) {
   const recap = document.querySelector("#recap");
   const offs = progress.guesses.map((guess, i) => pointsOff(guess, currentQuestions[i].answer));
-  const charges = offs.map((_, i) => chargeLeft(dailyTotal(progress.guesses.slice(0, i + 1), currentQuestions.slice(0, i + 1))));
+  const charges = chargeTrack(progress.guesses, currentQuestions);
   const best = bestGuessIndex(progress.guesses, currentQuestions);
   recap.innerHTML = `<section class="log" aria-label="Drain by question: your charge after each question">
       <h3 class="log-title">Drain by question</h3>
@@ -565,7 +577,7 @@ function renderRecap(progress) {
       button.setAttribute("aria-pressed", Number(button.dataset.step) === step);
     });
     const question = currentQuestions[step];
-    detail.innerHTML = step < progress.guesses.length ? logRow(question, progress.guesses[step], offs[step], step, step === best) : `<article class="recap-item log-row unreached">
+    detail.innerHTML = step < progress.guesses.length ? logRow(question, progress.guesses[step], offs[step], step, step === best, charges[step] - (step ? charges[step - 1] : 100)) : `<article class="recap-item log-row unreached">
       <div class="log-row-head"><span class="log-q">Q${step + 1}</span><span class="recap-badge">Not reached</span></div>
       <p class="recap-question">${escapeHtml(question.text)}</p>
       <p class="recap-numbers"><span>Answer: ${question.answer.toFixed(1)}%</span></p>
@@ -608,13 +620,13 @@ function dischargeGraph(charges) {
 
 // One answered question: what it cost, the question, a mini reveal bar (green up to the lower of
 // guess and answer, gray across the gap, a YOU tick and an ANSWER tick), and the two numbers.
-function logRow(question, guess, off, i, isBest) {
+function logRow(question, guess, off, i, isBest, change) {
   const lit = litStyle(off);
   const guessX = Math.max(0, Math.min(100, guess));
   const answerX = Math.max(0, Math.min(100, question.answer));
   const low = Math.min(guessX, answerX);
   return `<article class="recap-item log-row">
-      <div class="log-row-head"><span class="log-q">Q${i + 1}</span>${isBest ? '<span class="recap-badge">Best guess</span>' : ""}<span class="log-cost">${off === 0 ? noDrainNote() : `−${(off * DRAIN_RATE).toFixed(1)}%`}</span></div>
+      <div class="log-row-head"><span class="log-q">Q${i + 1}</span>${isBest ? '<span class="recap-badge">Best guess</span>' : ""}<span class="log-cost">${off === 0 ? `${noDrainNote()}${change > 0 ? ` +${change.toFixed(1)}%` : ""}` : `−${(off * DRAIN_RATE).toFixed(1)}%`}</span></div>
       <p class="recap-question">${escapeHtml(question.text)}</p>
       <div class="mini-bar" aria-hidden="true"><span class="mini-fill" style="width:${low}%"></span><span class="mini-gap" style="left:${low}%;width:${Math.abs(guessX - answerX)}%"></span>
         <span class="mini-tick" style="left:${guessX}%;background:${lit.color};box-shadow:${lit.glow}"></span><span class="mini-tick answer" style="left:${answerX}%"></span></div>
@@ -626,8 +638,7 @@ function renderResults() {
   const progress = progressFor();
   const answered = progress.guesses.length;
   const out = isOutOfCharge(progress.guesses, currentQuestions);
-  const score = Number(dailyTotal(progress.guesses, currentQuestions.slice(0, answered)).toFixed(1));
-  const charge = chargeLeft(score);
+  const charge = finalCharge(progress.guesses, currentQuestions);
   const animate = animateResults && !out;
   animateResults = false;
   const headline = out
@@ -644,7 +655,7 @@ function renderResults() {
   renderDots(out ? answered : 5);
   document.querySelector(".progress-dot.current")?.classList.remove("current");
   renderRecap(progress);
-  document.querySelector("#shareButton").addEventListener("click", () => shareResult(score, progress, out));
+  document.querySelector("#shareButton").addEventListener("click", () => shareResult(charge, progress, out));
   document.querySelector("#replayButton")?.addEventListener("click", () => {
     state.progress[`practice:${currentDate}`] = { guesses: [], locked: [], revealed: 0, draft: null };
     save();
@@ -810,10 +821,9 @@ function crowdLine(position) {
     </svg>`;
 }
 
-function shareResult(score, progress, out) {
+function shareResult(charge, progress, out) {
   // The real distance of the best guess (even one that scored a perfect 0), e.g. "0.2% away".
   const closest = Math.min(...progress.guesses.map((guess, i) => Math.abs(guess - currentQuestions[i].answer)));
-  const charge = chargeLeft(score);
   const status = out ? `🪫 Out of charge on Q${progress.guesses.length}` : lowBatteryTier(charge) ? `🪫 Survived on ${formatCharge(charge)}` : `🔋 ${formatCharge(charge)}`;
   const link = `${location.origin}${location.pathname}`;
   const result = `${GAME_NAME} #${currentNumber}\n${status}\nClosest guess - ${closest.toFixed(1)}% away\n${link}`;
@@ -853,15 +863,15 @@ function lastTenGames(games) {
   if (!recent.length) return "<p class=\"hist-empty\">Finish today's puzzle to start your history.</p>";
   const shortDate = date => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
   return `<div class="recent-games" role="group" aria-label="Your recent games, oldest to newest">${recent.map((game, i) => `
-      <button class="recent-bar${i === recent.length - 1 ? " selected" : ""}" data-date="${escapeAttr(game.date)}" data-charge="${chargeLabel(game.score)}" aria-label="${longDate(game.date)}: ${chargeLabel(game.score)}">
-        <span class="recent-bar-fill${chargeLeft(game.score) < 0 ? " negative" : ""}" style="height:${Math.max(4, Math.min(100, chargeLeft(game.score))).toFixed(1)}%"></span>
+      <button class="recent-bar${i === recent.length - 1 ? " selected" : ""}" data-date="${escapeAttr(game.date)}" data-charge="${chargeLabel(game)}" aria-label="${longDate(game.date)}: ${chargeLabel(game.score)}">
+        <span class="recent-bar-fill${gameCharge(game) < 0 ? " negative" : ""}" style="height:${Math.max(4, Math.min(100, gameCharge(game))).toFixed(1)}%"></span>
         <span class="recent-bar-date">${shortDate(game.date)}</span>
       </button>`).join("")}</div>
     <p class="recent-detail" id="recentDetail" aria-live="polite"></p>`;
 }
 
-function chargeLabel(score) {
-  const charge = chargeLeft(score);
+function chargeLabel(game) {
+  const charge = gameCharge(game);
   return charge < 0 ? "Out of charge" : `${formatCharge(charge)} charge left`;
 }
 
@@ -883,7 +893,7 @@ function bindLastTenGames() {
 function showStats() {
   const games = state.games;
   // A game that ran out of charge counts as 0% left.
-  const charges = games.map(game => Math.max(0, chargeLeft(game.score)));
+  const charges = games.map(game => Math.max(0, gameCharge(game)));
   const average = charges.length ? charges.reduce((a, b) => a + b, 0) / charges.length : null;
   const best = charges.length ? Math.max(...charges) : null;
   openDialog("Your stats", `<div class="stat-cards">
