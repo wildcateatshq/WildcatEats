@@ -177,7 +177,7 @@ export function lowBatteryTier(charge) {
 }
 
 // Achievements, in the order they're listed, grouped into Daily, Hard mode, and Endless. badge is
-// the short text on the round badge ("bolt" draws a lightning bolt instead).
+// the short text on the round badge ("bolt" and "infinity" draw an icon instead).
 export const ACHIEVEMENTS = [
   { id: "first-charge", name: "First Charge", description: "Finish your first daily puzzle.", badge: "1ST" },
   { id: "supercharged", name: "Supercharged", description: "Get a SUPERCHARGED answer.", badge: "bolt" },
@@ -196,7 +196,7 @@ export const ACHIEVEMENTS = [
   { id: "hellproof", group: "Hard mode", name: "Hellproof", description: "Finish hard mode with 50% charge or more.", badge: "50+" },
   { id: "hard-supercharged", group: "Hard mode", name: "Supercharged in Hell", description: "Get a SUPERCHARGED answer in hard mode.", badge: "bolt" },
   { id: "devils-week", group: "Hard mode", name: "Devil's Week", description: "Play hard mode 7 days in a row.", badge: "7H", hardStreak: 7 },
-  { id: "first-run", group: "Endless", name: "First Run", description: "Finish an endless run.", badge: "∞" },
+  { id: "first-run", group: "Endless", name: "First Run", description: "Finish an endless run.", badge: "infinity" },
   { id: "ten-strong", group: "Endless", name: "Ten Strong", description: "Survive 10 rounds in one endless run.", badge: "10" },
   { id: "unplugged", group: "Endless", name: "Unplugged", description: "Survive 25 rounds in one endless run.", badge: "25" },
   { id: "overclocked", group: "Endless", name: "Overclocked", description: "Get 3 SUPERCHARGED answers in one endless run.", badge: "x3" },

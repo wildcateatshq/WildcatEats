@@ -287,6 +287,9 @@ body.hard{--charge:#b85cff;--charge-glow:#b85cff73;--charge-ink:#1c0630;--green:
 .recent-bar-fill.hard{background:color-mix(in srgb,#b85cff 70%,var(--card))}
 /* Endless mode: the start-screen button and the end-of-run personal best line. */
 .endless-button{margin-top:10px}
+.inf-icon{display:inline-block;width:1.5em;height:.75em;margin-left:.15em;vertical-align:-.05em;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
+.ach-badge .inf-icon{width:24px;height:12px;margin:0;stroke-width:2.6}
+#puzzleNumber .inf-icon{width:20px;height:10px;margin:0;vertical-align:middle}
 .endless-button.coming-soon{opacity:.5;border-style:dashed;cursor:not-allowed;transform:none;box-shadow:none}
 .final-score .endless-best{margin:12px 0 0;font:700 12px var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
 .final-score .endless-best.new{color:var(--ink)}

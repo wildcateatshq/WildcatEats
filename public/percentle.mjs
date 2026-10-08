@@ -16,6 +16,8 @@ const CHARGE_COLORS = [
 ];
 const PUZZLES_URL = "/api/percentle/puzzles";
 const ENDLESS_URL = "/api/percentle/endless";
+// A drawn infinity sign: fonts' ∞ often has uneven loops.
+const INFINITY_ICON = '<svg class="inf-icon" viewBox="0 0 24 12" aria-hidden="true"><path d="M12 6C10 3.2 8 2 6 2a4 4 0 0 0 0 8c2 0 4-1.2 6-4s4-4 6-4a4 4 0 0 1 0 8c-2 0-4-1.2-6-4z"/></svg>';
 // v2: puzzles now come from the daily agent, so v1 progress (from the old bank) no longer matches.
 const STORAGE_KEY = "percentle.v2";
 const stage = document.querySelector("#questionStage");
@@ -301,7 +303,7 @@ function render() {
   // Only shown while replaying an archived puzzle, so players can leave it at any time.
   document.querySelector("#returnButton").hidden = !practiceMode;
   if (practiceMode || endlessMode) leaveStartScreen();
-  document.querySelector("#puzzleNumber").textContent = endlessMode ? "∞" : `NO. ${currentNumber}`;
+  document.querySelector("#puzzleNumber").innerHTML = endlessMode ? INFINITY_ICON : `NO. ${currentNumber}`;
   document.querySelector("#puzzleDate").textContent = endlessMode ? "ENDLESS MODE" : currentDate === today ? (currentTheme || "Today's edition").toUpperCase() : `${currentDate} · PRACTICE`;
   if (endlessMode) document.querySelector("#progressDots").innerHTML = "";
   else renderDots(Math.min(index, 4));
@@ -765,7 +767,7 @@ function announceAchievements() {
 }
 
 function achievementBadge(achievement) {
-  return `<span class="ach-badge" aria-hidden="true">${achievement.badge === "bolt" ? '<span class="ach-bolt"></span>' : escapeHtml(achievement.badge)}</span>`;
+  return `<span class="ach-badge" aria-hidden="true">${achievement.badge === "bolt" ? '<span class="ach-bolt"></span>' : achievement.badge === "infinity" ? INFINITY_ICON : escapeHtml(achievement.badge)}</span>`;
 }
 
 function showAchievements() {
@@ -1064,7 +1066,7 @@ function renderEndlessResults() {
       <h2 class="out-title">${out ? "Run over" : "Bank cleared"}</h2><p class="out-where">Survived ${rounds} round${rounds === 1 ? "" : "s"}</p>
       <p class="endless-best${newBest ? " new" : ""}">${newBest ? "New personal best!" : `Personal best this period: ${best}`}</p></div>
     <section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">How you stack up · Endless</h3><p class="crowd-status">Comparing your best run…</p></section>
-    <button class="lock-button" id="againButton">Play again <span aria-hidden="true">∞</span></button>
+    <button class="lock-button" id="againButton">Play again ${INFINITY_ICON}</button>
     <button class="next-button secondary-button" id="shareButton">Share this run <span aria-hidden="true">↗</span></button>
     <button class="next-button secondary-button" id="todayButton">Back to today's puzzle</button>`;
   document.querySelector("#questionCounter").textContent = "RUN OVER";
@@ -1138,7 +1140,7 @@ async function updateEndlessButton() {
     const { live } = await (await fetch(`${ENDLESS_URL}/availability`)).json();
     button.disabled = !live;
     button.classList.toggle("coming-soon", !live);
-    button.innerHTML = live ? "Endless mode <span aria-hidden=\"true\">∞</span>" : "Endless mode · Coming soon";
+    button.innerHTML = live ? `Endless mode ${INFINITY_ICON}` : "Endless mode · Coming soon";
   } catch (error) {
     console.error("Could not check whether endless mode is live.", error);
   }
