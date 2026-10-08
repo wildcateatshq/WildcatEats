@@ -162,3 +162,35 @@ test("puzzle responses are cached only while they can't change", async t => {
   assert.match(await cacheOf("/2026-10-06"), /immutable/, "past puzzles never change");
   assert.equal(await cacheOf("/history", auth), "no-store");
 });
+
+test("a special carries its theme through publishing, reading, and a restart; normal days have none", async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "percentle-theme-"));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const filePath = path.join(dir, "puzzles.json");
+  const store = createPuzzleStore({ filePath });
+  await store.init();
+  const app = express();
+  app.use(express.json());
+  app.use("/p", createPuzzleRouter(store, { today: () => "2026-10-07", publishToken: "secret" }));
+  const server = app.listen(0);
+  t.after(() => server.close());
+  const url = `http://localhost:${server.address().port}/p`;
+  const auth = { "Content-Type": "application/json", Authorization: "Bearer secret" };
+  const questions = ["Sports", "Sports", "Music", "World", "U.S. life"].map((category, i) => question(category, { text: `Themed question number ${i + 1}?` }));
+  const publish = (date, body) => fetch(`${url}/${date}`, { method: "PUT", headers: auth, body: JSON.stringify(body) });
+
+  assert.equal((await publish("2026-10-08", { questions, theme: "  World Series Special " })).status, 201);
+  assert.equal((await publish("2026-10-09", { questions })).status, 201);
+  assert.equal((await publish("2026-10-10", { questions, theme: "x".repeat(41) })).status, 400, "themes are at most 40 characters");
+
+  const special = await (await fetch(`${url}/2026-10-08`, { headers: auth })).json();
+  assert.equal(special.theme, "World Series Special", "trimmed");
+  const normal = await (await fetch(`${url}/2026-10-09`, { headers: auth })).json();
+  assert.equal("theme" in normal, false);
+
+  const reopened = createPuzzleStore({ filePath });
+  await reopened.init();
+  assert.equal((await reopened.getPuzzle("2026-10-08")).theme, "World Series Special");
+  assert.equal((await reopened.getPuzzle("2026-10-09")).theme, null);
+  assert.equal((await reopened.get("2026-10-08")).length, 5, "get still returns just the questions");
+});

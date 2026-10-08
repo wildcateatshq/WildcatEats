@@ -2,7 +2,7 @@
 
 const crypto = require("node:crypto");
 const express = require("express");
-const { MAX_DAYS_AHEAD, addDays, daysBetween, easternDate, isCalendarDate, puzzleNumber, secondsUntilEasternMidnight, validatePuzzle } = require("./puzzles");
+const { MAX_DAYS_AHEAD, addDays, daysBetween, easternDate, isCalendarDate, puzzleNumber, secondsUntilEasternMidnight, validatePuzzle, validateTheme } = require("./puzzles");
 
 const ARCHIVE_DAYS = 30;
 const MAX_NOTES_LENGTH = 20_000;
@@ -33,7 +33,8 @@ function createPuzzleRouter(store, options = {}) {
     next();
   }
 
-  const send = (res, date, questions) => res.json({ date, number: puzzleNumber(date), questions });
+  // A special also carries its theme (e.g. "World Series Special"); normal days leave it out.
+  const send = (res, date, { questions, theme }) => res.json({ date, number: puzzleNumber(date), ...(theme ? { theme } : {}), questions });
 
   // A live puzzle can't change, so it can be cached until the next one goes live at midnight
   // Eastern (browsers re-check every 10 minutes; a CDN such as Cloudflare can hold it all day).
@@ -49,13 +50,13 @@ function createPuzzleRouter(store, options = {}) {
   router.get("/today", async (req, res, next) => {
     try {
       const date = today();
-      const questions = await store.get(date);
-      if (!questions) {
+      const puzzle = await store.getPuzzle(date);
+      if (!puzzle) {
         noStore(res);
         return res.status(404).json({ error: "Today's puzzle hasn't been published yet.", date, number: puzzleNumber(date) });
       }
       cacheUntilMidnight(res);
-      send(res, date, questions);
+      send(res, date, puzzle);
     } catch (error) {
       next(error);
     }
@@ -80,7 +81,10 @@ function createPuzzleRouter(store, options = {}) {
       const date = today();
       const dates = await store.dates(addDays(date, -days), addDays(date, MAX_DAYS_AHEAD));
       const puzzles = [];
-      for (const day of dates) puzzles.push({ date: day, questions: await store.get(day) });
+      for (const day of dates) {
+        const { questions, theme } = await store.getPuzzle(day);
+        puzzles.push({ date: day, ...(theme ? { theme } : {}), questions });
+      }
       res.json({ today: date, puzzles });
     } catch (error) {
       next(error);
@@ -116,12 +120,12 @@ function createPuzzleRouter(store, options = {}) {
       if (!isCalendarDate(date)) return res.status(400).json({ error: "Date must be YYYY-MM-DD." });
       const current = today();
       if (date > current && !isPublisher(req)) return res.status(404).json({ error: "That puzzle isn't out yet." });
-      const questions = await store.get(date);
-      if (!questions) return res.status(404).json({ error: "No puzzle was published for that date." });
+      const puzzle = await store.getPuzzle(date);
+      if (!puzzle) return res.status(404).json({ error: "No puzzle was published for that date." });
       if (date < current) cacheForever(res);
       else if (date === current) cacheUntilMidnight(res);
       else noStore(res);
-      send(res, date, questions);
+      send(res, date, puzzle);
     } catch (error) {
       next(error);
     }
@@ -141,9 +145,10 @@ function createPuzzleRouter(store, options = {}) {
         return res.status(409).json({ error: "Today's puzzle is already live and can't be replaced." });
       }
       const questions = validatePuzzle(req.body?.questions);
-      await store.put(date, questions);
+      const theme = validateTheme(req.body?.theme);
+      await store.put(date, questions, theme);
       res.status(201);
-      send(res, date, questions);
+      send(res, date, { questions, theme });
     } catch (error) {
       if (error instanceof RangeError) return res.status(400).json({ error: error.message });
       next(error);

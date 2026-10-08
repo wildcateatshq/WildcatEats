@@ -136,7 +136,10 @@ Each question has `text` (ending in "?"), `answer` (strictly between 0 and 100, 
 decimal), `category`, `funFact` (shown after the answer), `sourceName`, and an `https://`
 `sourceUrl` (kept for checking, not shown). Categories are `U.S. life`, `Sports`, `Music`,
 `Movies`, and `World`, in any mix: a day can have several questions from one category and
-none from another. The server rejects a puzzle that breaks these rules and lists every
+none from another. A puzzle can also carry an optional `theme` (3–40 characters, e.g. "World
+Series Special"), which makes it a special: the game shows the title on the start screen and
+in the share text. The agent only adds one after the editor approves the special by email.
+The server rejects a puzzle that breaks these rules and lists every
 problem so the agent can fix them in one retry. A day's puzzle can't be changed once that day has started, because players' guesses
 and crowd scores depend on it; unreleased days can be replaced.
 

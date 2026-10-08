@@ -57,6 +57,8 @@ const today = todayPuzzle.date;
 let state = readState();
 let currentDate = today;
 let currentNumber = todayPuzzle.number;
+// A special's title, like "World Series Special" (null on a normal day).
+let currentTheme = todayPuzzle.theme || null;
 let currentQuestions = todayPuzzle.questions;
 let practiceMode = false;
 let toastTimer;
@@ -274,7 +276,7 @@ function render() {
   document.querySelector("#returnButton").hidden = !practiceMode;
   if (practiceMode) leaveStartScreen();
   document.querySelector("#puzzleNumber").textContent = `NO. ${currentNumber}`;
-  document.querySelector("#puzzleDate").textContent = currentDate === today ? "TODAY'S EDITION" : `${currentDate} · PRACTICE`;
+  document.querySelector("#puzzleDate").textContent = currentDate === today ? (currentTheme || "Today's edition").toUpperCase() : `${currentDate} · PRACTICE`;
   renderDots(Math.min(index, 4));
   const animate = justLocked;
   justLocked = false;
@@ -744,6 +746,7 @@ function showAchievements() {
 function returnToToday() {
   currentDate = today;
   currentNumber = todayPuzzle.number;
+  currentTheme = todayPuzzle.theme || null;
   currentQuestions = todayPuzzle.questions;
   practiceMode = false;
   render();
@@ -826,7 +829,7 @@ function shareResult(charge, progress, out) {
   const closest = Math.min(...progress.guesses.map((guess, i) => Math.abs(guess - currentQuestions[i].answer)));
   const status = out ? `🪫 Out of charge on Q${progress.guesses.length}` : lowBatteryTier(charge) ? `🪫 Survived on ${formatCharge(charge)}` : `🔋 ${formatCharge(charge)}`;
   const link = `${location.origin}${location.pathname}`;
-  const result = `${GAME_NAME} #${currentNumber}\n${status}\nClosest guess - ${closest.toFixed(1)}% away\n${link}`;
+  const result = `${GAME_NAME} #${currentNumber}${currentTheme ? ` · ${currentTheme}` : ""}\n${status}\nClosest guess - ${closest.toFixed(1)}% away\n${link}`;
   if (navigator.share) {
     navigator.share({ text: result }).catch(error => {
       if (error.name !== "AbortError") copyResult(result);
@@ -929,6 +932,7 @@ async function loadArchive() {
       if (!response.ok) throw new Error(puzzle.error || `Puzzle request failed (${response.status}).`);
       currentDate = puzzle.date;
       currentNumber = puzzle.number;
+      currentTheme = puzzle.theme || null;
       currentQuestions = withRoundedAnswers(puzzle.questions);
       practiceMode = true;
       dialog.close();
@@ -949,6 +953,9 @@ function showStartScreen() {
   document.querySelector("#startButton").innerHTML = `${label} <span aria-hidden="true">→</span>`;
   const day = new Date(`${today}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
   document.querySelector("#startEdition").textContent = `No. ${todayPuzzle.number} · ${day}`;
+  const special = document.querySelector("#startSpecial");
+  special.hidden = !todayPuzzle.theme;
+  special.querySelector("span").textContent = todayPuzzle.theme || "";
   document.body.classList.add("starting");
 }
 

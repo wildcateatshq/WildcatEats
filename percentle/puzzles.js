@@ -57,6 +57,16 @@ function text(value, field, min, max, problems) {
 
 // Returns cleaned questions or throws a RangeError listing every problem, so an agent
 // can fix all of them in one retry.
+// A special's title, like "World Series Special": optional, 3–40 characters on one line.
+// Returns the trimmed title, or null when there isn't one.
+function validateTheme(theme) {
+  if (theme === undefined || theme === null || theme === "") return null;
+  if (typeof theme !== "string" || /[\r\n]/.test(theme) || theme.trim().length < 3 || theme.trim().length > 40) {
+    throw new RangeError("theme must be a single line of 3 to 40 characters.");
+  }
+  return theme.trim();
+}
+
 function validatePuzzle(questions) {
   if (!Array.isArray(questions) || questions.length !== QUESTIONS_PER_PUZZLE) {
     throw new RangeError(`A puzzle needs exactly ${QUESTIONS_PER_PUZZLE} questions.`);
@@ -101,13 +111,15 @@ function createPuzzleStore(options = {}) {
     ? null
     : new (require("pg").Pool)({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }));
   const puzzles = new Map();
+  const themes = new Map();
   let writes = Promise.resolve();
 
   async function persist() {
     await fs.mkdir(path.dirname(filePath), { recursive: true });
     const tempPath = `${filePath}.${process.pid}.${crypto.randomUUID()}.tmp`;
     try {
-      await fs.writeFile(tempPath, JSON.stringify(Object.fromEntries(puzzles), null, 2), { encoding: "utf8", flag: "wx" });
+      const saved = Object.fromEntries([...puzzles].map(([date, questions]) => [date, themes.get(date) ? { questions, theme: themes.get(date) } : questions]));
+      await fs.writeFile(tempPath, JSON.stringify(saved, null, 2), { encoding: "utf8", flag: "wx" });
       await fs.rename(tempPath, filePath);
     } catch (error) {
       await fs.rm(tempPath, { force: true }).catch(() => {});
@@ -124,6 +136,7 @@ function createPuzzleStore(options = {}) {
           published_at timestamptz not null default now()
         )
       `);
+      await pool.query("alter table percentle_puzzles add column if not exists theme text");
       await pool.query(`
         create table if not exists percentle_agent_notes (
           id smallint primary key default 1 check (id = 1),
@@ -135,9 +148,11 @@ function createPuzzleStore(options = {}) {
     }
     try {
       const loaded = JSON.parse(await fs.readFile(filePath, "utf8"));
-      for (const [date, questions] of Object.entries(loaded)) {
+      for (const [date, saved] of Object.entries(loaded)) {
         if (!isCalendarDate(date)) throw new Error(`Invalid Percentle puzzle date ${date}.`);
-        puzzles.set(date, validatePuzzle(questions));
+        puzzles.set(date, validatePuzzle(Array.isArray(saved) ? saved : saved?.questions));
+        const theme = Array.isArray(saved) ? null : validateTheme(saved?.theme);
+        if (theme) themes.set(date, theme);
       }
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
@@ -145,11 +160,16 @@ function createPuzzleStore(options = {}) {
   }
 
   async function get(date) {
+    return (await getPuzzle(date))?.questions || null;
+  }
+
+  // A day's questions and its theme (null on a normal day), or null if nothing is published.
+  async function getPuzzle(date) {
     if (pool) {
-      const { rows } = await pool.query("select questions from percentle_puzzles where puzzle_date = $1", [date]);
-      return rows[0]?.questions || null;
+      const { rows } = await pool.query("select questions, theme from percentle_puzzles where puzzle_date = $1", [date]);
+      return rows[0] ? { questions: rows[0].questions, theme: rows[0].theme || null } : null;
     }
-    return puzzles.get(date) || null;
+    return puzzles.has(date) ? { questions: puzzles.get(date), theme: themes.get(date) || null } : null;
   }
 
   // Dates with a puzzle between `from` and `to` inclusive, newest first.
@@ -164,17 +184,19 @@ function createPuzzleStore(options = {}) {
     return [...puzzles.keys()].filter(date => date >= from && date <= to).sort().reverse();
   }
 
-  async function put(date, questions) {
+  async function put(date, questions, theme = null) {
     if (pool) {
       await pool.query(
-        `insert into percentle_puzzles (puzzle_date, questions) values ($1, $2)
-         on conflict (puzzle_date) do update set questions = excluded.questions, published_at = now()`,
-        [date, JSON.stringify(questions)]
+        `insert into percentle_puzzles (puzzle_date, questions, theme) values ($1, $2, $3)
+         on conflict (puzzle_date) do update set questions = excluded.questions, theme = excluded.theme, published_at = now()`,
+        [date, JSON.stringify(questions), theme]
       );
       return;
     }
     const operation = writes.then(() => {
       puzzles.set(date, questions);
+      if (theme) themes.set(date, theme);
+      else themes.delete(date);
       return persist();
     });
     writes = operation.catch(() => {});
@@ -211,7 +233,7 @@ function createPuzzleStore(options = {}) {
     await fs.writeFile(notesPath, notes, "utf8");
   }
 
-  return { init, get, dates, put, getNotes, putNotes };
+  return { init, get, getPuzzle, dates, put, getNotes, putNotes };
 }
 
 module.exports = {
@@ -225,5 +247,6 @@ module.exports = {
   easternDate,
   isCalendarDate,
   puzzleNumber,
-  validatePuzzle
+  validatePuzzle,
+  validateTheme
 };

@@ -29,8 +29,9 @@ steps in order:
 
 1. Get the dates, the history, and your notes (Step 1).
 2. Handle any new replies from the editor (Step 2).
-3. Write any puzzles that are missing, publish them, and email them to the editor (Step 3).
-4. Report (Step 7).
+3. Check for upcoming big events and suggest specials (Step 2b).
+4. Write any puzzles that are missing, publish them, and email them to the editor (Step 3).
+5. Report (Step 7).
 
 Most runs only have Step 2 to do, or nothing at all. That's normal: finish quickly.
 
@@ -83,6 +84,11 @@ For each thread that needs handling, read every message from the editor since yo
   changed, and that you've noted the feedback for future puzzles.
 - **They approve it or only comment** ("looks good", "love #3"): reply with one short line
   confirming.
+- **They answer a special idea** (Step 2b): if they say yes, record the approved special in your
+  notes (`Approved special: <YYYY-MM-DD> — <theme>`) and reply confirming the date. If that date's
+  puzzle is already published but not live yet, rewrite it as the special now (Step 3) and send
+  it as a new puzzle email. If they say no, record that it was declined and reply with one line.
+  Never make a special the editor hasn't approved.
 
 Then **update your notes** with what this feedback says about the editor's taste. What do they
 like or dislike, in topics, eras, difficulty, and wording? Merge it into the existing notes instead
@@ -99,6 +105,24 @@ If saving returns 404, the site doesn't support notes yet, so skip it and say so
 `notes.json` holds `{"notes": "<the full updated notes as one string>"}`. Write it with a script
 (for example `node -e` or `python3`) so quotes and line breaks are escaped correctly.
 
+## Step 2b: Suggest specials
+
+A **special** is a day when all five questions are about one big event the audience is talking
+about, and the game shows its title (for example "World Series Special"). The editor decides
+which days are specials; you only suggest them.
+
+Each run, check whether one of these is happening within the next **10 days**: the World Series,
+the Super Bowl, the NBA Finals, the College Football Playoff final, the men's or women's Final
+Four, the NFL or NBA Draft, the Grammys, the VMAs, a major album release from a top artist, the
+Olympics, or the World Cup. If one is, and your notes don't already show that you asked about it:
+
+- Pick the best date for it: usually the day of the event or the day after, and always after
+  TOMORROW so there's time to write it.
+- Email the editor a **new** email with the subject
+  `[Chargle] Special idea: <Event> on <Weekday, Month D>`, saying in two or three lines what the
+  special would cover and asking them to reply yes or no.
+- Add `Asked about special: <event> for <YYYY-MM-DD>` to your notes so you don't ask twice.
+
 ## Step 3: Write missing puzzles
 
 - If **TOMORROW** has no puzzle, write one now, however late it is.
@@ -112,6 +136,15 @@ For each puzzle you write, avoid repeats:
 
 Write it using Steps 4 and 5, publish it (Step 6), then email it to the editor as a **new** email
 in the format below.
+
+**If your notes show an approved special for that date**, write it as the special:
+- All five questions are about the event: the teams, players, artists, records, and history
+  involved. Every other rule in Step 5 still applies, including sources and completed time
+  frames (don't ask about results of the event itself before it has finished).
+- Categories can all be the same (for example all `Sports`), and the 14-day rule about repeating
+  a team or artist doesn't apply to the event's own teams or artists.
+- Add `"theme": "<Event> Special"` to `puzzle.json` (3–40 characters, for example
+  `"World Series Special"`). Only ever add a theme to an approved special.
 
 ## Step 4: Choose the topics
 
@@ -249,7 +282,7 @@ curl -sS --max-time 120 -X PUT \
 **Email format.** Publish first, then email, so the puzzle is live even if the editor never
 replies. Send plain text.
 - **Subject** (new puzzles): `[Chargle] #<number> for <Weekday, Month D> (<YYYY-MM-DD>)`, using
-  the `number` from the publish response.
+  the `number` from the publish response. For a special, add ` — <theme>` at the end.
 - **Body**:
 
 ```
