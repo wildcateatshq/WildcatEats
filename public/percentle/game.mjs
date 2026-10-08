@@ -197,3 +197,16 @@ export function longestStreak(dates) {
 export function streakAchievements(streak) {
   return ACHIEVEMENTS.filter(achievement => achievement.streak && streak >= achievement.streak).map(achievement => achievement.id);
 }
+
+// Which answered question was the player's best guess: the fewest points off, with ties (e.g.
+// two SUPERCHARGED answers) going to the guess that was actually closer, then the earlier one.
+export function bestGuessIndex(guesses, questions) {
+  let best = 0;
+  guesses.forEach((guess, i) => {
+    const off = pointsOff(guess, questions[i].answer);
+    const bestOff = pointsOff(guesses[best], questions[best].answer);
+    const closer = Math.abs(guess - questions[i].answer) < Math.abs(guesses[best] - questions[best].answer);
+    if (off < bestOff || (off === bestOff && closer)) best = i;
+  });
+  return best;
+}

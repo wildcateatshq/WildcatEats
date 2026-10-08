@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   achievementsForGame,
   applyGuessKey,
+  bestGuessIndex,
   chargeLeft,
   crowdRank,
   DRAIN_RATE,
@@ -163,4 +164,11 @@ test("streak achievements count the longest run of consecutive days", () => {
   assert.equal(longestStreak(["2026-10-31", "2026-11-01"]), 2, "runs across months");
   assert.deepEqual(streakAchievements(7), ["week-streak"]);
   assert.deepEqual(streakAchievements(6), []);
+});
+
+test("the best guess has the fewest points off, with ties going to the guess that was actually closer", () => {
+  const questions = [10, 20, 30, 40, 50].map(answer => ({ answer }));
+  assert.equal(bestGuessIndex([15, 30, 32, 60, 90], questions), 2, "Q3 was only 2 off");
+  assert.equal(bestGuessIndex([10.4, 20.1, 50], questions), 1, "both within 0.5 score 0; Q2 was closer");
+  assert.equal(bestGuessIndex([12, 22], questions), 0, "an exact tie keeps the earlier one");
 });

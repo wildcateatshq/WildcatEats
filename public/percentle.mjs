@@ -1,4 +1,4 @@
-import { achievementsForGame, ACHIEVEMENTS, applyGuessKey, chargeLeft, crowdRank, dailyTotal, DRAIN_RATE, reactionFor, easternDate, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { achievementsForGame, ACHIEVEMENTS, applyGuessKey, bestGuessIndex, chargeLeft, crowdRank, dailyTotal, DRAIN_RATE, reactionFor, easternDate, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
 const GAME_NAME = "Chargle";
@@ -545,12 +545,13 @@ function bindNext(index) {
 
 // Below the card on the results screen: "Drain by question". A graph shows the battery stepping
 // down question by question, like a phone's battery-usage chart, and under it one box shows a
-// single question with a mini version of its reveal bar. It starts on question 1; tapping a step
-// on the graph switches the box to that question.
+// single question with a mini version of its reveal bar. It starts on the best guess (marked as
+// such); tapping a step on the graph switches the box to that question.
 function renderRecap(progress) {
   const recap = document.querySelector("#recap");
   const offs = progress.guesses.map((guess, i) => pointsOff(guess, currentQuestions[i].answer));
   const charges = offs.map((_, i) => chargeLeft(dailyTotal(progress.guesses.slice(0, i + 1), currentQuestions.slice(0, i + 1))));
+  const best = bestGuessIndex(progress.guesses, currentQuestions);
   recap.innerHTML = `<section class="log" aria-label="Drain by question: your charge after each question">
       <h3 class="log-title">Drain by question</h3>
       ${dischargeGraph(charges)}
@@ -564,14 +565,14 @@ function renderRecap(progress) {
       button.setAttribute("aria-pressed", Number(button.dataset.step) === step);
     });
     const question = currentQuestions[step];
-    detail.innerHTML = step < progress.guesses.length ? logRow(question, progress.guesses[step], offs[step], step) : `<article class="recap-item log-row unreached">
+    detail.innerHTML = step < progress.guesses.length ? logRow(question, progress.guesses[step], offs[step], step, step === best) : `<article class="recap-item log-row unreached">
       <div class="log-row-head"><span class="log-q">Q${step + 1}</span><span class="recap-badge">Not reached</span></div>
       <p class="recap-question">${escapeHtml(question.text)}</p>
       <p class="recap-numbers"><span>Answer: ${question.answer.toFixed(1)}%</span></p>
     </article>`;
   };
   recap.querySelectorAll(".log-step").forEach(button => button.addEventListener("click", () => show(Number(button.dataset.step))));
-  show(0);
+  show(best);
 }
 
 // The stepped line: flat at the charge going into each question, then a drop at the question to
@@ -607,13 +608,13 @@ function dischargeGraph(charges) {
 
 // One answered question: what it cost, the question, a mini reveal bar (green up to the lower of
 // guess and answer, gray across the gap, a YOU tick and an ANSWER tick), and the two numbers.
-function logRow(question, guess, off, i) {
+function logRow(question, guess, off, i, isBest) {
   const lit = litStyle(off);
   const guessX = Math.max(0, Math.min(100, guess));
   const answerX = Math.max(0, Math.min(100, question.answer));
   const low = Math.min(guessX, answerX);
   return `<article class="recap-item log-row">
-      <div class="log-row-head"><span class="log-q">Q${i + 1}</span><span class="log-cost">${off === 0 ? noDrainNote() : `−${(off * DRAIN_RATE).toFixed(1)}%`}</span></div>
+      <div class="log-row-head"><span class="log-q">Q${i + 1}</span>${isBest ? '<span class="recap-badge">Best guess</span>' : ""}<span class="log-cost">${off === 0 ? noDrainNote() : `−${(off * DRAIN_RATE).toFixed(1)}%`}</span></div>
       <p class="recap-question">${escapeHtml(question.text)}</p>
       <div class="mini-bar" aria-hidden="true"><span class="mini-fill" style="width:${low}%"></span><span class="mini-gap" style="left:${low}%;width:${Math.abs(guessX - answerX)}%"></span>
         <span class="mini-tick" style="left:${guessX}%;background:${lit.color};box-shadow:${lit.glow}"></span><span class="mini-tick answer" style="left:${answerX}%"></span></div>
