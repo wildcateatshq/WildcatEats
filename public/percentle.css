@@ -282,7 +282,7 @@ body.hard{--charge:#b85cff;--charge-glow:#b85cff73;--charge-ink:#1c0630;--green:
 .mode-flash.to-hard{background:radial-gradient(circle at 50% 50%,#ecd4ff 0%,#b85cff 42%,#3d0b66 100%)}
 .mode-flash.to-normal{background:radial-gradient(circle at 50% 58%,#c8ffe0 0%,#39ff88 45%,#0f5a2e 100%)}
 .mode-flash.fading{animation:charge-out .9s ease-out both}
-.devil{width:min(190px,46vw);filter:drop-shadow(0 0 30px #000a);animation:devil-in .55s cubic-bezier(.2,1.4,.4,1) .1s both}
+.devil{width:min(300px,72vw);filter:blur(.7px) drop-shadow(0 0 10px #000) drop-shadow(0 0 28px #000b);animation:devil-in .55s cubic-bezier(.2,1.4,.4,1) .1s both}
 @keyframes devil-in{from{opacity:0;transform:scale(.4) rotate(-14deg)}to{opacity:1;transform:none}}
 .recent-bar-fill.hard{background:color-mix(in srgb,#b85cff 70%,var(--card))}
 /* Endless mode: the start-screen button and the end-of-run personal best line. */

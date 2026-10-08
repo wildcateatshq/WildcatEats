@@ -1127,7 +1127,7 @@ function updateHardSwitch() {
 
 // Switching modes floods the screen: purple with a black devil going into hard mode, green coming
 // back out. The look changes while the screen is covered.
-const DEVIL = `<svg class="devil" viewBox="0 0 120 120" aria-hidden="true"><path fill="#000" d="M18 10c3 20 11 32 23 38a40 40 0 0 0-5 20c0 26 11 44 24 44s24-18 24-44a40 40 0 0 0-5-20c12-6 20-18 23-38-9 10-19 16-30 17a32 32 0 0 0-24 0C37 26 27 20 18 10z"/><path fill="#b85cff" d="M40 60l17 8-15 4zM80 60l-17 8 15 4z"/><path d="M45 88q15 12 30 0" fill="none" stroke="#b85cff" stroke-width="4.5" stroke-linecap="round"/></svg>`;
+const DEVIL = `<svg class="devil" viewBox="0 0 200 150" aria-hidden="true"><path fill="#000" d="M8,22 L30,30 L38,18 L46,30 L58,20 L62,32 L76,30 L96,54 L70,58 L44,50 L24,38 Z M192,22 L170,30 L162,18 L154,30 L142,20 L138,32 L124,30 L104,54 L130,58 L156,50 L176,38 Z M12,58 L19.3,55.8 L26.7,69 L34,62.5 L41.3,78 L48.7,67.8 L56,85 L63.3,71.8 L70.7,90 L78,74.5 L85.3,93 L92.7,75.8 L100,94 L107.3,75.8 L114.7,93 L122,74.5 L129.3,90 L136.7,71.8 L144,85 L151.3,67.8 L158.7,78 L166,62.5 L173.3,69 L180.7,55.8 L188,58 L188,58 L184.3,70.7 L177,92.8 L169.7,87.6 L162.3,113.9 L155,101.3 L147.7,130.5 L140.3,111.8 L133,142.8 L125.7,119.1 L118.3,150.5 L111,123.1 L103.7,153.9 L96.3,123.9 L89,152.8 L81.7,121.5 L74.3,147.2 L67,115.8 L59.7,137.2 L52.3,107 L45,122.8 L37.7,94.9 L30.3,103.9 L23,79.6 L15.7,80.5 Z"/></svg>`;
 
 function toggleHardMode() {
   if (document.querySelector(".mode-flash") || state.progress[today]?.guesses.length) return;
