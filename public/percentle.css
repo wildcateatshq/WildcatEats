@@ -286,6 +286,11 @@ body.hard{--charge:#b85cff;--charge-glow:#b85cff73;--charge-ink:#1c0630;--green:
 @keyframes devil-in{from{opacity:0;transform:scale(.4) rotate(-14deg)}to{opacity:1;transform:none}}
 .recent-bar-fill.hard{background:color-mix(in srgb,#b85cff 70%,var(--card))}
 /* Endless mode: the start-screen button and the end-of-run personal best line. */
+/* Drawn icons (instead of arrow and emoji characters, which phones turn into emoji). */
+.icon{display:inline-block;width:1.05em;height:1.05em;vertical-align:-.16em;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.icon-button .icon{width:18px;height:18px;vertical-align:0}
+.reveal-arrow .icon{width:.9em;height:.9em;vertical-align:-.05em}
+.icon-devil{color:#b85cff;vertical-align:-.2em}
 .endless-button{margin-top:10px}
 .inf-icon{display:inline-block;width:1.5em;height:.75em;margin-left:.15em;vertical-align:-.05em;fill:none;stroke:currentColor;stroke-width:2.2;stroke-linecap:round}
 .ach-badge .inf-icon{width:24px;height:12px;margin:0;stroke-width:2.6}

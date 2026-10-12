@@ -16,6 +16,13 @@ const CHARGE_COLORS = [
 ];
 const PUZZLES_URL = "/api/percentle/puzzles";
 const ENDLESS_URL = "/api/percentle/endless";
+// Drawn icons: arrow and emoji characters show up as emoji on many phones.
+const ICONS = {
+  right: '<svg class="icon icon-right" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  left: '<svg class="icon icon-left" viewBox="0 0 24 24" aria-hidden="true"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>',
+  share: '<svg class="icon icon-share" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17 17 7M9 7h8v8"/></svg>',
+  devil: '<svg class="icon icon-devil" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4c.5 3 2 4.5 3.5 5.2A6.5 6.5 0 0 0 7 13c0 4 2.2 7 5 7s5-3 5-7a6.5 6.5 0 0 0-1.5-3.8C17 8.5 18.5 7 19 4c-1.6 1.6-3.4 2.4-5 2.6a5 5 0 0 0-4 0C8.4 6.4 6.6 5.6 5 4z" fill="currentColor" stroke="none"/></svg>'
+};
 // A drawn infinity sign: fonts' ∞ often has uneven loops.
 const INFINITY_ICON = '<svg class="inf-icon" viewBox="0 0 24 12" aria-hidden="true"><path d="M12 6C10 3.2 8 2 6 2a4 4 0 0 0 0 8c2 0 4-1.2 6-4s4-4 6-4a4 4 0 0 1 0 8c-2 0-4-1.2-6-4z"/></svg>';
 // v2: puzzles now come from the daily agent, so v1 progress (from the old bank) no longer matches.
@@ -463,7 +470,7 @@ function guessForm(guess) {
     <div class="range-wrap"><div class="battery bar-battery" id="guessBattery" style="--level:${guess}"><div class="battery-cell"><span class="battery-fill"></span>${ZAP}
         <input class="battery-range" id="guessRange" type="range" min="0" max="100" step="0.1" value="${guess}" aria-label="Adjust your percentage guess from 0 to 100"></div></div>
       <div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div></div>
-    <button class="lock-button" id="lockButton">Lock in my guess <span aria-hidden="true">→</span></button>`;
+    <button class="lock-button" id="lockButton">Lock in my guess ${ICONS.right}</button>`;
 }
 
 function bindGuessControls(initial, index) {
@@ -559,7 +566,7 @@ function reveal(question, guess, index) {
   const left = Math.min(guessX, answerX);
   const width = Math.abs(guessX - answerX);
   const answerHigher = question.answer >= guess;
-  const arrow = guess === question.answer ? "=" : answerHigher ? "→" : "←";
+  const arrow = guess === question.answer ? "=" : answerHigher ? ICONS.right : ICONS.left;
   const lit = litStyle(off);
   return `<div class="reveal-row ${answerHigher ? "" : "lower"}${off === 0 ? " struck" : ""}" id="revealRow" aria-label="You guessed ${Number(guess).toFixed(1)} percent. The answer is ${question.answer.toFixed(1)} percent, ${off.toFixed(1)} points off.">
       <span class="reveal-num reveal-guess" style="--lit-color:${lit.color};--lit-glow:${lit.glow}">${Number(guess).toFixed(1)}<small>%</small></span>
@@ -575,7 +582,7 @@ function reveal(question, guess, index) {
       <div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div>
     </div>
     <p class="source-note">${escapeHtml(question.funFact)}</p>
-    <button class="next-button" id="nextButton">${index === currentQuestions.length - 1 ? "Battery report" : "Next question"} <span aria-hidden="true">→</span></button>`;
+    <button class="next-button" id="nextButton">${index === currentQuestions.length - 1 ? "Battery report" : "Next question"} ${ICONS.right}</button>`;
 }
 
 function bindNext(index) {
@@ -684,9 +691,9 @@ function renderResults() {
       <div class="result-battery-wrap">${batteryMarkup("result-battery", "resultBattery", animate ? 100 : charge)}</div></div>`;
   stage.innerHTML = `${headline}
     ${practiceMode ? "" : `<section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">How you stack up${hard ? " · Hard mode" : ""}</h3><p class="crowd-copy">Your charge is added anonymously. Never your guesses, name, or account.</p><p class="crowd-status">Seeing how you stack up…</p></section>`}
-    <button class="share-button" id="shareButton">Share ${currentDate === today ? "today's" : "this"} result <span aria-hidden="true">↗</span></button>
+    <button class="share-button" id="shareButton">Share ${currentDate === today ? "today's" : "this"} result ${ICONS.share}</button>
     ${practiceMode ? '<button class="next-button secondary-button" id="replayButton">Play this puzzle again</button><button class="next-button secondary-button" id="todayButton">Back to today\'s puzzle</button>' : ""}
-    <button class="next-button secondary-button" id="statsInline">Your stats &amp; archives <span aria-hidden="true">→</span></button>`;
+    <button class="next-button secondary-button" id="statsInline">Your stats &amp; archives ${ICONS.right}</button>`;
   document.querySelector("#questionCounter").textContent = out ? "POWER LOST" : "PUZZLE COMPLETE";
   renderDots(out ? answered : 5);
   document.querySelector(".progress-dot.current")?.classList.remove("current");
@@ -932,7 +939,7 @@ function bindLastTenGames() {
   const bars = [...dialog.querySelectorAll(".recent-bar")];
   const select = bar => {
     bars.forEach(other => other.classList.toggle("selected", other === bar));
-    detail.innerHTML = `${longDate(bar.dataset.date)} · <strong>${bar.dataset.charge}</strong>${"hard" in bar.dataset ? " · Hard mode 😈" : ""}`;
+    detail.innerHTML = `${longDate(bar.dataset.date)} · <strong>${bar.dataset.charge}</strong>${"hard" in bar.dataset ? ` · Hard mode ${ICONS.devil}` : ""}`;
   };
   bars.forEach(bar => bar.addEventListener("click", () => select(bar)));
   if (bars.length) select(bars.at(-1));
@@ -1067,7 +1074,7 @@ function renderEndlessResults() {
       <p class="endless-best${newBest ? " new" : ""}">${newBest ? "New personal best!" : `Personal best this period: ${best}`}</p></div>
     <section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">How you stack up · Endless</h3><p class="crowd-status">Comparing your best run…</p></section>
     <button class="lock-button" id="againButton">Play again ${INFINITY_ICON}</button>
-    <button class="next-button secondary-button" id="shareButton">Share this run <span aria-hidden="true">↗</span></button>
+    <button class="next-button secondary-button" id="shareButton">Share this run ${ICONS.share}</button>
     <button class="next-button secondary-button" id="todayButton">Back to today's puzzle</button>`;
   document.querySelector("#questionCounter").textContent = "RUN OVER";
   document.querySelector("#progressDots").innerHTML = "";
@@ -1122,7 +1129,7 @@ async function loadEndlessCrowd(startsOn, best) {
 function showStartScreen() {
   const label = isTodayFinished() ? "See today's results"
     : (state.progress[today]?.guesses.length ?? 0) > 0 ? "Continue today's game" : "Play today's game";
-  document.querySelector("#startButton").innerHTML = `${label} <span aria-hidden="true">→</span>`;
+  document.querySelector("#startButton").innerHTML = `${label} ${ICONS.right}`;
   const day = new Date(`${today}T12:00:00Z`).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", timeZone: "UTC" });
   document.querySelector("#startEdition").textContent = `No. ${todayPuzzle.number} · ${day}`;
   const special = document.querySelector("#startSpecial");
