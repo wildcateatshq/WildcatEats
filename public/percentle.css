@@ -30,8 +30,13 @@ main{padding:47px 0 34px}
 /* The big outlined question number, with a smaller "/5" beside it. */
 .q-counter{display:flex;align-items:baseline;gap:6px}
 .q-num{font:700 76px/.82 var(--display);letter-spacing:-4px;color:transparent;-webkit-text-stroke:1.5px color-mix(in srgb,var(--charge) 70%,transparent);margin-left:-3px}
+/* Odometer digits: each sits in a one-digit window; a changing digit's strip rolls up by one. */
+.q-num{display:inline-flex}
+.q-digit{display:inline-block;height:.86em;overflow:hidden}
+.q-digit>span,.q-roll>span{display:block;height:.86em;line-height:.86em}
+.q-roll{display:block;animation:odometer .7s cubic-bezier(.3,1.35,.5,1) .15s both}
+@keyframes odometer{from{transform:translateY(0)}to{transform:translateY(-.86em)}}
 .q-of{display:inline-flex;align-items:center;font:500 18px var(--mono);color:var(--muted);letter-spacing:1px}
-.q-of .inf-icon{width:26px;height:13px;margin-left:2px}
 .q-label{font:500 10px var(--mono);letter-spacing:3px;text-transform:uppercase;color:var(--green)}
 .question-body{padding:16px 0 8px}
 .question-text{font:600 clamp(22px,4.8vw,29px)/1.25 var(--display);letter-spacing:0;margin:0 0 12px;max-width:550px}

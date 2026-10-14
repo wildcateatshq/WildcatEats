@@ -292,16 +292,30 @@ function showToast(message) {
 }
 
 // Above each question: its number, big and outlined, with how many there are ("01 /5"; endless
-// runs show "/∞"). Results screens show a short label instead.
+// runs show just the number). Results screens show a short label instead.
 function setQuestionNumber(index) {
   const counter = document.querySelector("#questionCounter");
-  counter.innerHTML = `<span class="q-num">${String(index + 1).padStart(2, "0")}</span><span class="q-of">/${endlessMode ? INFINITY_ICON : currentQuestions.length}</span>`;
+  const number = String(index + 1).padStart(2, "0");
+  // Moving on to the next question, the number rolls like an odometer: each digit that changes
+  // rolls up and away while the new one rolls up from below. Reloads just show the number.
+  // Only rolls when moving on by exactly one (not on reloads, new runs, or switching puzzles).
+  const previous = counter.dataset.number;
+  const rolling = previous !== undefined && Number(previous) + 1 === index + 1 && previous.length === number.length;
+  const digits = [...number].map((digit, i) => {
+    const before = rolling ? previous[i] : null;
+    return before !== null && before !== digit
+      ? `<span class="q-digit"><span class="q-roll"><span>${before}</span><span>${digit}</span></span></span>`
+      : `<span class="q-digit"><span>${digit}</span></span>`;
+  }).join("");
+  counter.innerHTML = `<span class="q-num" aria-hidden="true">${digits}</span>${endlessMode ? "" : `<span class="q-of" aria-hidden="true">/${currentQuestions.length}</span>`}`;
+  counter.dataset.number = number;
   counter.setAttribute("aria-label", endlessMode ? `Round ${index + 1}` : `Question ${index + 1} of ${currentQuestions.length}`);
 }
 
 function setCounterLabel(text) {
   const counter = document.querySelector("#questionCounter");
   counter.innerHTML = `<span class="q-label">${text}</span>`;
+  delete counter.dataset.number;
   counter.removeAttribute("aria-label");
 }
 
