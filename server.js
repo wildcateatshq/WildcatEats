@@ -18,6 +18,8 @@ const percentlePuzzles = require("./percentle/puzzles").createPuzzleStore();
 const { createPuzzleRouter } = require("./percentle/puzzle-router");
 const percentleEndless = require("./percentle/endless").createEndlessStore();
 const { createEndlessRouter } = require("./percentle/endless-router");
+const percentleStats = require("./percentle/stats").createStatsStore();
+const { createStatsRouter } = require("./percentle/stats-router");
 
 // Push notifications are fully optional — with no VAPID keys set, the
 // in-app unread badge still works fine, sendPushToUser() below just quietly
@@ -333,6 +335,8 @@ app.use("/api/percentle/crowd", createCrowdRouter(percentleCrowd));
 app.use("/api/percentle/puzzles", createPuzzleRouter(percentlePuzzles));
 // Endless mode's two-week question banks and anonymous best runs (percentle/endless.js).
 app.use("/api/percentle/endless", createEndlessRouter(percentleEndless));
+// Daily player stats (anonymous visits, sources, shares) and the editor's spreadsheet feed.
+app.use("/api/percentle/stats", createStatsRouter(percentleStats, percentleCrowd));
 
 // "Late Night" is a pickup spot that only exists 9 PM – midnight, Eastern,
 // every day — computed off the server clock (not the client's) so it's
@@ -1078,7 +1082,7 @@ app.use((err, req, res, next) => {
 
 db.init()
   .then(() => {
-    return Promise.all([percentleCrowd.init(), percentlePuzzles.init(), percentleEndless.init()]);
+    return Promise.all([percentleCrowd.init(), percentlePuzzles.init(), percentleEndless.init(), percentleStats.init()]);
   })
   .then(() => {
     app.listen(PORT, () => console.log(`NovaDash running at http://localhost:${PORT} (storage: ${db.backend})`));
