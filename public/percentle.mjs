@@ -291,10 +291,18 @@ function showToast(message) {
   toastTimer = setTimeout(() => toast.classList.remove("visible"), 2200);
 }
 
-function renderDots(index) {
-  document.querySelector("#progressDots").innerHTML = currentQuestions.map((_, i) =>
-    `<span class="progress-dot ${i < index ? "done" : ""} ${i === index ? "current" : ""}"></span>`
-  ).join("");
+// Above each question: its number, big and outlined, with how many there are ("01 /5"; endless
+// runs show "/∞"). Results screens show a short label instead.
+function setQuestionNumber(index) {
+  const counter = document.querySelector("#questionCounter");
+  counter.innerHTML = `<span class="q-num">${String(index + 1).padStart(2, "0")}</span><span class="q-of">/${endlessMode ? INFINITY_ICON : currentQuestions.length}</span>`;
+  counter.setAttribute("aria-label", endlessMode ? `Round ${index + 1}` : `Question ${index + 1} of ${currentQuestions.length}`);
+}
+
+function setCounterLabel(text) {
+  const counter = document.querySelector("#questionCounter");
+  counter.innerHTML = `<span class="q-label">${text}</span>`;
+  counter.removeAttribute("aria-label");
 }
 
 function render() {
@@ -312,8 +320,6 @@ function render() {
   if (practiceMode || endlessMode) leaveStartScreen();
   document.querySelector("#puzzleNumber").innerHTML = endlessMode ? INFINITY_ICON : `NO. ${currentNumber}`;
   document.querySelector("#puzzleDate").textContent = endlessMode ? "ENDLESS MODE" : currentDate === today ? (currentTheme || "Today's edition").toUpperCase() : `${currentDate} · PRACTICE`;
-  if (endlessMode) document.querySelector("#progressDots").innerHTML = "";
-  else renderDots(Math.min(index, 4));
   const animate = justLocked;
   justLocked = false;
   // Reloading part-way through a power-out goes straight to the out-of-charge screen.
@@ -329,7 +335,7 @@ function render() {
     return;
   }
   const question = currentQuestions[index];
-  document.querySelector("#questionCounter").textContent = `${endlessMode ? "ROUND" : "QUESTION"} ${String(index + 1).padStart(2, "0")}`;
+  setQuestionNumber(index);
   const guess = progress.draft ?? 50;
   stage.innerHTML = `
     <div class="question-body">
@@ -694,9 +700,7 @@ function renderResults() {
     <button class="share-button" id="shareButton">Share ${currentDate === today ? "today's" : "this"} result ${ICONS.share}</button>
     ${practiceMode ? '<button class="next-button secondary-button" id="replayButton">Play this puzzle again</button><button class="next-button secondary-button" id="todayButton">Back to today\'s puzzle</button>' : ""}
     <button class="next-button secondary-button" id="statsInline">Your stats &amp; archives ${ICONS.right}</button>`;
-  document.querySelector("#questionCounter").textContent = out ? "POWER LOST" : "PUZZLE COMPLETE";
-  renderDots(out ? answered : 5);
-  document.querySelector(".progress-dot.current")?.classList.remove("current");
+  setCounterLabel(out ? "Power lost" : "Puzzle complete");
   renderRecap(progress);
   document.querySelector("#shareButton").addEventListener("click", () => shareResult(charge, progress, out));
   document.querySelector("#replayButton")?.addEventListener("click", () => {
@@ -1076,8 +1080,7 @@ function renderEndlessResults() {
     <button class="lock-button" id="againButton">Play again ${INFINITY_ICON}</button>
     <button class="next-button secondary-button" id="shareButton">Share this run ${ICONS.share}</button>
     <button class="next-button secondary-button" id="todayButton">Back to today's puzzle</button>`;
-  document.querySelector("#questionCounter").textContent = "RUN OVER";
-  document.querySelector("#progressDots").innerHTML = "";
+  setCounterLabel("Run over");
   renderRecap(progress);
   document.querySelector("#againButton").addEventListener("click", async () => {
     if (await startEndless()) render();
