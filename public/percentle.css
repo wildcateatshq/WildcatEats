@@ -330,28 +330,30 @@ dialog .ach p{margin:1px 0 0;font-size:12px;line-height:1.4}
 .ach-toast.shown{transform:translate(-50%,0)}
 .ach-toast small{display:block;font:500 9px var(--mono);letter-spacing:2px;text-transform:uppercase;color:var(--green)}
 .ach-toast strong{display:block;font:700 15px var(--display);letter-spacing:1px;text-transform:uppercase}
-/* Phones, while a question is up: tighter spacing so the question (and its reveal, fun fact and Next)
-   fits on one screen. The start and results screens keep their normal spacing. */
+/* Phones, while a question is up: the question (and its reveal, fun fact and Next) fits on one screen.
+   --room is the height left over on taller phones, shared out between the gaps so the page fills the
+   screen instead of leaving space at the bottom. The start and results screens keep their normal spacing. */
 @media(max-width:520px){
+body:not(.starting):has(.question-body){--room:clamp(0px,100vh - 650px,220px)}
+@supports(height:100svh){body:not(.starting):has(.question-body){--room:clamp(0px,100svh - 650px,220px)}}
 body:not(.starting):has(.question-body) .topbar{height:56px}
-body:not(.starting):has(.question-body) main{padding:14px 0 12px}
-body:not(.starting):has(.question-body) .intro{margin-bottom:6px}
-body:not(.starting):has(.question-body) .score-box{min-height:0;padding-top:8px}
-body:not(.starting):has(.question-body) .score-battery{height:52px;margin:5px 9px 4px 0}
+body:not(.starting):has(.question-body) main{padding:calc(14px + var(--room)*.14) 0 12px}
+body:not(.starting):has(.question-body) .intro{margin-bottom:calc(6px + var(--room)*.12)}
+body:not(.starting):has(.question-body) .score-box{min-height:0;padding-top:calc(8px + var(--room)*.06)}
 body:not(.starting):has(.question-body) .progress-row{min-height:46px}
 body:not(.starting):has(.question-body) .q-num{font-size:52px;letter-spacing:-3px}
 body:not(.starting):has(.question-body) .game-card{padding:0 0 8px;min-height:0}
-body:not(.starting):has(.question-body) .question-body{padding:8px 0 4px}
+body:not(.starting):has(.question-body) .question-body{padding:calc(8px + var(--room)*.08) 0 4px}
 body:not(.starting):has(.question-body) .question-text{font-size:21px;line-height:1.22;margin-bottom:8px}
-body:not(.starting):has(.question-body) .guess-display{margin:12px 0 0}
+body:not(.starting):has(.question-body) .guess-display{margin:calc(12px + var(--room)*.35) 0 0}
 body:not(.starting):has(.question-body) .guess-input{font-size:40px}
 body:not(.starting):has(.question-body) .range-wrap{padding-top:6px}
 body:not(.starting):has(.question-body) .bar-battery{height:40px}
 body:not(.starting):has(.question-body) .range-labels{margin-top:8px}
-body:not(.starting):has(.question-body) .range-wrap+.lock-button{margin-top:16px}
+body:not(.starting):has(.question-body) .range-wrap+.lock-button{margin-top:calc(16px + var(--room)*.35)}
 body:not(.starting):has(.question-body) .lock-button,body:not(.starting):has(.question-body) .next-button{padding:13px 18px}
-body:not(.starting):has(.question-body) .comparison{padding:12px 0 0}
+body:not(.starting):has(.question-body) .comparison{padding:calc(12px + var(--room)*.1) 0 0}
 body:not(.starting):has(.question-body) .reveal-row{margin:10px 0 0}
-body:not(.starting):has(.question-body) .source-note{padding:9px 12px;line-height:1.45}
-body:not(.starting):has(.question-body) .next-button{margin-top:12px}
+body:not(.starting):has(.question-body) .source-note{padding:9px 12px;line-height:1.45;margin-top:calc(var(--room)*.06)}
+body:not(.starting):has(.question-body) .next-button{margin-top:calc(12px + var(--room)*.12)}
 }
