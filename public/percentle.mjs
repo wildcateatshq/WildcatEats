@@ -320,6 +320,8 @@ function setCounterLabel(text) {
 }
 
 function render() {
+  // A height kept from the previous question (see bindNext) only holds until the next screen change.
+  document.querySelector("#gameCard").style.minHeight = "";
   const progress = progressFor();
   const out = isOutOfCharge(progress.guesses, currentQuestions, rateOf(progress));
   const view = viewForProgress(progress, currentQuestions.length, out);
@@ -612,7 +614,14 @@ function bindNext(index) {
     progress.revealed = index + 1;
     save();
     animateResults = progress.revealed === currentQuestions.length;
+    // Moving on, the page stays where the player is: the game area keeps its height (so the
+    // shorter next question doesn't pull the page up) and the scroll position is put back.
+    const card = document.querySelector("#gameCard");
+    const scrolled = window.scrollY;
+    const height = card.offsetHeight;
     render();
+    card.style.minHeight = `${height}px`;
+    window.scrollTo({ top: scrolled });
   });
 }
 

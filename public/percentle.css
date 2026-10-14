@@ -25,14 +25,14 @@ main{padding:47px 0 34px}
 @keyframes live{50%{opacity:.35;box-shadow:0 0 2px var(--charge)}}
 .date-rule{width:24px;height:1px;background:var(--line)}
 /* The question sits straight on the page: no card, border, or glow around it. */
-.game-card{position:relative;padding:4px 0 30px;min-height:400px;overflow:hidden}
+.game-card{position:relative;padding:4px 0 30px;min-height:400px}
 .progress-row{min-height:58px;display:flex;align-items:flex-end}
 /* The big outlined question number, with a smaller "/5" beside it. */
 .q-counter{display:flex;align-items:baseline;gap:6px}
 .q-num{font:700 76px/.82 var(--display);letter-spacing:-4px;color:transparent;-webkit-text-stroke:1.5px color-mix(in srgb,var(--charge) 70%,transparent);margin-left:-3px}
 /* Odometer digits: each sits in a one-digit window; a changing digit's strip rolls up by one. */
 .q-num{display:inline-flex}
-.q-digit{display:inline-block;height:.86em;overflow:hidden}
+.q-digit{display:inline-block;height:.86em;overflow:hidden;padding:0 .08em;margin:0 -.08em}
 .q-digit>span,.q-roll>span{display:block;height:.86em;line-height:.86em}
 .q-roll{display:block;animation:odometer .7s cubic-bezier(.3,1.35,.5,1) .15s both}
 @keyframes odometer{from{transform:translateY(0)}to{transform:translateY(-.86em)}}
@@ -76,7 +76,7 @@ main{padding:47px 0 34px}
 @keyframes strike-flash{0%,22%{opacity:1}28%{opacity:.15}34%{opacity:1}55%{opacity:.8}100%{opacity:0}}
 .game-card.struck{animation:jolt .35s ease-out 1.38s}
 @keyframes jolt{0%,100%{transform:none}25%{transform:translateY(5px)}55%{transform:translateY(-2px)}}
-.game-card.struck::after{content:"";position:absolute;inset:0;z-index:5;pointer-events:none;background:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--charge) 60%,#fff),transparent 70%);opacity:0;animation:card-flash .5s ease-out 1.38s both}
+.game-card.struck::after{content:"";position:absolute;inset:0;z-index:5;pointer-events:none;background:radial-gradient(closest-side at 50% 52%,color-mix(in srgb,var(--charge) 60%,#fff),transparent);opacity:0;animation:card-flash .5s ease-out 1.38s both}
 @keyframes card-flash{0%{opacity:0}12%{opacity:.55}100%{opacity:0}}
 .reveal-row.struck.go .reveal-num{animation:white-hot .8s ease-out 1.38s}
 @keyframes white-hot{0%{filter:brightness(2.2) drop-shadow(0 0 12px var(--charge))}100%{filter:none}}
