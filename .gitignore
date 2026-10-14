@@ -8,3 +8,5 @@ server.log
 /data/percentle-puzzles.json.*.tmp
 /data/percentle-endless.json
 /data/percentle-endless.json.*.tmp
+/data/percentle-stats.json
+/data/percentle-stats.json.*.tmp

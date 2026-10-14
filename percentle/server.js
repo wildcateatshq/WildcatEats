@@ -13,12 +13,15 @@ const { createPuzzleStore } = require("./puzzles");
 const { createPuzzleRouter } = require("./puzzle-router");
 const { createEndlessStore } = require("./endless");
 const { createEndlessRouter } = require("./endless-router");
+const { createStatsStore } = require("./stats");
+const { createStatsRouter } = require("./stats-router");
 
 const PORT = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, "..", "public");
 const crowd = createCrowdStore();
 const puzzles = createPuzzleStore();
 const endless = createEndlessStore();
+const stats = createStatsStore();
 const app = express();
 
 // The page itself is always re-checked so a deploy shows up straight away; its styles, scripts,
@@ -41,13 +44,14 @@ app.get("/sitemap.xml", (req, res) => res.type("application/xml").send(
 app.use("/api/percentle/crowd", createCrowdRouter(crowd));
 app.use("/api/percentle/puzzles", createPuzzleRouter(puzzles));
 app.use("/api/percentle/endless", createEndlessRouter(endless));
+app.use("/api/percentle/stats", createStatsRouter(stats, crowd));
 app.use((req, res) => res.redirect("/"));
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: "Something went wrong." });
 });
 
-Promise.all([crowd.init(), puzzles.init(), endless.init()])
+Promise.all([crowd.init(), puzzles.init(), endless.init(), stats.init()])
   .then(() => app.listen(PORT, () => console.log(`Percentle running at http://localhost:${PORT} (storage: ${process.env.DATABASE_URL ? "postgres" : "json-file"})`)))
   .catch(error => {
     console.error("Failed to set up Percentle storage:", error.message);

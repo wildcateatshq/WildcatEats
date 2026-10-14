@@ -181,7 +181,36 @@ function createCrowdStore(options = {}) {
     return operation;
   }
 
-  return { init, getSummary, submit };
+  // Per day, for the stats spreadsheet: finishes (both modes), hard-mode finishes, players who ran
+  // out of charge, and the summed charge left of those who didn't (scores are 100 - charge).
+  async function dailyFinishes() {
+    if (pool) {
+      const { rows } = await pool.query(
+        `select to_char(puzzle_date, 'YYYY-MM-DD') as date, count(*)::int as finished,
+                coalesce(sum(case when mode = 'hard' then 1 else 0 end), 0)::int as hard,
+                coalesce(sum(case when score >= $1 then 1 else 0 end), 0)::int as out,
+                coalesce(sum(case when score < $1 then score else 0 end), 0)::float as "pointsOff"
+         from percentle_daily_scores group by puzzle_date`,
+        [OUT_OF_CHARGE_RANK]
+      );
+      return rows.map(({ pointsOff, ...day }) => ({ ...day, chargeSum: (day.finished - day.out) * 100 - pointsOff }));
+    }
+    const days = new Map();
+    for (const [key, entries] of dailyScores) {
+      const date = key.replace(/^hard:/, "");
+      const day = days.get(date) || { date, finished: 0, hard: 0, out: 0, chargeSum: 0 };
+      for (const score of entries.values()) {
+        day.finished++;
+        if (key.startsWith("hard:")) day.hard++;
+        if (score >= OUT_OF_CHARGE_RANK) day.out++;
+        else day.chargeSum += 100 - score;
+      }
+      days.set(date, day);
+    }
+    return [...days.values()];
+  }
+
+  return { init, getSummary, submit, dailyFinishes };
 }
 
 module.exports = { createCrowdStore, isUtcDate, summarize, summaryFromCounts, validateSubmission };

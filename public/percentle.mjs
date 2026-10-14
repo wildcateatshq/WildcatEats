@@ -41,6 +41,47 @@ document.querySelectorAll("[data-game-name]").forEach(element => {
 });
 document.querySelector(".wordmark").setAttribute("aria-label", `${GAME_NAME} home`);
 
+// Daily player stats for the editor: a lasting anonymous ID (separate from the crowd IDs, so it's
+// never linked to a score), where the visit came from, and whether the player shared or played
+// endless. Failures are ignored: stats must never get in the way of the game.
+const STATS_URL = "/api/percentle/stats";
+let fallbackPlayerId = null;
+function playerId() {
+  let id = readPreference("percentle.player");
+  if (!id && crypto.randomUUID) {
+    id = fallbackPlayerId ??= crypto.randomUUID();
+    try { localStorage.setItem("percentle.player", id); } catch {}
+  }
+  return id;
+}
+
+function sendStat(path, body) {
+  const id = playerId();
+  if (!id) return;
+  fetch(`${STATS_URL}/${path}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id, ...body }), keepalive: true })
+    .catch(() => {});
+}
+
+// Once per day per device, counted even if today's puzzle is late or fails to load. A "?ref=" tag (chargle.io/?ref=flyer) is noted and then removed from
+// the address bar, so links copied from it don't carry it on.
+function recordVisit(day) {
+  const params = new URLSearchParams(location.search);
+  const ref = params.get("ref");
+  if (ref !== null) {
+    params.delete("ref");
+    const rest = params.toString();
+    history.replaceState(history.state, "", `${location.pathname}${rest ? `?${rest}` : ""}${location.hash}`);
+  }
+  if (readPreference("percentle.visited") === day) return;
+  let referrer = null;
+  try {
+    const from = new URL(document.referrer);
+    if (from.hostname !== location.hostname) referrer = from.hostname;
+  } catch {}
+  sendStat("visit", { ref, referrer });
+  try { localStorage.setItem("percentle.visited", day); } catch {}
+}
+recordVisit(easternDate());
 
 let todayPuzzle;
 try {
@@ -725,7 +766,10 @@ function renderResults() {
     <button class="next-button secondary-button" id="statsInline">Your stats &amp; archives ${ICONS.right}</button>`;
   setCounterLabel(out ? "Power lost" : "Puzzle complete");
   renderRecap(progress);
-  document.querySelector("#shareButton").addEventListener("click", () => shareResult(charge, progress, out));
+  document.querySelector("#shareButton").addEventListener("click", () => {
+    sendStat("event", { kind: "share" });
+    shareResult(charge, progress, out);
+  });
   document.querySelector("#replayButton")?.addEventListener("click", () => {
     state.progress[`practice:${currentDate}`] = { guesses: [], locked: [], revealed: 0, draft: null };
     save();
@@ -1088,6 +1132,7 @@ function renderEndlessResults() {
   if (!progress.recorded) {
     progress.recorded = { rounds, newBest: rounds > previousBest };
     state.endless.runs++;
+    sendStat("event", { kind: "endless" });
     state.endless.best[period] = Math.max(previousBest, rounds);
     state.endless.allTime = Math.max(state.endless.allTime, rounds);
     const supercharged = progress.guesses.filter((guess, i) => pointsOff(guess, currentQuestions[i].answer) === 0).length;
@@ -1109,6 +1154,7 @@ function renderEndlessResults() {
     if (await startEndless()) render();
   });
   document.querySelector("#shareButton").addEventListener("click", () => {
+    sendStat("event", { kind: "share" });
     const text = `${GAME_NAME} Endless\n⚡ Survived ${rounds} round${rounds === 1 ? "" : "s"}${newBest ? " (new best!)" : ""}\n${location.origin}${location.pathname}`;
     if (navigator.share) navigator.share({ text }).catch(error => { if (error.name !== "AbortError") copyResult(text); });
     else copyResult(text);

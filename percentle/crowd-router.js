@@ -72,4 +72,4 @@ function createCrowdRouter(store, currentDate = () => easternDate(), options = {
   return router;
 }
 
-module.exports = { createCrowdRouter, createRateLimit };
+module.exports = { clientAddress, createCrowdRouter, createRateLimit };

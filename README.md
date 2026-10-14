@@ -177,6 +177,20 @@ otherwise in `data/percentle-endless.json`.
 Run the scoring, Eastern-date, puzzle-validation, puzzle API, and crowd tests with `npm test`.
 No additional packages or build step are needed.
 
+### Daily stats spreadsheet
+
+Each browser gets a lasting random player ID (`percentle.player`, separate from the crowd IDs, so
+it is never linked to a score). Once a day the page sends it with where the visit came from: a
+`?ref=` tag such as `chargle.io/?ref=flyer` (removed from the address bar once read), else the
+linking site, else "direct" (texts and most apps send nothing). Shares and endless runs are
+counted against the same ID. Rows live in `percentle_visits` (or `data/percentle-stats.json`).
+
+`GET /api/percentle/stats/daily.csv?key=...` returns one row per day, oldest first, from the first
+day with data through today: players who opened the game, new and returning players, finishes,
+hard-mode finishes, outs, average charge left, endless runs, shares, and sources. Visit columns
+are blank for days before tracking began. It needs `PERCENTLE_STATS_KEY` (unset turns it off),
+and is meant for Excel's Data > From Web, set to refresh when the workbook opens.
+
 ### Crowd comparison
 
 Player progress, streaks, and personal scores stay in the browser. When a player finishes
