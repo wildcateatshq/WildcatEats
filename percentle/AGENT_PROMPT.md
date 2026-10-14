@@ -266,17 +266,25 @@ different team, artist, or film.
 2. Always say the time frame: a season, year, ceremony, period, or "as of [Month Year]". Use
    **completed** seasons, ceremonies, and periods only, never a season or event that's still in
    progress.
-3. The answer is a number **strictly between 0 and 100**, rounded to **one decimal place**. If you
+3. **Never name the source in the question.** No "according to Pew", "per Luminate", "Census
+   Bureau data shows", "a Gallup poll found", or similar: it doesn't help a player understand
+   the question. The time frame (usually the year) is all the context it needs, for example
+   "In 2025, what percentage of U.S. adults use TikTok?", not "According to Pew Research Center's
+   2025 survey, what percentage of U.S. adults use TikTok?". The source goes only in
+   `sourceName` and `sourceUrl`. The one exception is when the stat can't be defined without
+   naming who measures it (a "Rotten Tomatoes score", "Billboard Hot 100"), because then the
+   name is part of what's being asked.
+4. The answer is a number **strictly between 0 and 100**, rounded to **one decimal place**. If you
    work it out, do the arithmetic carefully and double-check it, for example 11 ÷ 14 = 0.7857 → 78.6.
    A whole number like 65.0 is fine; it's stored as 65.
-4. Vary the answers: include at least one answer below 35 and at least one above 60, and avoid
+5. Vary the answers: include at least one answer below 35 and at least one above 60, and avoid
    answers below 2 or above 98. A real statistic that happens to be a whole number is fine. Just
    don't pick a question *because* its answer is an easy round number like 25, 50, or 75.
-5. The question must not give away the answer, and it needs exactly one reasonable reading.
+6. The question must not give away the answer, and it needs exactly one reasonable reading.
    Define terms ("regular-season", "men's Division I", "domestic box office").
-6. Keep it fun and family-friendly. No tragedies, deaths, crimes, partisan politics, religion,
+7. Keep it fun and family-friendly. No tragedies, deaths, crimes, partisan politics, religion,
    health conditions of named people, or private individuals.
-7. Mainstream topics an 18–25-year-old has heard of beat obscure trivia. The fun is in the
+8. Mainstream topics an 18–25-year-old has heard of beat obscure trivia. The fun is in the
    guess, not in knowing the answer. Before publishing, reread all five questions and replace any
    that this audience would shrug at.
 
