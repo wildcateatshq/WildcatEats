@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin sign in · NovaDash</title>
+  <link rel="icon" href="/wildcat-eats-logo.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; background: #f4f6fb; color: #1a1f2b; font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    main { width: min(100%, 420px); padding: 36px; border: 1px solid #e3e7f0; border-radius: 20px; background: white; box-shadow: 0 12px 32px rgba(0, 32, 91, .08); }
+    .eyebrow { margin: 0 0 12px; color: #00205b; font-size: 12px; font-weight: 700; letter-spacing: .12em; }
+    h1 { margin: 0 0 8px; font-size: 28px; }
+    p { margin: 0 0 28px; color: #6b7280; line-height: 1.5; }
+    label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 600; }
+    .password-field { position: relative; }
+    input { width: 100%; padding: 13px 70px 13px 14px; border: 1px solid #b9c1d0; border-radius: 10px; font: inherit; }
+    input[type="email"] { padding-right: 14px; margin-bottom: 18px; }
+    input:focus { outline: 2px solid #00205b; outline-offset: 2px; }
+    button { width: 100%; margin-top: 18px; padding: 14px; border: 0; border-radius: 10px; background: #00205b; color: white; font: inherit; font-weight: 700; cursor: pointer; }
+    .reveal { position: absolute; top: 50%; right: 7px; width: auto; margin: 0; padding: 7px 9px; transform: translateY(-50%); background: transparent; color: #00205b; font-size: 13px; }
+    button:disabled { opacity: .6; cursor: wait; }
+    .error { min-height: 20px; margin: 12px 0 0; color: #b42318; font-size: 14px; }
+    .back { display: block; margin-top: 20px; color: #00205b; font-size: 14px; text-align: center; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="eyebrow">NOVADASH OPERATIONS</div>
+    <h1>Admin sign in</h1>
+    <p>Use the admin email and password configured for this website.</p>
+    <form id="loginForm" autocomplete="off">
+      <label for="adminEmail">Admin email</label>
+      <input id="adminEmail" type="email" inputmode="email" autocomplete="off" required autofocus />
+      <label for="adminPassword">Admin password</label>
+      <div class="password-field">
+        <input id="adminPassword" type="password" autocomplete="off" required />
+        <button class="reveal" id="revealPassword" type="button" aria-label="Show admin password">Show</button>
+      </div>
+      <button id="loginButton" type="submit">Sign in to dashboard</button>
+      <div class="error" id="error" role="alert" aria-live="polite"></div>
+    </form>
+    <a class="back" href="/">Back to NovaDash</a>
+  </main>
+  <script>
+    document.getElementById("revealPassword").addEventListener("click", () => {
+      const input = document.getElementById("adminPassword");
+      const button = document.getElementById("revealPassword");
+      const visible = input.type === "password";
+      input.type = visible ? "text" : "password";
+      button.textContent = visible ? "Hide" : "Show";
+      button.setAttribute("aria-label", visible ? "Hide admin password" : "Show admin password");
+    });
+    document.getElementById("loginForm").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const button = document.getElementById("loginButton");
+      const error = document.getElementById("error");
+      button.disabled = true;
+      error.textContent = "";
+      try {
+        const response = await fetch("/api/admin/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            email: document.getElementById("adminEmail").value,
+            password: document.getElementById("adminPassword").value
+          })
+        });
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || "Unable to unlock the dashboard.");
+        }
+        window.location.replace("/admin");
+      } catch (err) {
+        error.textContent = err.message;
+        button.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

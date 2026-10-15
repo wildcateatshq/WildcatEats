@@ -5,7 +5,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const FILE = path.join(__dirname, "db.json");
+const FILE = process.env.JSON_DB_PATH ? path.resolve(process.env.JSON_DB_PATH) : path.join(__dirname, "db.json");
 
 function load() {
   if (!fs.existsSync(FILE)) {
@@ -148,6 +148,24 @@ async function getOrdersByRunner(userId) {
     .filter((o) => o.runnerId === userId)
     .sort((a, b) => b.createdAt - a.createdAt)
     .map(withOrderNames);
+}
+
+async function getAdminOverview() {
+  const inProgress = new Set(["claimed", "picked_up", "arrived"]);
+  return {
+    stats: {
+      totalUsers: db.users.length,
+      totalOrders: db.orders.length,
+      openOrders: db.orders.filter((o) => o.status === "open").length,
+      inProgressOrders: db.orders.filter((o) => inProgress.has(o.status)).length,
+      deliveredOrders: db.orders.filter((o) => o.status === "delivered").length,
+      pendingReports: db.orders.filter((o) => o.disputedAt && !o.refundedAt && !o.disputeDismissedAt).length
+    },
+    recentOrders: [...db.orders]
+      .sort((a, b) => b.createdAt - a.createdAt)
+      .slice(0, 12)
+      .map(withOrderNames)
+  };
 }
 
 async function updateOrder(id, patch) {
@@ -299,6 +317,7 @@ module.exports = {
   getOpenOrders,
   getOrdersByOrderer,
   getOrdersByRunner,
+  getAdminOverview,
   updateOrder,
   deleteOrder,
   getMessagesByOrder,

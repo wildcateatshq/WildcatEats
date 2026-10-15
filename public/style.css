@@ -456,6 +456,166 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
   font-size: 0.95rem;
 }
 
+/* ---------- admin dashboard ---------- */
+
+body.admin-page { background: #f5f7fb; }
+
+main.admin-dashboard {
+  max-width: 1180px;
+  padding: 34px 24px 80px;
+}
+
+.admin-heading,
+.admin-section-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.admin-heading { margin-bottom: 26px; }
+.admin-heading h1 {
+  font-family: var(--font-body);
+  font-size: clamp(2rem, 4vw, 2.8rem);
+  letter-spacing: -0.055em;
+  line-height: 1.1;
+  margin: 0 0 8px;
+}
+.admin-heading .subtitle { margin-bottom: 0; }
+.admin-heading .btn { flex: none; }
+
+.admin-eyebrow {
+  color: var(--navy-light);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+  margin: 0 0 8px;
+}
+
+.admin-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 36px;
+}
+
+.admin-stat {
+  display: flex;
+  flex-direction: column;
+  min-height: 145px;
+  padding: 20px 22px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+}
+.admin-stat span {
+  color: #4b5565;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+.admin-stat strong {
+  color: var(--navy);
+  font-size: 2.65rem;
+  font-weight: 700;
+  letter-spacing: -0.055em;
+  line-height: 1.15;
+  margin-top: 10px;
+}
+.admin-stat small {
+  color: var(--muted);
+  font-size: 0.76rem;
+  margin-top: auto;
+}
+
+.admin-section { margin-top: 34px; }
+.admin-section-heading { margin-bottom: 16px; }
+.admin-section-heading h2 {
+  font-size: 1.32rem;
+  letter-spacing: -0.025em;
+  margin: 0;
+}
+.admin-section-heading > span {
+  color: var(--muted);
+  font-size: 0.83rem;
+}
+
+.admin-recent {
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+}
+.admin-recent-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 17px 21px;
+  border-bottom: 1px solid var(--border);
+}
+.admin-recent-row:last-child { border-bottom: 0; }
+.admin-recent-main,
+.admin-recent-side { display: flex; flex-direction: column; gap: 6px; }
+.admin-recent-main { min-width: 0; }
+.admin-recent-main strong { font-size: 0.95rem; }
+.admin-recent-main span {
+  color: var(--muted);
+  font-size: 0.82rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.admin-recent-side { align-items: flex-end; flex: none; }
+.admin-recent-side > span:last-child { color: var(--muted); font-size: 0.78rem; }
+
+.admin-account-search { margin: 18px 0; }
+.admin-account-search label, .admin-credit-editor label { display: block; font-size: 0.83rem; font-weight: 650; margin-bottom: 8px; }
+.admin-account-search > div { display: flex; gap: 10px; }
+.admin-account-search input, .admin-credit-editor input {
+  width: 100%; min-width: 0; padding: 12px 14px; border: 1px solid var(--border);
+  border-radius: 10px; background: #fff; font: inherit;
+}
+.admin-account-search .btn { flex: none; }
+.admin-account-row {
+  width: 100%; display: flex; align-items: center; justify-content: space-between;
+  gap: 18px; padding: 16px 21px; border: 0; border-bottom: 1px solid var(--border);
+  background: #fff; color: var(--navy); text-align: left; font: inherit; cursor: pointer;
+}
+.admin-account-row:last-child { border-bottom: 0; }
+.admin-account-row:hover, .admin-account-row:focus-visible { background: #f0f5fb; }
+.admin-account-row > span:first-child { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.admin-account-row small { color: var(--muted); overflow-wrap: anywhere; }
+.admin-credit-editor {
+  margin-top: 18px; padding: 22px; background: #fff; border: 1px solid var(--border);
+  border-radius: 16px; box-shadow: var(--shadow-sm);
+}
+.admin-credit-editor[hidden] { display: none; }
+.admin-credit-editor h3 { margin: 0 0 4px; }
+.admin-credit-editor h4 { margin: 26px 0 8px; }
+.admin-credit-editor p { color: var(--muted); margin: 6px 0 15px; }
+.admin-credit-editor form { max-width: 440px; display: flex; flex-direction: column; align-items: flex-start; }
+.admin-credit-editor input { margin-bottom: 17px; }
+.admin-credit-history-row { display: flex; flex-direction: column; gap: 3px; padding: 11px 0; border-top: 1px solid var(--border); }
+.admin-credit-history-row span { color: var(--muted); font-size: 0.84rem; }
+
+@media (max-width: 700px) {
+  main.admin-dashboard { padding: 25px 16px 70px; }
+  .admin-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .admin-stat { min-height: 128px; padding: 16px; }
+  .admin-stat strong { font-size: 2.1rem; }
+  .admin-recent-row { gap: 12px; padding: 15px; }
+}
+
+@media (max-width: 480px) {
+  .admin-heading { align-items: flex-start; }
+  .admin-heading .btn { padding: 10px 12px; }
+  .admin-recent-row { align-items: flex-start; flex-direction: column; }
+  .admin-recent-main span { white-space: normal; }
+  .admin-recent-side { width: 100%; flex-direction: row; align-items: center; justify-content: space-between; }
+}
+
 /* ---------- landing / auth page ---------- */
 
 .auth-panel .card .logo {
@@ -471,6 +631,33 @@ button.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(16, 58, 134
   display: inline-block;
 }
 .auth-panel .card p.tagline { text-align: center; color: var(--muted); margin-top: 0; margin-bottom: 22px; font-size: 0.9rem; }
+
+/* The native login screen is intentionally quiet: a white canvas with the
+   blue NovaDash wordmark above the sign-in fields. The marketing hero remains
+   available in the source for future web treatments, but does not compete
+   with the mobile authentication flow. */
+.login-page {
+  background: #fff;
+}
+.login-page .hero-panel {
+  display: none;
+}
+.login-page .auth-panel {
+  position: relative;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: #fff;
+}
+.login-page .auth-panel .card {
+  max-width: 420px;
+  border: 0;
+  box-shadow: none;
+}
+.login-page .auth-panel .card .nova-wordmark {
+  color: var(--navy);
+  font-size: 2.15rem;
+  margin-bottom: 30px;
+}
 
 .switch-link { text-align: center; margin-top: 14px; font-size: 0.9rem; }
 .switch-link a {

@@ -1,209 +1,69 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>NovaDash</title>
-<link rel="icon" href="/wildcat-eats-logo.png" type="image/png" />
-<link rel="manifest" href="/manifest.json" />
-<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-<meta name="theme-color" content="#00205b" />
-<meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-title" content="NovaDash" />
-<link rel="preconnect" href="https://fonts.googleapis.com" />
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
-<link rel="stylesheet" href="/style.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#00205b" />
+  <meta name="description" content="NovaDash is a campus delivery app built for Villanova students." />
+  <title>NovaDash — campus delivery, made for Villanova</title>
+  <link rel="icon" href="/wildcat-eats-logo.png" type="image/png" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/landing.css" />
 </head>
 <body>
-<div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading NovaDash">
-  <div class="page-loader-mark">
-    <img src="/wildcat-eats-logo.png" alt="" style="width:34px; height:34px; object-fit:contain;" />
-  </div>
-  <div class="page-loader-bar"><div class="page-loader-bar-fill"></div></div>
-</div>
+  <header class="site-header">
+    <a class="wordmark" href="/" aria-label="NovaDash home">NovaDash<span class="wordmark-dot">.</span></a>
+    <nav aria-label="Main navigation">
+      <a href="#about">About</a>
+      <a href="#how-it-works">How it works</a>
+    </nav>
+  </header>
 
-<div class="landing-shell">
-  <div class="hero-panel">
-    <div class="content">
-      <span class="eyebrow">Villanova students only</span>
-      <h1>Campus food,<br />delivered by fellow <span class="accent">Wildcats</span>.</h1>
-      <p class="lede">Post what you want from any spot on campus, and a fellow student picks it up and brings it straight to you — no app-store delivery markup, no strangers.</p>
-      <div class="hero-features">
-        <div class="feature">
-          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg></span>
-          <span class="text"><b>Usually under 30 minutes</b><span>Runners are already on campus.</span></span>
-        </div>
-        <div class="feature">
-          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.5 8.5 8 10 4.5-1.5 8-5 8-10V6l-8-4Z"/></svg></span>
-          <span class="text"><b>Secure, on-platform payments</b><span>Cards are only charged once someone claims your order.</span></span>
-        </div>
-        <div class="feature">
-          <span class="icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"/><circle cx="10" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-          <span class="text"><b>Run by students, for students</b><span>Every runner is a Villanova student earning between classes.</span></span>
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="eyebrow-line"></span> MADE FOR VILLANOVA</p>
+        <h1 id="hero-title">Good food.<br /><em>Less running.</em></h1>
+        <p class="hero-description">The campus delivery app that connects Wildcats who need a meal with Wildcats already on the move.</p>
+        <a class="primary-link" href="#how-it-works">See how it works <span aria-hidden="true">↗</span></a>
+        <p class="hero-footnote">Ordering and deliveries happen in the NovaDash app, not on this website.</p>
+      </div>
+      <div class="hero-visual">
+        <img src="/campus.jpg" alt="Villanova campus and church on a clear day" />
+        <div class="image-card">
+          <span class="image-card-icon" aria-hidden="true">↗</span>
+          <div><strong>Made for the spaces between classes.</strong><span>Campus life moves quickly. Your food can, too.</span></div>
         </div>
       </div>
-    </div>
-  </div>
+    </section>
 
-  <div class="auth-panel">
-    <div class="card">
-      <div class="logo">
-        <img src="/wildcat-eats-logo.png" alt="" style="height:32px; width:auto; vertical-align:-8px; margin-right:2px;" />
-        <span class="dash-text">NovaDash</span>
+    <section class="intro" id="about" aria-labelledby="intro-title">
+      <p class="section-label">A CAMPUS-FIRST IDEA</p>
+      <div class="intro-grid">
+        <h2 id="intro-title">A better way to get food across campus.</h2>
+        <p>NovaDash brings ordering and delivery together in one iPhone app. Students can request food from familiar campus spots, and nearby students can choose to take the delivery.</p>
       </div>
-      <p class="tagline">Campus food delivery, run by students, for students.</p>
+    </section>
 
-      <div id="errorBox"></div>
-
-      <form id="loginForm">
-        <label for="loginEmail">Email</label>
-        <input type="email" id="loginEmail" placeholder="you@villanova.edu" required />
-        <label for="loginPassword">Password</label>
-        <input type="password" id="loginPassword" required />
-        <button class="btn" type="submit" style="width:100%; margin-top:16px;">Log in</button>
-      </form>
-
-      <form id="signupForm" style="display:none;">
-        <label for="signupName">Name</label>
-        <input type="text" id="signupName" placeholder="Jane Wildcat" required />
-        <label for="signupEmail">Villanova email</label>
-        <input type="email" id="signupEmail" placeholder="you@villanova.edu" required />
-        <label for="signupPhone">Phone number</label>
-        <input type="text" id="signupPhone" placeholder="(610) 555-1234" required />
-        <label for="signupPassword">Password</label>
-        <input type="password" id="signupPassword" required minlength="4" />
-        <button class="btn gold" type="submit" style="width:100%; margin-top:16px;">Create account</button>
-      </form>
-
-      <form id="verifyForm" style="display:none;">
-        <p style="font-size:0.9rem; color:var(--muted); margin-top:0;">
-          We emailed a 6-digit code to <b id="verifyEmailLabel"></b>. Enter it below to finish signing up.
-        </p>
-        <div id="devCodeBox"></div>
-        <label for="verifyCode">Verification code</label>
-        <input type="text" id="verifyCode" inputmode="numeric" maxlength="6" placeholder="123456" required />
-        <button class="btn gold" type="submit" style="width:100%; margin-top:16px;">Verify & create account</button>
-        <div class="switch-link"><span><a id="resendCode">Resend code</a></span></div>
-      </form>
-
-      <div class="switch-link" id="switchLinks">
-        <span id="toSignup">New here? <a>Create an account</a></span>
-        <span id="toLogin" style="display:none;">Already have an account? <a>Log in</a></span>
+    <section class="how" id="how-it-works" aria-labelledby="how-title">
+      <div class="how-heading">
+        <p class="section-label">HOW IT WORKS</p>
+        <h2 id="how-title">Two sides of the same campus.</h2>
       </div>
-    </div>
-  </div>
-</div>
+      <div class="how-grid">
+        <article class="how-card"><span class="card-number">01 / ORDER</span><div class="card-symbol" aria-hidden="true">↗</div><h3>Pick a place.</h3><p>Choose a dining spot, describe your order, and set where to meet—all in the app.</p></article>
+        <article class="how-card"><span class="card-number">02 / DELIVER</span><div class="card-symbol" aria-hidden="true">→</div><h3>Make the run.</h3><p>Nearby students can see open requests and accept a delivery that fits their route.</p></article>
+        <article class="how-card"><span class="card-number">03 / CONNECT</span><div class="card-symbol" aria-hidden="true">✓</div><h3>Meet up.</h3><p>Order details and delivery updates help both students stay on the same page.</p></article>
+      </div>
+    </section>
+  </main>
 
-<script src="/app.js"></script>
-<script>
-(async () => {
-  const existing = await getMe();
-  if (existing) { window.location.href = "/order.html"; return; }
-  hidePageLoader();
-})();
-
-const loginForm = document.getElementById("loginForm");
-const signupForm = document.getElementById("signupForm");
-const verifyForm = document.getElementById("verifyForm");
-const switchLinks = document.getElementById("switchLinks");
-const errorBox = document.getElementById("errorBox");
-let pendingEmail = null;
-
-document.getElementById("toSignup").onclick = () => {
-  loginForm.style.display = "none";
-  signupForm.style.display = "block";
-  document.getElementById("toSignup").style.display = "none";
-  document.getElementById("toLogin").style.display = "block";
-  errorBox.innerHTML = "";
-};
-document.getElementById("toLogin").onclick = () => {
-  signupForm.style.display = "none";
-  loginForm.style.display = "block";
-  document.getElementById("toLogin").style.display = "none";
-  document.getElementById("toSignup").style.display = "block";
-  errorBox.innerHTML = "";
-};
-
-loginForm.onsubmit = async (e) => {
-  e.preventDefault();
-  errorBox.innerHTML = "";
-  try {
-    await api("/api/login", {
-      method: "POST",
-      body: {
-        email: document.getElementById("loginEmail").value,
-        password: document.getElementById("loginPassword").value
-      }
-    });
-    window.location.href = "/order.html";
-  } catch (err) {
-    errorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
-  }
-};
-
-signupForm.onsubmit = async (e) => {
-  e.preventDefault();
-  errorBox.innerHTML = "";
-  try {
-    const data = await api("/api/signup", {
-      method: "POST",
-      body: {
-        name: document.getElementById("signupName").value,
-        email: document.getElementById("signupEmail").value,
-        phone: document.getElementById("signupPhone").value,
-        password: document.getElementById("signupPassword").value
-      }
-    });
-    showVerifyStep(data);
-  } catch (err) {
-    errorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
-  }
-};
-
-function showVerifyStep(data) {
-  pendingEmail = data.email;
-  document.getElementById("verifyEmailLabel").textContent = data.email;
-  showDevCode(data.devCode);
-  signupForm.style.display = "none";
-  switchLinks.style.display = "none";
-  verifyForm.style.display = "block";
-}
-
-function showDevCode(devCode) {
-  const box = document.getElementById("devCodeBox");
-  if (devCode) {
-    box.innerHTML = `<div class="error" style="background:#fff8e6; color:#8a6d1a; border-color:#f2e2a8;">
-      Email sending isn't configured yet (see .env.example) — for testing, your code is <b>${escapeHtml(devCode)}</b>.
-    </div>`;
-  } else {
-    box.innerHTML = "";
-  }
-}
-
-verifyForm.onsubmit = async (e) => {
-  e.preventDefault();
-  errorBox.innerHTML = "";
-  try {
-    await api("/api/verify-email", {
-      method: "POST",
-      body: { email: pendingEmail, code: document.getElementById("verifyCode").value }
-    });
-    window.location.href = "/order.html";
-  } catch (err) {
-    errorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
-  }
-};
-
-document.getElementById("resendCode").onclick = async () => {
-  errorBox.innerHTML = "";
-  try {
-    const data = await api("/api/resend-code", { method: "POST", body: { email: pendingEmail } });
-    showDevCode(data.devCode);
-  } catch (err) {
-    errorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
-  }
-};
-</script>
+  <footer class="site-footer">
+    <a class="wordmark" href="/">NovaDash<span class="wordmark-dot">.</span></a>
+    <p>Built for Wildcats, by Wildcats.</p>
+  </footer>
+  <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});</script>
 </body>
 </html>

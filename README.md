@@ -1,8 +1,7 @@
 # NovaDash
 
-A DoorDash-style app for Villanova students: post a food order (where to pick up, where to
-drop it off), and any other student can browse open orders, claim one, and deliver it —
-marking pickup and "I'm here!" along the way.
+The public website is a landing page. Ordering and delivery happen in the
+native iPhone app under `ios/`, which connects directly to Supabase.
 
 ## Run it
 
@@ -11,44 +10,51 @@ npm install
 npm start
 ```
 
-Then open http://localhost:3000
+Then open http://localhost:3000 for the landing page or
+http://localhost:3000/admin for admin sign-in.
 
-## How it works
+## Website access
 
-- Any student account can both place orders and deliver them — no separate roles.
-- **Signup requires a villanova.edu email**, verified with a real 6-digit code sent to that
-  inbox before the account is created (nothing's created until the code is confirmed).
-- **Order Food** tab: pick a store, pick a hall/dropoff spot, describe what you want, set a tip.
-- **Deliver** tab: browse open orders, claim one, mark "picked up," then "I'm here!" (which
-  flags the orderer's tracking view), then "mark delivered."
-- The orderer's phone gets a **text when their order is claimed**, and a **text + phone call
-  when the runner arrives**.
-- No payments are wired up yet — orders just have a note field where students can put a Venmo
-  handle or similar. That's the natural next thing to add (see below).
+The website has no student signup, ordering, or delivery pages. Old web page
+URLs redirect to the landing page, and their APIs return 404. The native Swift
+app remains separate from the retired website ordering routes.
 
-## Turning on real storage + email + texting/calling
+## Admin dashboard
 
-Right now, data lives in a local `db.json` file, verification codes get logged to the server
-console (and shown right in the UI), and notifications just get logged too — so the whole app
-works fully with zero setup. Each piece below activates independently the moment its env vars
-are set — you don't need all three at once.
+Set `ADMIN_EMAIL` and a strong `ADMIN_PASSWORD` in `.env` (or as environment
+variables on your host). Restart the server, then sign in directly at `/admin`.
+No web account or student signup is required. Keep both values private and do
+not commit `.env`. A successful sign-in creates an internal admin record only
+if the legacy dashboard database needs one for report messages.
 
-1. `cp .env.example .env`
-2. **Storage:** create a free [Supabase](https://supabase.com) project, then Settings → Database
-   → Connection string (URI, "Session" mode) → paste into `DATABASE_URL`. Tables are created
-   automatically on first run — no migration step.
-3. **Email:** fill in `SMTP_HOST` / `SMTP_USER` / `SMTP_PASS` (e.g. a Gmail account + an
-   [app password](https://myaccount.google.com/apppasswords)) for real verification emails.
-4. **Texting/calling:** sign up at [twilio.com](https://www.twilio.com), grab a phone number,
-   and fill in `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_FROM_NUMBER`.
-5. Restart the server (`npm start`).
+The existing dashboard reads the website's legacy database (`db.json` locally,
+or Postgres with `DATABASE_URL`). The native iPhone app uses separate Supabase
+tables, so its orders do not appear in this legacy dashboard unless a native
+Supabase dashboard integration is added.
+
+### Native account test credits
+
+The `/admin` dashboard can add test credits to native iPhone accounts. To enable
+it, run `supabase/migrations/004_native_test_credits.sql` in the SQL editor of
+the same Supabase project used by the Swift app. Set `SUPABASE_URL` and a
+server-only `SUPABASE_SECRET_KEY` in `.env` (or your host's environment), then
+restart the server. A legacy `SUPABASE_SERVICE_ROLE_KEY` also works. Never add
+either secret to the iPhone app or public website files. [Supabase's RLS and
+key guidance](https://supabase.com/docs/guides/database/secure-data) explains
+why these keys must stay on the backend.
+
+Search for a native account by full email, choose it, enter a dollar amount and
+reason, and confirm. Each addition is recorded, and the app's Account page
+shows the updated test balance when reopened or pulled to refresh. Credits are
+not real deposits, cannot yet pay for orders, and cannot be withdrawn. Future
+refunds will need a separate payment-aware flow rather than using this tool.
 
 ## Deploying
 
-`render.yaml` is a ready-to-go blueprint for [Render](https://render.com): New → Blueprint →
-connect this repo → Render reads the file and creates the web service → paste in the env vars
-from step 2 above (`DATABASE_URL`, `SMTP_*`, `TWILIO_*`) in the dashboard → deploy. `SESSION_SECRET`
-is generated for you automatically.
+`render.yaml` is a blueprint for [Render](https://render.com). Configure
+`ADMIN_EMAIL` and `ADMIN_PASSWORD` in the Render environment for hosted admin
+sign-in; your local `.env` is not uploaded. `SESSION_SECRET` is generated by
+the blueprint.
 
 (Vercel isn't a fit here — it's built for serverless functions/static sites, and this is a
 persistent Express server with in-memory sessions and polling. Render runs it as a normal
@@ -57,24 +63,13 @@ always-on process, no rewrite needed.)
 ## Stack
 
 Deliberately minimal so it's easy to read and extend:
-- **Backend:** Node + Express, session-based auth (cookie sessions, scrypt-hashed passwords).
+- **Backend:** Node + Express, session-based admin auth.
 - **Storage:** Postgres via Supabase when `DATABASE_URL` is set (`pgdb.js`), otherwise a local
   `db.json` file (`jsondb.js`) — `db.js` picks automatically. Both implement the same async
   interface, so nothing else in the app needs to know which one is active.
-- **Frontend:** plain HTML/CSS/JS, no build step. Each page polls the API every few seconds
-  for live-ish status updates.
+- **Frontend:** plain HTML/CSS/JS, no build step. The public page is informational.
 
-## Things to double check / customize
-
-- `config.js` has the list of stores and dorms — I filled it in from general knowledge of
-  Villanova, so **verify the hall/dining names are current** before showing this to anyone.
-- The session secret in `server.js` is a placeholder — replace it before deploying anywhere
-  public.
-
-## Natural next steps
-
-1. Real payments (Stripe) instead of the "put your Venmo in the notes" workaround.
-2. Ratings/history so orderers can see a runner's track record.
+Set a random `SESSION_SECRET` before deploying outside Render.
 
 ## Percentle daily guessing game
 

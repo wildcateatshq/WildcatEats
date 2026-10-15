@@ -2,16 +2,12 @@
 // shell available offline. Deliberately never caches /api/* — this app
 // leans on live polling for order/runner state, so a cached API response
 // would be actively misleading, not just stale.
-const CACHE_NAME = "novadash-v4";
+const CACHE_NAME = "novadash-v6";
 const APP_SHELL = [
   "/",
   "/index.html",
-  "/order.html",
-  "/deliver.html",
-  "/messages.html",
-  "/settings.html",
-  "/style.css",
-  "/app.js",
+  "/landing.css",
+  "/campus.jpg",
   "/manifest.json",
   "/wildcat-eats-logo.png",
   "/icon-192.png",
@@ -36,7 +32,9 @@ self.addEventListener("activate", (event) => {
 // when there's a connection, and still renders the shell when there isn't.
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
-  if (event.request.method !== "GET" || url.origin !== self.location.origin || url.pathname.startsWith("/api/")) {
+  if (event.request.method !== "GET" || url.origin !== self.location.origin ||
+      url.pathname.startsWith("/api/") || url.pathname === "/admin" || url.pathname === "/admin.html" ||
+      ["/order.html", "/deliver.html", "/messages.html", "/settings.html"].includes(url.pathname)) {
     return;
   }
   event.respondWith(

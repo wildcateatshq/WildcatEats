@@ -249,6 +249,38 @@ async function getOrdersByRunner(userId) {
   return rows.map(rowToOrder);
 }
 
+async function getAdminOverview() {
+  const [usersResult, ordersResult, recentResult] = await Promise.all([
+    pool.query("select count(*)::int as total_users from users"),
+    pool.query(`
+      select
+        count(*)::int as total_orders,
+        count(*) filter (where status = 'open')::int as open_orders,
+        count(*) filter (where status in ('claimed', 'picked_up', 'arrived'))::int as in_progress_orders,
+        count(*) filter (where status = 'delivered')::int as delivered_orders,
+        count(*) filter (
+          where disputed_at is not null
+            and refunded_at is null
+            and dispute_dismissed_at is null
+        )::int as pending_reports
+      from orders
+    `),
+    pool.query(`${ORDER_SELECT} order by o.created_at desc limit 12`)
+  ]);
+  const counts = ordersResult.rows[0];
+  return {
+    stats: {
+      totalUsers: usersResult.rows[0].total_users,
+      totalOrders: counts.total_orders,
+      openOrders: counts.open_orders,
+      inProgressOrders: counts.in_progress_orders,
+      deliveredOrders: counts.delivered_orders,
+      pendingReports: counts.pending_reports
+    },
+    recentOrders: recentResult.rows.map(rowToOrder)
+  };
+}
+
 // Maps our camelCase patch keys to columns; timestamp fields are passed as ms and converted.
 const TIMESTAMP_FIELDS = new Set([
   "claimedAt",
@@ -470,6 +502,7 @@ module.exports = {
   getOpenOrders,
   getOrdersByOrderer,
   getOrdersByRunner,
+  getAdminOverview,
   updateOrder,
   deleteOrder,
   getMessagesByOrder,

@@ -32,6 +32,12 @@ services:
         sync: false
       - key: ADMIN_EMAIL
         sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
       - key: MAPBOX_TOKEN
         sync: false
       - key: PERCENTLE_PUBLISH_TOKEN

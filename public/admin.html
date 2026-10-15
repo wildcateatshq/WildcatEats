@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/style.css" />
 </head>
-<body>
+<body class="admin-page">
 <div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading NovaDash">
   <div class="page-loader-mark">
     <img src="/wildcat-eats-logo.png" alt="" style="width:34px; height:34px; object-fit:contain;" />
@@ -23,30 +23,222 @@
   <div class="page-loader-bar"><div class="page-loader-bar-fill"></div></div>
 </div>
 <header class="nav" id="nav"></header>
-<main>
-  <h1>Reported orders</h1>
-  <p class="subtitle">Orders orderers have flagged as a problem. Refunding also tries to reverse the runner's payout.</p>
-  <div id="errorBox"></div>
-  <div id="reportsList"></div>
+<main class="admin-dashboard">
+  <div class="admin-heading">
+    <div>
+      <p class="admin-eyebrow">NOVADASH OPERATIONS</p>
+      <h1>Admin dashboard</h1>
+      <p class="subtitle">Legacy web order data. Orders from the native iPhone app are stored separately in Supabase and are not shown here yet.</p>
+    </div>
+    <button class="btn secondary" id="adminRefresh" type="button">Refresh</button>
+  </div>
+
+  <div id="overviewError" role="alert"></div>
+  <section class="admin-stats" aria-label="Platform overview">
+    <div class="admin-stat"><span>Open orders</span><strong id="statOpen">—</strong><small>Waiting for a runner</small></div>
+    <div class="admin-stat"><span>In progress</span><strong id="statProgress">—</strong><small>Accepted deliveries</small></div>
+    <div class="admin-stat"><span>Delivered</span><strong id="statDelivered">—</strong><small>Completed orders</small></div>
+    <div class="admin-stat"><span>Needs review</span><strong id="statReports">—</strong><small>Unresolved reports</small></div>
+    <div class="admin-stat"><span>Total orders</span><strong id="statOrders">—</strong><small>All-time requests</small></div>
+    <div class="admin-stat"><span>Users</span><strong id="statUsers">—</strong><small>Registered accounts</small></div>
+  </section>
+
+  <section class="admin-section" id="nativeCredits" aria-labelledby="creditsHeading">
+    <div class="admin-section-heading">
+      <div><p class="admin-eyebrow">NATIVE APP</p><h2 id="creditsHeading">Account test credits</h2></div>
+    </div>
+    <p class="subtitle">Add testing credit to an iPhone account. This is not a payment, cash balance, or refund, and cannot be spent or withdrawn.</p>
+    <form id="accountSearch" class="admin-account-search">
+      <label for="accountEmail">Find an account by email</label>
+      <div><input id="accountEmail" type="email" autocomplete="off" placeholder="student@villanova.edu" /><button class="btn secondary" type="submit">Search</button></div>
+    </form>
+    <div id="creditError" role="alert"></div>
+    <div id="nativeAccounts" class="admin-recent" aria-live="polite"><div class="empty">Loading native accounts…</div></div>
+    <div id="creditEditor" class="admin-credit-editor" hidden>
+      <h3 id="creditAccountName"></h3>
+      <p id="creditAccountEmail"></p>
+      <p>Test balance: <strong id="creditBalance"></strong></p>
+      <form id="creditForm">
+        <label for="creditAmount">Amount to add (USD)</label>
+        <input id="creditAmount" type="number" min="0.01" max="1000" step="0.01" required placeholder="10.00" />
+        <label for="creditReason">Reason</label>
+        <input id="creditReason" type="text" minlength="3" maxlength="500" required placeholder="Testing credit for order flow" />
+        <button class="btn" id="addCreditButton" type="submit">Add test credit</button>
+      </form>
+      <h4>Recent adjustments</h4>
+      <div id="creditHistory" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="admin-section" aria-labelledby="recentHeading">
+    <div class="admin-section-heading">
+      <div><p class="admin-eyebrow">ACTIVITY</p><h2 id="recentHeading">Recent orders</h2></div>
+      <span>Latest 12</span>
+    </div>
+    <div class="admin-recent" id="recentOrders" aria-live="polite"><div class="empty">Loading recent orders…</div></div>
+  </section>
+
+  <section class="admin-section" id="reports" aria-labelledby="reportsHeading">
+    <div class="admin-section-heading">
+      <div><p class="admin-eyebrow">SUPPORT</p><h2 id="reportsHeading">Reported orders</h2></div>
+    </div>
+    <p class="subtitle">Review issues, message each party, and decide whether to refund or dismiss a report.</p>
+    <div id="reportsError" role="alert"></div>
+    <div id="reportsList" aria-live="polite"></div>
+  </section>
 </main>
 
 <script src="/app.js"></script>
 <script>
 let user = null;
+let lastOverviewSnapshot = null;
+const overviewError = document.getElementById("overviewError");
+const reportsError = document.getElementById("reportsError");
+const creditError = document.getElementById("creditError");
+let selectedAccount = null;
+const money = (cents) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 
 (async () => {
   user = await requireAuthOrRedirect();
   if (!user) return;
+  if (!user.isAdmin) {
+    document.querySelector("main").innerHTML = `<div class="error">Admin access required.</div>`;
+    hidePageLoader();
+    return;
+  }
   document.getElementById("reportsList").innerHTML = skeletonList(2);
   try {
-    await refresh();
+    await Promise.all([refreshOverview(), refreshReports(), refreshNativeAccounts()]);
   } finally {
     hidePageLoader();
   }
-  setInterval(refresh, 4000);
+  setInterval(refreshReports, 4000);
+  setInterval(refreshOverview, 15000);
 })();
 
-const errorBox = document.getElementById("errorBox");
+document.getElementById("adminRefresh").onclick = () => {
+  refreshOverview();
+  refreshReports();
+  refreshNativeAccounts();
+};
+
+document.getElementById("accountSearch").addEventListener("submit", (event) => {
+  event.preventDefault();
+  refreshNativeAccounts();
+});
+
+async function refreshNativeAccounts() {
+  const email = document.getElementById("accountEmail").value.trim();
+  try {
+    const { accounts } = await api(`/api/admin/native-accounts${email ? `?email=${encodeURIComponent(email)}` : ""}`);
+    creditError.innerHTML = "";
+    const list = document.getElementById("nativeAccounts");
+    list.innerHTML = accounts.length ? accounts.map((account) => `
+      <button type="button" class="admin-account-row" data-account-id="${escapeHtml(account.id)}">
+        <span><strong>${escapeHtml(account.name || "Unnamed account")}</strong><small>${escapeHtml(account.email)}</small></span>
+        <span>${money(account.balanceCents)} <span aria-hidden="true">›</span></span>
+      </button>`).join("") : `<div class="empty">No native accounts found.</div>`;
+    list.querySelectorAll("[data-account-id]").forEach((button) => {
+      button.onclick = () => selectAccount(accounts.find((account) => account.id === button.dataset.accountId));
+    });
+    if (selectedAccount) {
+      const updated = accounts.find((account) => account.id === selectedAccount.id);
+      if (updated) await selectAccount(updated);
+      else {
+        selectedAccount = null;
+        document.getElementById("creditEditor").hidden = true;
+      }
+    }
+  } catch (error) {
+    creditError.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+    document.getElementById("nativeAccounts").innerHTML = `<div class="empty">Native accounts unavailable.</div>`;
+    selectedAccount = null;
+    document.getElementById("creditEditor").hidden = true;
+  }
+}
+
+async function selectAccount(account) {
+  if (!account) return;
+  selectedAccount = account;
+  document.getElementById("creditEditor").hidden = false;
+  document.getElementById("creditAccountName").textContent = account.name || "Unnamed account";
+  document.getElementById("creditAccountEmail").textContent = account.email;
+  document.getElementById("creditBalance").textContent = money(account.balanceCents);
+  const history = document.getElementById("creditHistory");
+  history.textContent = "Loading adjustments…";
+  try {
+    const { credits } = await api(`/api/admin/native-accounts/${account.id}/credits`);
+    if (selectedAccount.id !== account.id) return;
+    history.innerHTML = credits.length ? credits.map((credit) => `
+      <div class="admin-credit-history-row"><strong>+${money(credit.amount_cents)}</strong>
+      <span>${escapeHtml(credit.reason)} · ${escapeHtml(credit.created_by)} · ${new Date(credit.created_at).toLocaleString()}</span></div>`).join("")
+      : `<p class="subtitle">No adjustments yet.</p>`;
+  } catch (error) {
+    history.textContent = error.message;
+  }
+}
+
+document.getElementById("creditForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (!selectedAccount) return;
+  const account = selectedAccount;
+  const amount = document.getElementById("creditAmount").value.trim();
+  const reason = document.getElementById("creditReason").value.trim();
+  if (!confirm(`Add ${money(Math.round(Number(amount) * 100))} in test credit to ${account.email}? This will be recorded.`)) return;
+  const button = document.getElementById("addCreditButton");
+  button.disabled = true;
+  try {
+    await api(`/api/admin/native-accounts/${account.id}/credits`, {
+      method: "POST", body: { amount, reason, requestId: crypto.randomUUID() }
+    });
+    creditError.innerHTML = "";
+    document.getElementById("creditForm").reset();
+    await refreshNativeAccounts();
+  } catch (error) {
+    creditError.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+  } finally {
+    button.disabled = false;
+  }
+});
+
+async function refreshOverview() {
+  try {
+    const { stats, recentOrders } = await api("/api/admin/overview");
+    overviewError.innerHTML = "";
+    document.getElementById("statOpen").textContent = stats.openOrders;
+    document.getElementById("statProgress").textContent = stats.inProgressOrders;
+    document.getElementById("statDelivered").textContent = stats.deliveredOrders;
+    document.getElementById("statReports").textContent = stats.pendingReports;
+    document.getElementById("statOrders").textContent = stats.totalOrders;
+    document.getElementById("statUsers").textContent = stats.totalUsers;
+
+    const snapshot = JSON.stringify(recentOrders);
+    if (snapshot !== lastOverviewSnapshot) {
+      lastOverviewSnapshot = snapshot;
+      document.getElementById("recentOrders").innerHTML = recentOrders.length
+        ? recentOrders.map(renderRecentOrder).join("")
+        : `<div class="empty">No orders yet.</div>`;
+    }
+  } catch (err) {
+    overviewError.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function renderRecentOrder(o) {
+  const statusClass = /^[a-z_]+$/.test(o.status) ? o.status : "";
+  return `
+    <div class="admin-recent-row">
+      <div class="admin-recent-main">
+        <strong>${escapeHtml(o.store)}</strong>
+        <span>${escapeHtml(o.ordererName || "Unknown")} · ${escapeHtml(o.items)}</span>
+      </div>
+      <div class="admin-recent-side">
+        <span class="badge ${statusClass}">${escapeHtml(STATUS_LABEL[o.status] || o.status)}</span>
+        <span>$${Number(o.tip).toFixed(2)} · ${timeAgo(o.createdAt)}</span>
+      </div>
+    </div>
+  `;
+}
 
 // A full rebuild every 4s (polling for new reports/messages) was resetting
 // hover state and flickering any open chat thread even when nothing had
@@ -55,10 +247,11 @@ const errorBox = document.getElementById("errorBox");
 // threads on their own, since new messages don't show up in this payload.
 let lastReportsSnapshot = null;
 
-async function refresh() {
+async function refreshReports() {
   const list = document.getElementById("reportsList");
   try {
     const { orders } = await api("/api/admin/reports");
+    reportsError.innerHTML = "";
 
     if (orders.length === 0) {
       if (lastReportsSnapshot !== "empty") {
@@ -88,7 +281,8 @@ async function refresh() {
           try {
             const res = await api(`/api/admin/orders/${o.id}/refund`, { method: "POST" });
             if (res.warning) toast(res.warning, "error");
-            refresh();
+            refreshOverview();
+            refreshReports();
           } catch (err) {
             toast(err.message, "error");
             btn.disabled = false;
@@ -103,7 +297,8 @@ async function refresh() {
           dismissBtn.disabled = true;
           try {
             await api(`/api/admin/orders/${o.id}/dismiss`, { method: "POST" });
-            refresh();
+            refreshOverview();
+            refreshReports();
           } catch (err) {
             toast(err.message, "error");
             dismissBtn.disabled = false;
@@ -112,7 +307,7 @@ async function refresh() {
       }
     });
   } catch (err) {
-    errorBox.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
+    reportsError.innerHTML = `<div class="error">${escapeHtml(err.message)}</div>`;
   }
 }
 

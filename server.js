@@ -14,6 +14,7 @@ const locations = require("./locations");
 const webpush = require("web-push");
 const percentleCrowd = require("./percentle/crowd").createCrowdStore();
 const { createCrowdRouter } = require("./percentle/crowd-router");
+const { createNativeCreditsRouter } = require("./native-credits");
 const percentlePuzzles = require("./percentle/puzzles").createPuzzleStore();
 const { createPuzzleRouter } = require("./percentle/puzzle-router");
 const percentleEndless = require("./percentle/endless").createEndlessStore();
@@ -42,6 +43,20 @@ const PORT = process.env.PORT || 3000;
 app.set("trust proxy", 1); // Render sits behind a proxy — needed for correct https:// URLs (Stripe Connect links)
 
 app.use(express.json());
+app.get("/admin.html", (req, res) => res.redirect(308, "/admin"));
+// The public website is now informational. Keep these legacy files in the
+// repository for reference, but never serve their ordering UI on the domain.
+const retiredWebPages = new Set(["/order.html", "/deliver.html", "/messages.html", "/settings.html"]);
+app.use((req, res, next) => {
+  if (req.method !== "GET" && req.method !== "HEAD") return next();
+  try {
+    const pathname = path.posix.normalize(decodeURIComponent(req.path)).toLowerCase();
+    if (retiredWebPages.has(pathname)) return res.redirect(302, "/");
+  } catch (_) {
+    // Let Express handle malformed URL encodings normally.
+  }
+  next();
+});
 app.use(express.static(path.join(__dirname, "public")));
 app.use(
   session({
@@ -51,6 +66,16 @@ app.use(
     cookie: { maxAge: 1000 * 60 * 60 * 24 * 7 } // 1 week
   })
 );
+
+// The native Swift app uses Supabase directly. Retain the legacy handlers
+// below for reference, but do not expose website signup or ordering APIs.
+app.use("/api", (req, res, next) => {
+  const route = req.path;
+  if (route === "/admin/login" || route === "/logout" || route === "/me" ||
+      route.startsWith("/admin/") || route.startsWith("/percentle/") ||
+      (req.method === "POST" && /^\/messages\/threads\/[^/]+\/read$/.test(route))) return next();
+  res.status(404).json({ error: "This feature is available in the NovaDash app." });
+});
 
 // ---------- helpers ----------
 
@@ -88,9 +113,7 @@ function getPresentRunnerIds() {
   return ids;
 }
 
-// Gated on ADMIN_EMAIL rather than a DB role — this app has exactly one
-// admin (whoever runs it), so a normal account matching that env var is
-// enough. No ADMIN_EMAIL set means the admin tooling is fully disabled.
+// Legacy helper for web-database report threads and admin notifications.
 async function isUserAdmin(userId) {
   const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase();
   if (!adminEmail || !userId) return false;
@@ -107,12 +130,84 @@ async function getAdminUserId() {
   return user ? user.id : null;
 }
 
+function adminConfigured() {
+  return Boolean(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD);
+}
+
+function isAdminSession(req) {
+  return adminConfigured() && req.session.adminEmail === process.env.ADMIN_EMAIL.toLowerCase() &&
+    req.session.adminUnlockedFor === req.session.userId && Boolean(req.session.userId);
+}
+
 async function requireAdmin(req, res, next) {
-  if (!req.session.userId) return res.status(401).json({ error: "Not logged in" });
-  if (!process.env.ADMIN_EMAIL) return res.status(403).json({ error: "Admin tools aren't configured on this server." });
-  if (!(await isUserAdmin(req.session.userId))) return res.status(403).json({ error: "Not authorized." });
+  if (!adminConfigured()) {
+    return res.status(403).json({ error: "Admin tools aren't configured on this server." });
+  }
+  if (!isAdminSession(req)) return res.status(401).json({ error: "Admin sign-in required." });
   next();
 }
+
+app.get("/admin", async (req, res) => {
+  res.set("Cache-Control", "no-store");
+  if (!adminConfigured()) return res.status(503).send("Admin sign-in is not configured on this server.");
+  if (!isAdminSession(req)) return res.sendFile(path.join(__dirname, "admin-login.html"));
+  res.sendFile(path.join(__dirname, "public", "admin.html"));
+});
+
+// Only the configured email/password can create an admin session. No prior
+// website account is needed; a legacy DB identity is provisioned after a
+// successful sign-in so existing report-message actions retain a sender ID.
+const adminLoginAttempts = new Map(); // IP -> { failures, lockedUntil }
+app.post("/api/admin/login", async (req, res, next) => {
+  if (!adminConfigured()) return res.status(503).json({ error: "Admin sign-in is not configured." });
+  const now = Date.now();
+  const client = req.ip || "unknown";
+  let attempts = adminLoginAttempts.get(client) || { failures: 0, lockedUntil: 0 };
+  if (attempts.lockedUntil > now) {
+    return res.status(429).json({ error: "Too many attempts. Try again in 15 minutes." });
+  }
+  if (attempts.lockedUntil) attempts = { failures: 0, lockedUntil: 0 };
+
+  const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+  const supplied = typeof req.body?.password === "string" ? req.body.password : "";
+  const expectedHash = crypto.createHash("sha256").update(process.env.ADMIN_PASSWORD).digest();
+  const suppliedHash = crypto.createHash("sha256").update(supplied).digest();
+  const passwordMatches = crypto.timingSafeEqual(expectedHash, suppliedHash);
+  if (email !== process.env.ADMIN_EMAIL.toLowerCase() || !passwordMatches) {
+    attempts.failures += 1;
+    if (attempts.failures >= 5) {
+      attempts.lockedUntil = now + 15 * 60 * 1000;
+      attempts.failures = 0;
+      adminLoginAttempts.set(client, attempts);
+      return res.status(429).json({ error: "Too many attempts. Try again in 15 minutes." });
+    }
+    adminLoginAttempts.set(client, attempts);
+    return res.status(401).json({ error: "Invalid admin email or password." });
+  }
+
+  adminLoginAttempts.delete(client);
+  let adminUser = await db.getUserByEmail(email);
+  if (!adminUser) {
+    try {
+      adminUser = await db.createUser({
+        name: "NovaDash Admin",
+        email,
+        phone: "",
+        passwordHash: hashPassword(crypto.randomBytes(32).toString("hex"))
+      });
+    } catch (err) {
+      adminUser = await db.getUserByEmail(email);
+      if (!adminUser) throw err;
+    }
+  }
+  req.session.regenerate((err) => {
+    if (err) return next(err);
+    req.session.userId = adminUser.id;
+    req.session.adminEmail = email;
+    req.session.adminUnlockedFor = adminUser.id;
+    res.json({ ok: true });
+  });
+});
 
 function publicUser(u) {
   if (!u) return null;
@@ -278,6 +373,7 @@ app.post("/api/verify-email", async (req, res) => {
   await db.deletePendingVerification(emailKey);
 
   req.session.userId = user.id;
+  delete req.session.adminUnlockedFor;
   res.json({ user: publicUser(user) });
 });
 
@@ -315,6 +411,7 @@ app.post("/api/login", async (req, res) => {
     return res.status(401).json({ error: "Invalid email or password." });
   }
   req.session.userId = user.id;
+  delete req.session.adminUnlockedFor;
   res.json({ user: publicUser(user) });
 });
 
@@ -323,7 +420,7 @@ app.post("/api/logout", (req, res) => {
 });
 
 app.get("/api/me", async (req, res) => {
-  const user = req.session.userId ? await db.getUserById(req.session.userId) : null;
+  const user = isAdminSession(req) ? await db.getUserById(req.session.userId) : null;
   res.json({ user: publicUser(user) });
 });
 
@@ -783,7 +880,7 @@ async function isUnread(userId, threadKey, last) {
 
 app.get("/api/messages/threads", requireAuth, async (req, res) => {
   const userId = req.session.userId;
-  const admin = await isUserAdmin(userId);
+  const admin = req.session.adminUnlockedFor === userId && await isUserAdmin(userId);
   const [asOrderer, asRunner, disputed] = await Promise.all([
     db.getOrdersByOrderer(userId),
     db.getOrdersByRunner(userId),
@@ -864,7 +961,7 @@ app.get("/api/messages/threads", requireAuth, async (req, res) => {
   res.json({ threads, unreadCount: threads.filter((t) => t.unread).length });
 });
 
-app.post("/api/messages/threads/:threadKey/read", requireAuth, async (req, res) => {
+app.post("/api/messages/threads/:threadKey/read", requireAdmin, async (req, res) => {
   await db.markThreadRead(req.session.userId, req.params.threadKey);
   res.json({ ok: true });
 });
@@ -983,7 +1080,15 @@ app.post("/api/orders/:id/report", requireAuth, async (req, res) => {
   res.json({ order: publicOrder(updated) });
 });
 
-// ---------- admin (dispute review) ----------
+// ---------- admin dashboard and dispute review ----------
+
+app.use("/api/admin/native-accounts", createNativeCreditsRouter(requireAdmin));
+
+app.get("/api/admin/overview", requireAdmin, async (req, res) => {
+  const overview = await db.getAdminOverview();
+  res.set("Cache-Control", "no-store");
+  res.json({ stats: overview.stats, recentOrders: overview.recentOrders.map((o) => publicOrder(o)) });
+});
 
 app.get("/api/admin/reports", requireAdmin, async (req, res) => {
   const reports = await db.getDisputedOrders();

@@ -13,6 +13,7 @@ async function api(path, opts = {}) {
   const res = await fetch(path, {
     method,
     headers: { "Content-Type": "application/json" },
+    credentials: "include",
     body: opts.body ? JSON.stringify(opts.body) : undefined
   });
   let data = {};
@@ -62,7 +63,7 @@ function warmPrefetch(pathname) {
       const raw = sessionStorage.getItem(key);
       if (raw && Date.now() - JSON.parse(raw).ts <= PREFETCH_TTL_MS) return; // already warm
     } catch (e) {}
-    fetch(path, { headers: { "Content-Type": "application/json" } })
+    fetch(path, { headers: { "Content-Type": "application/json" }, credentials: "include" })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (data == null) return;
@@ -91,11 +92,11 @@ async function getMe() {
 async function requireAuthOrRedirect() {
   const user = await getMe();
   if (!user) {
-    window.location.href = "/";
+    window.location.href = window.location.pathname === "/admin" ? "/admin" : "/";
     return null;
   }
   renderNav(user);
-  startUnreadBadgePolling();
+  if (window.location.pathname !== "/admin") startUnreadBadgePolling();
   return user;
 }
 
@@ -149,6 +150,21 @@ function renderNav(user) {
   const el = document.getElementById("nav");
   if (!el) return;
   const path = window.location.pathname;
+  if (path === "/admin") {
+    el.innerHTML = `
+      <div class="nav-top">
+        <a class="brand" href="/">${PAW_ICON} <span class="dash-text">NovaDash</span></a>
+        <div class="nav-actions">
+          <span class="nav-user">Admin dashboard</span>
+          <button class="logout" id="logoutBtn">Sign out</button>
+        </div>
+      </div>`;
+    document.getElementById("logoutBtn").onclick = async () => {
+      await api("/api/logout", { method: "POST" });
+      window.location.href = "/admin";
+    };
+    return;
+  }
   el.innerHTML = `
     <div class="nav-top">
       <a class="brand" href="/order.html">${PAW_ICON} <span class="dash-text">NovaDash</span></a>
@@ -162,7 +178,7 @@ function renderNav(user) {
       <a class="navlink ${path === "/order.html" ? "active" : ""}" href="/order.html">Order Food</a>
       <a class="navlink ${path === "/deliver.html" ? "active" : ""}" href="/deliver.html">Deliver</a>
       <a class="navlink ${path === "/messages.html" ? "active" : ""}" href="/messages.html">Messages<span class="unread-badge" id="messagesUnreadBadge" style="display:none;"></span></a>
-      ${user.isAdmin ? `<a class="navlink ${path === "/admin.html" ? "active" : ""}" href="/admin.html">Reports</a>` : ""}
+      ${user.isAdmin ? `<a class="navlink ${path === "/admin" || path === "/admin.html" ? "active" : ""}" href="/admin">Admin</a>` : ""}
     </nav>
   `;
   document.getElementById("logoutBtn").onclick = async () => {
