@@ -35,7 +35,7 @@ if (location.hostname === "localhost" && new URLSearchParams(location.search).ha
   try { localStorage.removeItem(STORAGE_KEY); } catch {}
   history.replaceState(null, "", location.pathname);
 }
-document.title = `${GAME_NAME} — a little game of big percentages`;
+document.title = GAME_NAME.toUpperCase();
 document.querySelectorAll("[data-game-name]").forEach(element => {
   element.textContent = element.dataset.gameName === "lower" ? GAME_NAME.toLowerCase() : GAME_NAME;
 });
