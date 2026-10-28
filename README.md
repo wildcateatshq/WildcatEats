@@ -96,7 +96,9 @@ A SUPERCHARGED answer (within 0.5) recharges the battery by 5% (`SUPERCHARGE_BON
 100%; because of that cap, charge is worked out question by question (`chargeTrack`), and each
 saved game keeps its final charge (older games are re-scored from their total points off). **Hard mode** (a switch on the start screen) drains twice as fast (`HARD_DRAIN_RATE`), turns the
 greens purple, and locks in once a puzzle's first guess is made; hard players get their own crowd
-line (`mode` on crowd submissions) and their games are marked in stats and sharing.
+line (`mode` on crowd submissions) and their games are marked in stats and sharing. The switch is
+locked only while today's puzzle is under way: before it starts it sets the mode for the daily and
+for endless runs, and once it's finished it sets the mode for endless runs only.
 Dropping below 0% ends the game early: the alarms go off, the lights cut out, and
 the player sees an "Out of charge" screen. Exactly 0.0% survives.
 
@@ -162,11 +164,13 @@ curl -X PUT -H "Authorization: Bearer $PERCENTLE_PUBLISH_TOKEN" \
 
 Players answer questions until their battery runs out (same drain and recharge as the daily),
 from a bank of up to 500 questions per two-week period (periods start on launch day). The
-agent adds up to 40 sourced questions each night (`percentle/AGENT_PROMPT.md`, Step 3b) and
+agent adds sourced questions on every run (`percentle/AGENT_PROMPT.md`, Step 3b) and
 emails the editor a 25-question sample when a bank reaches 500. A bank goes live once it has 250
 questions; until then the previous period's is used, and before any exists the game says endless
 mode is warming up. Unseen questions are asked first. Best runs are compared anonymously within
-the period. Routes are under `/api/percentle/endless`: `GET /bank` (players), `POST /runs`
+the period. A run takes the hard switch's setting when it starts: hard runs drain twice as fast,
+are saved separately (`endless-hard:<startsOn>` progress, their own personal bests), and are
+compared only with other hard runs (`mode` on `POST /runs`, with a separate anonymous ID). Routes are under `/api/percentle/endless`: `GET /bank` (players), `POST /runs`
 (players, rate-limited), and, with the publish token, `GET /status`,
 `POST /banks/:startsOn/questions` (batches of up to 50) and `POST /banks/:startsOn/remove`.
 Banks and runs are stored in `percentle_endless_banks` / `percentle_endless_runs` with Postgres,

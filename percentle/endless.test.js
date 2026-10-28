@@ -75,6 +75,17 @@ test("the endless API fills banks in batches, goes live at 250 questions, and co
   assert.equal(lower.betterThan, 91.7, "a worse run keeps the player's best (12): beats 5 of 6, plus half a tie");
   assert.equal((await post("/runs", { startsOn: "2026-09-08", id: id(1), best: 5 }, { "Content-Type": "application/json" })).status, 400, "old periods are closed");
 
+  // Hard-mode runs are a separate line: a hard player is only compared with other hard players.
+  const hard = await (await post("/runs", { startsOn: "2026-10-06", id: id(20), best: 1, mode: "hard" }, { "Content-Type": "application/json" })).json();
+  assert.equal(hard.players, 1, "normal runs don't count on the hard line");
+  for (let n = 21; n <= 26; n++) await post("/runs", { startsOn: "2026-10-06", id: id(n), best: n - 20, mode: "hard" }, { "Content-Type": "application/json" });
+  const hardBest = await (await post("/runs", { startsOn: "2026-10-06", id: id(26), best: 6, mode: "hard" }, { "Content-Type": "application/json" })).json();
+  assert.equal(hardBest.players, 7);
+  assert.equal(hardBest.betterThan, 92.9, "the best hard run beats 6 of 7, plus half of its own tie");
+  const normalAgain = await (await post("/runs", { startsOn: "2026-10-06", id: id(6), best: 3 }, { "Content-Type": "application/json" })).json();
+  assert.equal(normalAgain.players, 6, "hard runs don't count on the normal line");
+  assert.equal((await post("/runs", { startsOn: "2026-10-06", id: id(30), best: 3, mode: "easy" }, { "Content-Type": "application/json" })).status, 400);
+
   const reopened = createEndlessStore({ filePath });
   await reopened.init();
   assert.equal((await reopened.getBank("2026-10-06")).length, 249, "the bank survives a restart");

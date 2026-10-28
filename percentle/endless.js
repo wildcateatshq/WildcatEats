@@ -22,8 +22,9 @@ function periodStart(date = easternDate()) {
   return addDays(LAUNCH_DATE, Math.floor(daysBetween(LAUNCH_DATE, date) / PERIOD_DAYS) * PERIOD_DAYS);
 }
 
-function validateRun(startsOn, id, best) {
+function validateRun(startsOn, id, best, mode = "normal") {
   if (!isCalendarDate(startsOn) || periodStart(startsOn) !== startsOn) throw new RangeError("startsOn must be a period's start date.");
+  if (mode !== "normal" && mode !== "hard") throw new RangeError('mode must be "normal" or "hard".');
   if (typeof id !== "string" || !UUID_PATTERN.test(id)) throw new RangeError("A valid anonymous run ID is required.");
   if (!Number.isInteger(best) || best < 0 || best > MAX_BANK_QUESTIONS) throw new RangeError(`best must be a whole number from 0 to ${MAX_BANK_QUESTIONS}.`);
 }
@@ -43,7 +44,8 @@ function createEndlessStore(options = {}) {
   const pool = options.pool || (options.filePath || !process.env.DATABASE_URL
     ? null
     : new (require("pg").Pool)({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }));
-  // File storage: { banks: { startsOn: [questions] }, runs: { startsOn: { id: best } } }.
+  // File storage: { banks: { startsOn: [questions] }, runs: { startsOn: { id: best } } }. Hard-mode
+  // runs are kept under "hard:<startsOn>", so they're only compared with each other.
   let data = { banks: {}, runs: {} };
   let writes = Promise.resolve();
 
@@ -88,6 +90,7 @@ function createEndlessStore(options = {}) {
           primary key (starts_on, anonymous_id)
         )
       `);
+      await pool.query("alter table percentle_endless_runs add column if not exists mode text not null default 'normal'");
       return;
     }
     try {
@@ -156,27 +159,28 @@ function createEndlessStore(options = {}) {
     });
   }
 
-  // Saves a player's best run for the period (keeping the higher one) and compares it.
-  async function submitRun(startsOn, id, best) {
-    validateRun(startsOn, id, best);
+  // Saves a player's best run for the period (keeping the higher one) and compares it with other
+  // runs in the same mode. Players use a separate anonymous ID for each mode.
+  async function submitRun(startsOn, id, best, mode = "normal") {
+    validateRun(startsOn, id, best, mode);
     if (pool) {
       await pool.query(
-        `insert into percentle_endless_runs (starts_on, anonymous_id, best) values ($1, $2, $3)
+        `insert into percentle_endless_runs (starts_on, anonymous_id, best, mode) values ($1, $2, $3, $4)
          on conflict (starts_on, anonymous_id) do update set best = greatest(percentle_endless_runs.best, excluded.best), submitted_at = now()`,
-        [startsOn, id, best]
+        [startsOn, id, best, mode]
       );
       const { rows } = await pool.query(
-        `with mine as (select best from percentle_endless_runs where starts_on = $1 and anonymous_id = $2)
+        `with mine as (select best, mode from percentle_endless_runs where starts_on = $1 and anonymous_id = $2)
          select count(*)::int as players,
                 coalesce(sum(case when r.best < mine.best then 1 else 0 end), 0)::int as beaten,
                 coalesce(sum(case when r.best = mine.best then 1 else 0 end), 0)::int as tied
-         from percentle_endless_runs r, mine where r.starts_on = $1`,
+         from percentle_endless_runs r, mine where r.starts_on = $1 and r.mode = mine.mode`,
         [startsOn, id]
       );
       return summarizeRuns(rows[0], true);
     }
     return queued(() => {
-      const runs = (data.runs[startsOn] ??= {});
+      const runs = (data.runs[mode === "hard" ? `hard:${startsOn}` : startsOn] ??= {});
       runs[id] = Math.max(runs[id] ?? 0, best);
       const all = Object.values(runs);
       return summarizeRuns({

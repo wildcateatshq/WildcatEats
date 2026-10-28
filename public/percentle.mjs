@@ -111,6 +111,8 @@ let currentNumber = todayPuzzle.number;
 // Endless mode: playing through the current two-week bank until the battery runs out.
 let endlessMode = false;
 let endlessBank = null;
+// Whether the endless run on screen is a hard-mode run (taken from the switch when it starts).
+let endlessHard = false;
 // Hard mode as chosen on the start screen. Each puzzle takes it on its first guess and keeps it.
 let hardPreferred = readPreference("percentle.hard") === "1";
 // A special's title, like "World Series Special" (null on a normal day).
@@ -152,6 +154,8 @@ function readState() {
     if (!stored.progress || typeof stored.progress !== "object") stored.progress = {};
     if (!stored.achievements || typeof stored.achievements !== "object") stored.achievements = {};
     if (!stored.endless || typeof stored.endless !== "object") stored.endless = { best: {}, allTime: 0, runs: 0 };
+    stored.endless.hardBest ??= {};
+    stored.endless.hardAllTime ??= 0;
     for (const progress of Object.values(stored.progress)) {
       if (!Array.isArray(progress.guesses)) progress.guesses = [];
       if (!Array.isArray(progress.locked)) progress.locked = [];
@@ -161,7 +165,7 @@ function readState() {
     return stored;
   } catch (error) {
     console.error("Could not read Percentle save data.", error);
-    return { games: [], progress: {}, achievements: {}, endless: { best: {}, allTime: 0, runs: 0 } };
+    return { games: [], progress: {}, achievements: {}, endless: { best: {}, allTime: 0, runs: 0, hardBest: {}, hardAllTime: 0 } };
   }
 }
 
@@ -246,7 +250,7 @@ function animateBattery(battery, from, to, duration) {
 
 // Whether a puzzle is (or will be) played in hard mode: locked in once it has a guess.
 function isHard(progress = progressFor()) {
-  if (endlessMode) return false;
+  if (endlessMode) return endlessHard;
   return progress.guesses.length ? Boolean(progress.hard) : hardPreferred;
 }
 
@@ -264,7 +268,7 @@ function readPreference(key) {
 }
 
 function progressFor(date = currentDate) {
-  const key = endlessMode ? `endless:${endlessBank.startsOn}` : practiceMode ? `practice:${date}` : date;
+  const key = endlessMode ? endlessKey(endlessBank.startsOn) : practiceMode ? `practice:${date}` : date;
   if (!state.progress[key]) state.progress[key] = { guesses: [], locked: [], revealed: 0, draft: null };
   return state.progress[key];
 }
@@ -376,7 +380,7 @@ function render() {
   document.querySelector("#returnButton").hidden = !practiceMode;
   if (practiceMode || endlessMode) leaveStartScreen();
   document.querySelector("#puzzleNumber").innerHTML = endlessMode ? INFINITY_ICON : `NO. ${currentNumber}`;
-  document.querySelector("#puzzleDate").textContent = endlessMode ? "ENDLESS MODE" : currentDate === today ? (currentTheme || "Today's edition").toUpperCase() : `${currentDate} · PRACTICE`;
+  document.querySelector("#puzzleDate").textContent = endlessMode ? (endlessHard ? "ENDLESS · HARD MODE" : "ENDLESS MODE") : currentDate === today ? (currentTheme || "Today's edition").toUpperCase() : `${currentDate} · PRACTICE`;
   const animate = justLocked;
   justLocked = false;
   // Reloading part-way through a power-out goes straight to the out-of-charge screen.
@@ -414,7 +418,7 @@ function renderScoreBox(progress, view, animate) {
   const battery = document.querySelector("#scoreBattery");
   const chip = document.querySelector("#drainChip");
   const note = document.querySelector("#scoreNote");
-  const key = endlessMode ? `endless:${endlessBank.startsOn}:${state.endless.runs}` : `${practiceMode ? "practice" : "daily"}:${currentDate}`;
+  const key = endlessMode ? `${endlessKey(endlessBank.startsOn)}:${state.endless.runs}` : `${practiceMode ? "practice" : "daily"}:${currentDate}`;
   const locked = progress.guesses.length;
   // The results screen shows the final battery inside the card, so the box above it steps aside.
   box.hidden = view.phase === "results";
@@ -1028,7 +1032,8 @@ function showStats() {
     <div class="stat-card"><span>BEST CHARGE</span><strong>${best === null ? "—" : formatCharge(best)}</strong></div>
     <div class="stat-card"><span>CURRENT STREAK</span><strong>${consecutiveStreak(games)} day${consecutiveStreak(games) === 1 ? "" : "s"}</strong></div>
     <div class="stat-card"><span>ENDLESS BEST</span><strong>${state.endless.allTime} round${state.endless.allTime === 1 ? "" : "s"}</strong></div>
-    <div class="stat-card"><span>ENDLESS RUNS</span><strong>${state.endless.runs}</strong></div></div>
+    <div class="stat-card"><span>ENDLESS RUNS</span><strong>${state.endless.runs}</strong></div>${state.endless.hardAllTime ? `
+    <div class="stat-card"><span>ENDLESS BEST · HARD</span><strong>${state.endless.hardAllTime} round${state.endless.hardAllTime === 1 ? "" : "s"}</strong></div>` : ""}</div>
     <h3 class="dialog-subtitle">Recent games</h3>${lastTenGames(games)}
     <h3 class="dialog-title">Past puzzles</h3><p>${isTodayFinished() ? "Replay any of the last 30 daily puzzles." : "Finish today's puzzle to unlock the archive."}</p>
     <div class="archive-list" id="archiveList">${isTodayFinished() ? "<span class='hist-empty'>Loading past puzzles…</span>" : "<span class='hist-empty'>The archive unlocks after today's five questions.</span>"}</div>`);
@@ -1088,7 +1093,13 @@ function markEndlessSeen(question) {
   }
 }
 
-// Starts an endless run (or carries on an unfinished one) from the live bank.
+// Normal and hard-mode endless runs are saved separately, so each mode keeps its own unfinished run.
+function endlessKey(startsOn, hard = endlessHard) {
+  return `${hard ? "endless-hard" : "endless"}:${startsOn}`;
+}
+
+// Starts an endless run (or carries on an unfinished one) from the live bank, in the mode the
+// start screen's hard switch is set to.
 async function startEndless() {
   let bank;
   try {
@@ -1102,7 +1113,7 @@ async function startEndless() {
   }
   endlessBank = { startsOn: bank.startsOn, questions: withRoundedAnswers(bank.questions) };
   const byKey = new Map(endlessBank.questions.map(question => [questionKey(question.text), question]));
-  const key = `endless:${bank.startsOn}`;
+  const key = endlessKey(bank.startsOn, hardPreferred);
   let run = state.progress[key];
   const finished = run && (run.recorded || run.revealed >= (run.order?.length ?? 0));
   if (!run || finished || !Array.isArray(run.order)) {
@@ -1110,12 +1121,13 @@ async function startEndless() {
     try {
       seen = JSON.parse(localStorage.getItem(endlessSeenKey(bank.startsOn)) || "[]");
     } catch {}
-    run = state.progress[key] = { guesses: [], locked: [], revealed: 0, draft: null, order: endlessOrder(endlessBank.questions, seen) };
+    run = state.progress[key] = { guesses: [], locked: [], revealed: 0, draft: null, order: endlessOrder(endlessBank.questions, seen), hard: hardPreferred };
     save();
   }
   // Questions removed from the bank since the run started are skipped.
   currentQuestions = run.order.map(key => byKey.get(key)).filter(Boolean);
   endlessMode = true;
+  endlessHard = hardPreferred;
   practiceMode = false;
   currentDate = today;
   currentTheme = null;
@@ -1125,26 +1137,32 @@ async function startEndless() {
 // End of a run: rounds survived, personal bests, and how the best compares this period.
 function renderEndlessResults() {
   const progress = progressFor();
-  const out = isOutOfCharge(progress.guesses, currentQuestions);
-  const rounds = roundsSurvived(progress.guesses, currentQuestions);
+  const rate = rateOf(progress);
+  const out = isOutOfCharge(progress.guesses, currentQuestions, rate);
+  const rounds = roundsSurvived(progress.guesses, currentQuestions, rate);
   const period = endlessBank.startsOn;
-  const previousBest = state.endless.best[period] ?? 0;
+  // Hard-mode runs keep their own personal bests.
+  const bests = endlessHard ? state.endless.hardBest : state.endless.best;
+  const previousBest = bests[period] ?? 0;
   if (!progress.recorded) {
     progress.recorded = { rounds, newBest: rounds > previousBest };
     state.endless.runs++;
     sendStat("event", { kind: "endless" });
-    state.endless.best[period] = Math.max(previousBest, rounds);
-    state.endless.allTime = Math.max(state.endless.allTime, rounds);
+    bests[period] = Math.max(previousBest, rounds);
+    if (endlessHard) state.endless.hardAllTime = Math.max(state.endless.hardAllTime, rounds);
+    else state.endless.allTime = Math.max(state.endless.allTime, rounds);
     const supercharged = progress.guesses.filter((guess, i) => pointsOff(guess, currentQuestions[i].answer) === 0).length;
     unlockAchievements(endlessAchievements({ rounds, supercharged }), true);
     save();
   }
   const { newBest } = progress.recorded;
-  const best = state.endless.best[period];
+  const best = bests[period];
+  const modeLabel = endlessHard ? " · Hard mode" : "";
+  const inHard = endlessHard ? " in hard mode" : "";
   stage.innerHTML = `<div class="final-score dead-score reveal"><div class="result-battery-wrap">${batteryMarkup("result-battery dead-battery", null, 0)}</div>
       <h2 class="out-title">${out ? "Run over" : "Bank cleared"}</h2><p class="out-where">Survived ${rounds} round${rounds === 1 ? "" : "s"}</p>
-      <p class="endless-best${newBest ? " new" : ""}">${newBest ? "New personal best!" : `Personal best this period: ${best}`}</p></div>
-    <section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">How you stack up · Endless</h3><p class="crowd-status">Comparing your best run…</p></section>
+      <p class="endless-best${newBest ? " new" : ""}">${newBest ? `New personal best${inHard}!` : `Personal best${inHard} this period: ${best}`}</p></div>
+    <section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">How you stack up · Endless${modeLabel}</h3><p class="crowd-status">Comparing your best run…</p></section>
     <button class="lock-button" id="againButton">Play again ${INFINITY_ICON}</button>
     <button class="next-button secondary-button" id="shareButton">Share this run ${ICONS.share}</button>
     <button class="next-button secondary-button" id="todayButton">Back to today's puzzle</button>`;
@@ -1155,18 +1173,18 @@ function renderEndlessResults() {
   });
   document.querySelector("#shareButton").addEventListener("click", () => {
     sendStat("event", { kind: "share" });
-    const text = `${GAME_NAME} Endless\n⚡ Survived ${rounds} round${rounds === 1 ? "" : "s"}${newBest ? " (new best!)" : ""}\n${location.origin}${location.pathname}`;
+    const text = `${GAME_NAME} Endless${endlessHard ? " · Hard mode 😈" : ""}\n⚡ Survived ${rounds} round${rounds === 1 ? "" : "s"}${newBest ? " (new best!)" : ""}\n${location.origin}${location.pathname}`;
     if (navigator.share) navigator.share({ text }).catch(error => { if (error.name !== "AbortError") copyResult(text); });
     else copyResult(text);
   });
   document.querySelector("#todayButton").addEventListener("click", returnToToday);
-  loadEndlessCrowd(period, best);
+  loadEndlessCrowd(period, best, endlessHard);
   setTimeout(announceAchievements, 1200);
 }
 
-// One anonymous ID per period, so a player's best run counts once.
-function endlessRunId(startsOn) {
-  const key = `percentle.endlessId.${startsOn}`;
+// One anonymous ID per period and mode, so a player's best run counts once on each line.
+function endlessRunId(startsOn, hard) {
+  const key = `percentle.endlessId${hard ? "Hard" : ""}.${startsOn}`;
   let id = readPreference(key);
   if (!id && crypto.randomUUID) {
     id = crypto.randomUUID();
@@ -1177,14 +1195,15 @@ function endlessRunId(startsOn) {
   return id;
 }
 
-async function loadEndlessCrowd(startsOn, best) {
+async function loadEndlessCrowd(startsOn, best, hard) {
   const panel = document.querySelector("#crowdPanel");
+  const players = hard ? "hard-mode players" : "players";
   try {
-    const summary = await crowdRequest(`${ENDLESS_URL}/runs`, { method: "POST", body: { startsOn, id: endlessRunId(startsOn), best } });
+    const summary = await crowdRequest(`${ENDLESS_URL}/runs`, { method: "POST", body: { startsOn, id: endlessRunId(startsOn, hard), best, mode: hard ? "hard" : "normal" } });
     const line = summary.betterThan === null
-      ? `Once at least ${summary.minimumComparisonPlayers} other players have finished a run this period, you'll see how your best compares.`
-      : `Your best run (${best} round${best === 1 ? "" : "s"}) beats <strong>${summary.betterThan.toFixed(1)}%</strong> of players this period.`;
-    panel.innerHTML = `<h3 class="crowd-title">How you stack up · Endless</h3><p class="crowd-position">${line}</p>`;
+      ? `Once at least ${summary.minimumComparisonPlayers} other ${players} have finished a run this period, you'll see how your best compares.`
+      : `Your best run (${best} round${best === 1 ? "" : "s"}) beats <strong>${summary.betterThan.toFixed(1)}%</strong> of ${players} this period.`;
+    panel.innerHTML = `<h3 class="crowd-title">How you stack up · Endless${hard ? " · Hard mode" : ""}</h3><p class="crowd-position">${line}</p>`;
     // "Top Charger": the best run beats most of this period's players.
     if (summary.betterThan !== null) {
       unlockAchievements(endlessAchievements({ rounds: best, betterThan: summary.betterThan }), true);
@@ -1230,17 +1249,22 @@ function applyHardLook() {
   document.body.classList.toggle("hard", isHard());
 }
 
-// The switch shows today's mode. Once today's puzzle has a guess, it's locked to that puzzle's mode.
+// While today's puzzle is under way the switch is locked to its mode. Before it starts it sets the
+// mode for today's puzzle and endless runs; once it's finished it only sets the mode for endless.
+function hardSwitchLocked() {
+  return Boolean(state.progress[today]?.guesses.length) && !isTodayFinished();
+}
+
 function updateHardSwitch() {
   const todays = state.progress[today];
-  const locked = Boolean(todays?.guesses.length);
+  const locked = hardSwitchLocked();
   const on = locked ? Boolean(todays.hard) : hardPreferred;
   const button = document.querySelector("#hardSwitch");
   button.setAttribute("aria-checked", String(on));
   button.disabled = locked;
   button.title = locked ? "Locked for today's puzzle" : "";
   document.querySelectorAll("[data-drain-rule]").forEach(element => { element.innerHTML = drainRule(drainRateFor(on)); });
-  applyHardLook();
+  document.body.classList.toggle("hard", on);
 }
 
 // Switching modes floods the screen: purple with a black devil going into hard mode, green coming
@@ -1248,7 +1272,7 @@ function updateHardSwitch() {
 const DEVIL = `<svg class="devil" viewBox="0 0 200 150" aria-hidden="true"><path fill="#000" d="M8,22 L30,30 L38,18 L46,30 L58,20 L62,32 L76,30 L96,54 L70,58 L44,50 L24,38 Z M192,22 L170,30 L162,18 L154,30 L142,20 L138,32 L124,30 L104,54 L130,58 L156,50 L176,38 Z M12,58 L19.3,55.8 L26.7,69 L34,62.5 L41.3,78 L48.7,67.8 L56,85 L63.3,71.8 L70.7,90 L78,74.5 L85.3,93 L92.7,75.8 L100,94 L107.3,75.8 L114.7,93 L122,74.5 L129.3,90 L136.7,71.8 L144,85 L151.3,67.8 L158.7,78 L166,62.5 L173.3,69 L180.7,55.8 L188,58 L188,58 L184.3,70.7 L177,92.8 L169.7,87.6 L162.3,113.9 L155,101.3 L147.7,130.5 L140.3,111.8 L133,142.8 L125.7,119.1 L118.3,150.5 L111,123.1 L103.7,153.9 L96.3,123.9 L89,152.8 L81.7,121.5 L74.3,147.2 L67,115.8 L59.7,137.2 L52.3,107 L45,122.8 L37.7,94.9 L30.3,103.9 L23,79.6 L15.7,80.5 Z"/></svg>`;
 
 function toggleHardMode() {
-  if (document.querySelector(".mode-flash") || state.progress[today]?.guesses.length) return;
+  if (document.querySelector(".mode-flash") || hardSwitchLocked()) return;
   hardPreferred = !hardPreferred;
   try {
     localStorage.setItem("percentle.hard", hardPreferred ? "1" : "0");

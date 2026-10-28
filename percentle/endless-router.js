@@ -120,11 +120,11 @@ function createEndlessRouter(store, options = {}) {
   router.post("/runs", async (req, res, next) => {
     res.set("Cache-Control", "no-store");
     if (!allowRun(clientAddress(req))) return res.status(429).json({ error: "Too many runs from this network right now. Try again in a minute." });
-    const { startsOn, id, best } = req.body || {};
+    const { startsOn, id, best, mode } = req.body || {};
     const current = periodStart(today());
     if (![current, addDays(current, -PERIOD_DAYS)].includes(startsOn)) return res.status(400).json({ error: "That endless period isn't open." });
     try {
-      res.json(await store.submitRun(startsOn, id, best));
+      res.json(await store.submitRun(startsOn, id, best, mode));
     } catch (error) {
       if (error instanceof RangeError) return res.status(400).json({ error: error.message });
       next(error);
