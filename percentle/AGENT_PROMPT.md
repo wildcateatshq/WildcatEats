@@ -300,10 +300,12 @@ company's annual report, and say whose figure and what year it is in the questio
 
 **Trivia sites for ideas.** Trivial Pursuit-style trivia, trivia websites, fun-fact lists and
 "surprising statistics" articles are good places to find random, interesting stats (editor,
-2026-10-28). Use them **for ideas only**: never copy a trivia question's wording, and never take a
-number from a trivia site on its own. Trace each stat back to its original source (the poll,
-study, report, or official data the trivia site got it from), check the number there, and cite
-that original source. If you can't find the original, skip the stat.
+2026-10-28). Never copy a trivia question's wording; write your own. First try to trace each stat back to its
+original source (the poll, study, report, or official data the trivia site got it from), check
+the number there, and cite that original source. If you can't find the original, you may still
+use the stat and cite the trivia page as the source, **unless the number seems unbelievable**
+(editor, 2026-10-28). Skip it if it seems implausibly high or low, or if other sources give a
+clearly different number.
 
 **Where to find numbers when a site blocks you.** If a site refuses your requests, never try to
 get around it; use another source. For example:
