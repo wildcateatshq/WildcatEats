@@ -34,6 +34,8 @@ app.use(express.json());
 app.get(["/", "/percentle.html"], (req, res) => res.sendFile(path.join(publicDir, "percentle.html"), page));
 app.get("/percentle.css", (req, res) => res.sendFile(path.join(publicDir, "percentle.css"), asset));
 app.get("/percentle.mjs", (req, res) => res.sendFile(path.join(publicDir, "percentle.mjs"), asset));
+// Google and some browsers look for the icon here rather than in the page's <link> tags.
+app.get("/favicon.ico", (req, res) => res.sendFile(path.join(publicDir, "percentle", "favicon.ico"), { maxAge: 24 * 60 * 60 * 1000 }));
 app.use("/percentle", express.static(path.join(publicDir, "percentle"), asset));
 // For search engines: the game's public address, what to crawl (not the API), and a sitemap.
 const SITE_URL = "https://chargle.io";
