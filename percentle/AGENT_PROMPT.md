@@ -317,6 +317,12 @@ get around it; use another source. For example:
 More generally, don't repeat a question **format** used in the last 14 days, even with a
 different team, artist, or film.
 
+**3-point share questions: at most once every 10 days** (editor, 2026-10-28). This covers every
+question about how much of a player's shooting or scoring is 3-pointers: the share of their shot
+attempts that were 3-pointers, the share of their points that came from 3-pointers, and similar
+splits. In the daily puzzles, use one only if none appeared in the last 10 days. In an endless
+bank, keep them to **10 or fewer** in total.
+
 **Rules**
 1. Ask for a single percentage and end with "?". Keep it under 220 characters and phrase it
    naturally. Good openings: "What percentage of …", "In [year], what percentage of …", or
