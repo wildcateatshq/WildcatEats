@@ -266,7 +266,9 @@ exact questions:
 - Music: "What percentage of artists with over 1 million monthly Spotify listeners are from the
   U.S.?" "What percentage of Drake's songs on Spotify have over 1 billion streams?"
 - Movies: "What percentage of the Barbie movie's runtime is Ken on screen?" "What percentage of
-  Americans say they've seen Titanic?"
+  Americans say they've seen Titanic?" Movie questions should be random and fun, often polls
+  about what people have watched or think (see "Family Feud-style poll questions" below), not
+  mostly box office.
 - U.S. life: survey-style questions about everyday habits, like the share of U.S. adults who use
   TikTok. The editor liked these.
 - World: population and geography, for example the share of the world's people living in one
@@ -317,11 +319,23 @@ get around it; use another source. For example:
 More generally, don't repeat a question **format** used in the last 14 days, even with a
 different team, artist, or film.
 
-**3-point share questions: at most once every 10 days** (editor, 2026-10-28). This covers every
-question about how much of a player's shooting or scoring is 3-pointers: the share of their shot
-attempts that were 3-pointers, the share of their points that came from 3-pointers, and similar
-splits. In the daily puzzles, use one only if none appeared in the last 10 days. In an endless
-bank, keep them to **10 or fewer** in total.
+**Formats limited to once every 10 days** (editor, 2026-10-28). In the daily puzzles, use one of
+these only if no question of that format appeared in the last 10 days. In an endless bank, keep
+each format to **10 or fewer** questions in total.
+- **3-point share:** how much of a player's shooting or scoring is 3-pointers, such as the share of
+  their shot attempts that were 3-pointers, the share of their points from 3-pointers, and similar
+  splits.
+- **Box office split:** how much of a film's box office came from the U.S. and Canada (domestic)
+  or from outside them (international), and similar splits of a film's gross.
+
+**Family Feud-style poll questions.** The editor finds these the most fun: "We asked people…, what
+percentage said…?" Use them often, in every category, and especially for **movies**, which should
+feel more random and less about box office. For example: "What percentage of U.S. adults ages 18
+to 29 say they have seen Frozen?", or the share of Americans who say they've seen every Harry
+Potter film, cried at a Pixar movie, or would rather watch a movie at home than in a theater.
+Find them in published polls, such as YouGov, Morning Consult, Pew, Gallup, and Ipsos. Use the
+poll's own age group and wording: if the poll reports 18–29, ask about ages 18 to 29, never a
+different range like 18–25.
 
 **Rules**
 1. Ask for a single percentage and end with "?". Keep it under 220 characters and phrase it
