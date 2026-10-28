@@ -62,6 +62,8 @@ test("the endless API fills banks in batches, goes live at 250 questions, and co
 
   const status = await (await fetch(`${url}/status`, { headers: auth })).json();
   assert.equal(status.current.count, 250);
+  assert.equal(Object.values(status.current.categories).reduce((sum, n) => sum + n, 0), 250);
+  assert.deepEqual(status.next.categories, {});
   assert.equal(status.next.startsOn, "2026-10-20");
 
   const removed = await (await post("/banks/2026-10-06/remove", { texts: [question(0).text.toUpperCase()] })).json();

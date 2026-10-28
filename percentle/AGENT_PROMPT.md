@@ -174,13 +174,16 @@ curl -sS --max-time 120 -H "Authorization: Bearer $PERCENTLE_PUBLISH_TOKEN" \
   "$PERCENTLE_SITE_URL/api/percentle/endless/status"
 ```
 
-It returns `previous`, `current`, and `next` periods, each with `startsOn`, `count`, and every
-question's `texts`. Add to `current` if it has fewer than 500 questions, otherwise to `next` if it
+It returns `previous`, `current`, and `next` periods, each with `startsOn`, `count`, `categories`
+(how many questions each category has), and every question's `texts`. Add to `current` if it has fewer than 500 questions, otherwise to `next` if it
 has fewer than 500; if both are full, skip this step.
 
 Write the questions with every rule in Steps 4 and 5, **including opening a source for every
 answer**. Also:
-- Mix all five categories freely, leaning toward sports and music, with a wide spread of answers.
+- Follow the category mix in Step 4 across the whole bank (about 35% Sports, 25% U.S. life, 25%
+  World, 8% Movies, 7% Music), and use the question kinds in Step 5. Check the bank's `categories`
+  counts before each batch and write for whichever categories are furthest below their share. Keep a
+  wide spread of answers.
 - Each question must stand on its own (players see them in random order) and must not repeat or
   closely match any text in the three banks or in the daily puzzle history.
 - Use only facts that won't change during the two weeks the bank is live.
@@ -233,8 +236,18 @@ global ones.
 
 **The mix flows freely.** There are no set themes, no required categories, and no fixed order.
 You don't need a movie question every day, and no category owns a particular slot, so shuffle
-the order every day. Lean toward sports and music overall. Over many days every category should
-still come up.
+the order every day. Over many days, aim for roughly this mix (updated 2026-10-28):
+
+| Category    | Share | |
+|-------------|-------|---|
+| `Sports`    | ~35%  | Lean slightly toward sports, but no more than this. |
+| `U.S. life` | ~25%  | Give these two plenty of room. |
+| `World`     | ~25%  | |
+| `Movies`    | ~8%   | Keep these two relatively low. |
+| `Music`     | ~7%   | |
+
+For a daily puzzle that usually means 1–2 sports questions, 1–2 U.S. life, 1 World, and a movie or
+music question only now and then.
 
 ## Step 5: Write the questions
 
@@ -258,6 +271,42 @@ exact questions:
   TikTok. The editor liked these.
 - World: population and geography, for example the share of the world's people living in one
   country, or the share of a continent covered by desert.
+
+**Question kinds to use more.** The editor wants more questions like these, in any category.
+They are **kinds of questions, not questions to copy**: write new ones in the same spirit, and
+don't reuse these exact examples. The editor especially likes **discounts and markups** and
+**tests and exams**.
+- **Percent of a known total:** "What percent of the Earth's surface is covered by water?"
+- **Percent change over a period:** "By what percent did the S&P 500 rise in 2024?"
+- **Percent of a population:** "What percent of US adults own a smartphone?", "What percent of
+  Ohio residents are over 65?"
+- **Percent of a sports stat:** "What percent of NBA free throws were made last season?"
+- **Discounts and markups (favorite):** "What is the typical markup on a restaurant wine list?",
+  "What percent of a retail price does a store typically keep as gross margin?"
+- **Percent of a company's revenue:** "What percent of Apple's revenue comes from services?"
+- **Tests and exams (favorite):** "What percent of students pass the bar exam on the first try?"
+  Think pass rates, average scores as a percent, acceptance rates, and the like.
+- **Daily habits:** "What percent of Americans say they check their phone within five minutes of
+  waking up?"
+- **Survey results:** "What percent of Americans say they prefer cats to dogs?"
+- **Time or space:** "What percent of a typical day do Americans spend sleeping?", "What percent of
+  the ocean floor has been mapped in high resolution?"
+
+Each still needs one checkable answer from a named source and a time frame (rule 2). For
+"typical" figures like markups, use a specific published number, such as an industry survey or a
+company's annual report, and say whose figure and what year it is in the question's time frame.
+
+**Where to find numbers when a site blocks you.** If a site refuses your requests, never try to
+get around it; use another source. For example:
+- **NFL:** NFL.com stats pages, team and player pages on Wikipedia, ESPN, StatMuse, and the open
+  nflverse data (CSV files published at github.com/nflverse/nflverse-data/releases).
+- **Jobs, prices and wages (BLS):** the BLS public data API (api.bls.gov) or FRED
+  (fred.stlouisfed.org).
+- **U.S. population, states and counties:** the Census Bureau (census.gov, QuickFacts, and the
+  Census data API).
+- **Companies' revenue:** the company's annual report or investor-relations page.
+- **Test pass rates:** the body that runs the test (for example the NCBE or a state bar for the
+  bar exam, the College Board for the SAT and AP exams).
 
 **Avoid these overused formats.** The editor has seen them too often:
 - a team's regular-season win percentage;

@@ -60,8 +60,8 @@ function createEndlessRouter(store, options = {}) {
     }
   });
 
-  // For the agent: the previous, current, and next periods' banks, so it can fill the right one
-  // and avoid repeating questions.
+  // For the agent: the previous, current, and next periods' banks, so it can fill the right one,
+  // keep the category mix balanced, and avoid repeating questions.
   router.get("/status", requirePublisher, async (req, res, next) => {
     res.set("Cache-Control", "no-store");
     try {
@@ -70,7 +70,9 @@ function createEndlessRouter(store, options = {}) {
       const result = { today: today(), minLive: MIN_LIVE_QUESTIONS, maxBatch: MAX_BATCH };
       for (const [name, startsOn] of Object.entries(periods)) {
         const questions = await store.getBank(startsOn);
-        result[name] = { startsOn, count: questions.length, texts: questions.map(question => question.text) };
+        const categories = {};
+        for (const question of questions) categories[question.category] = (categories[question.category] || 0) + 1;
+        result[name] = { startsOn, count: questions.length, categories, texts: questions.map(question => question.text) };
       }
       res.json(result);
     } catch (error) {
