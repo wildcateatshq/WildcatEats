@@ -298,6 +298,13 @@ Each still needs one checkable answer from a named source and a time frame (rule
 "typical" figures like markups, use a specific published number, such as an industry survey or a
 company's annual report, and say whose figure and what year it is in the question's time frame.
 
+**Trivia sites for ideas.** Trivial Pursuit-style trivia, trivia websites, fun-fact lists and
+"surprising statistics" articles are good places to find random, interesting stats (editor,
+2026-10-28). Use them **for ideas only**: never copy a trivia question's wording, and never take a
+number from a trivia site on its own. Trace each stat back to its original source (the poll,
+study, report, or official data the trivia site got it from), check the number there, and cite
+that original source. If you can't find the original, skip the stat.
+
 **Where to find numbers when a site blocks you.** If a site refuses your requests, never try to
 get around it; use another source. For example:
 - **NFL:** NFL.com stats pages, team and player pages on Wikipedia, ESPN, StatMuse, and the open
