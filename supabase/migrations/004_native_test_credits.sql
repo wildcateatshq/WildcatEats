@@ -43,9 +43,11 @@ create trigger on_native_test_credit_added
 alter table public.native_test_balances enable row level security;
 alter table public.native_test_credits enable row level security;
 
+drop policy if exists "native_test_balances_select_own" on public.native_test_balances;
 create policy "native_test_balances_select_own"
   on public.native_test_balances for select to authenticated
   using ((select auth.uid()) = user_id);
+drop policy if exists "native_test_credits_select_own" on public.native_test_credits;
 create policy "native_test_credits_select_own"
   on public.native_test_credits for select to authenticated
   using ((select auth.uid()) = user_id);

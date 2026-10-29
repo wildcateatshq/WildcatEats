@@ -15,6 +15,7 @@ const webpush = require("web-push");
 const percentleCrowd = require("./percentle/crowd").createCrowdStore();
 const { createCrowdRouter } = require("./percentle/crowd-router");
 const { createNativeCreditsRouter } = require("./native-credits");
+const { createNativeOrdersRouter } = require("./native-orders");
 const percentlePuzzles = require("./percentle/puzzles").createPuzzleStore();
 const { createPuzzleRouter } = require("./percentle/puzzle-router");
 const percentleEndless = require("./percentle/endless").createEndlessStore();
@@ -1083,6 +1084,7 @@ app.post("/api/orders/:id/report", requireAuth, async (req, res) => {
 // ---------- admin dashboard and dispute review ----------
 
 app.use("/api/admin/native-accounts", createNativeCreditsRouter(requireAdmin));
+app.use("/api/admin/native-orders", createNativeOrdersRouter(requireAdmin));
 
 app.get("/api/admin/overview", requireAdmin, async (req, res) => {
   const overview = await db.getAdminOverview();

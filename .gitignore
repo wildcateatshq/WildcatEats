@@ -1,6 +1,11 @@
 node_modules/
 db.json
 .env
+.env.mobile
+ios/App/build/
+ios/App/Pods/
+android/**/build/
+android/.gradle/
 server.log
 /data/percentle-crowd.json
 /data/percentle-crowd.json.*.tmp
@@ -10,3 +15,5 @@ server.log
 /data/percentle-endless.json.*.tmp
 /data/percentle-stats.json
 /data/percentle-stats.json.*.tmp
+.DS_Store
+xcuserdata/

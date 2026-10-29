@@ -27,10 +27,35 @@ No web account or student signup is required. Keep both values private and do
 not commit `.env`. A successful sign-in creates an internal admin record only
 if the legacy dashboard database needs one for report messages.
 
-The existing dashboard reads the website's legacy database (`db.json` locally,
-or Postgres with `DATABASE_URL`). The native iPhone app uses separate Supabase
-tables, so its orders do not appear in this legacy dashboard unless a native
-Supabase dashboard integration is added.
+The overview and reported-order sections read the website's legacy database
+(`db.json` locally, or Postgres with `DATABASE_URL`). Native iPhone orders are
+shown separately in the dashboard's native-order testing section.
+
+### Native order testing
+
+Set `SUPABASE_URL` and a server-only `SUPABASE_SECRET_KEY` for the same Supabase
+project as the iPhone app, then restart the server. Apply the native-app
+migrations in `supabase/migrations/001_native_app.sql`,
+`002_order_map.sql`, and `003_delivery_notifications.sql` if they are not
+already applied. In `/admin`, create a test request using a native account
+as the orderer and any native account as the test recipient, including the
+orderer. Sign in to the recipient account on the simulator. The dashboard sends that account a delivery
+offer without checking location. The app shows the open request on Deliver and
+presents a local notification while it is running with notification permission.
+For an existing dashboard-created open request, enter the recipient email and
+choose **Send test offer**. Self-delivery is allowed only when that account has
+a dashboard test offer for the order; ordinary app orders retain the self-delivery
+restriction. To complete the request without a delivery trip, choose **Fulfill
+for test**. This admin-only action does not charge the orderer.
+
+When an order is marked delivered (by a tap or QR handoff, or **Fulfill for
+test**), `supabase/migrations/007_native_delivery_payouts.sql` adds its payout
+to the runner's test balance as a recorded credit. Each order pays out once.
+
+The dashboard's **Store open overrides** section can force any listed dining
+location open until an admin returns it to its official schedule. Apply
+`supabase/migrations/009_store_hours_overrides.sql` to enable the shared state;
+the iPhone app refreshes active overrides every 30 seconds.
 
 ### Native account test credits
 

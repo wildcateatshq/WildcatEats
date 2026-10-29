@@ -1,0 +1,12 @@
+{
+  "images" : [
+    {
+      "filename" : "novadash-scooter-inner.svg",
+      "idiom" : "universal"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}

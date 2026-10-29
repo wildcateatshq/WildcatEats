@@ -1,0 +1,9 @@
+<svg preserveAspectRatio="none" overflow="visible" style="display: block;" width="23" height="28" viewBox="0 0 23 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+<g id="Group 1">
+<mask id="stroke0_0_12" fill="white">
+<path d="M0 26.5C0 20.1487 5.14873 15 11.5 15V15C17.8513 15 23 20.1487 23 26.5V27C23 27.5523 22.5523 28 22 28H1C0.447715 28 0 27.5523 0 27V26.5Z"/>
+</mask>
+<path id="Rectangle 103" d="M1 28H22C22.5523 28 23 27.5523 23 27V26.5C23 20.1487 17.8513 15 11.5 15V15C5.14873 15 0 20.1487 0 26.5V27C0 27.5523 0.447715 28 1 28Z" stroke-width="3" stroke="#FFFCF7" mask="url(#stroke0_0_12)"/>
+<path id="Ellipse 18" d="M17.25 6.5C17.25 9.67564 14.6756 12.25 11.5 12.25C8.32436 12.25 5.75 9.67564 5.75 6.5C5.75 3.32436 8.32436 0.75 11.5 0.75C14.6756 0.75 17.25 3.32436 17.25 6.5Z" stroke-width="1.5" stroke="#FFFCF7"/>
+</g>
+</svg>

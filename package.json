@@ -7,7 +7,11 @@
     "start": "node server.js",
     "percentle": "node percentle/server.js",
     "compare-pricing": "node compare-pricing.js",
-    "test": "node --test percentle/*.test.*"
+    "test": "node --test native-credits.test.js native-orders.test.js percentle/*.test.*",
+    "mobile:sync": "sh -c 'if [ -f .env.mobile ]; then set -a; . ./.env.mobile; set +a; fi; npx cap copy'",
+    "mobile:update-native": "npx cap sync",
+    "mobile:ios": "open ios/App/App.xcodeproj",
+    "mobile:android": "npx cap open android"
   },
   "engines": {
     "node": ">=20"
@@ -17,6 +21,10 @@
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "@capacitor/android": "^7.6.9",
+    "@capacitor/cli": "^7.6.9",
+    "@capacitor/core": "^7.6.9",
+    "@capacitor/ios": "^7.6.9",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "express-session": "^1.19.0",
@@ -25,5 +33,9 @@
     "stripe": "^22.6.0",
     "twilio": "^6.1.0",
     "web-push": "^3.6.7"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "typescript": "^5.8.3"
   }
 }

@@ -14,6 +14,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="/style.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css" integrity="sha384-K282sW/zFjTkrjR/+yr1H+gCukuy4OEYrkXRybV88g7pk+kZZYpNV6SAV59NcgFg" crossorigin="anonymous" />
 </head>
 <body class="admin-page">
 <div class="page-loader" id="pageLoader" role="status" aria-live="polite" aria-label="Loading NovaDash">
@@ -28,7 +29,7 @@
     <div>
       <p class="admin-eyebrow">NOVADASH OPERATIONS</p>
       <h1>Admin dashboard</h1>
-      <p class="subtitle">Legacy web order data. Orders from the native iPhone app are stored separately in Supabase and are not shown here yet.</p>
+      <p class="subtitle">Platform activity and native-app testing tools. The overview below uses legacy web data; native iPhone orders appear in their own section.</p>
     </div>
     <button class="btn secondary" id="adminRefresh" type="button">Refresh</button>
   </div>
@@ -70,6 +71,51 @@
     </div>
   </section>
 
+  <section class="admin-section" id="storeOverrides" aria-labelledby="storeOverridesHeading">
+    <div class="admin-section-heading">
+      <div><p class="admin-eyebrow">NATIVE APP · AVAILABILITY</p><h2 id="storeOverridesHeading">Store open overrides</h2></div>
+    </div>
+    <p class="subtitle">Force a location open when its published dining schedule says it is closed. Turn the override off to return to the official schedule.</p>
+    <div id="storeOverrideMessage" role="status" aria-live="polite"></div>
+    <div id="storeOverrideList" class="admin-recent" aria-live="polite"><div class="empty">Loading store availability…</div></div>
+  </section>
+
+  <section class="admin-section" id="userLocations" aria-labelledby="userLocationsHeading">
+    <div class="admin-section-heading">
+      <div><p class="admin-eyebrow">NATIVE APP · LOCATIONS</p><h2 id="userLocationsHeading">User locations</h2></div>
+      <span id="userLocationSummary"></span>
+    </div>
+    <p class="subtitle">Last known location of each iPhone account, saved while the account has the Deliver tab open. Live means updated in the last 10 minutes — the window used to send nearby delivery offers.</p>
+    <div id="userLocationMessage" role="status" aria-live="polite"></div>
+    <div id="userLocationMap" class="admin-location-map" role="region" aria-label="Map of user locations"></div>
+    <p class="admin-map-credit">Map © <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a> · © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</p>
+    <div id="userLocationList" class="admin-recent" aria-live="polite"><div class="empty">Loading user locations…</div></div>
+  </section>
+
+  <section class="admin-section" id="nativeOrders" aria-labelledby="nativeOrdersHeading">
+    <div class="admin-section-heading">
+      <div><p class="admin-eyebrow">NATIVE APP · TESTING</p><h2 id="nativeOrdersHeading">Order requests</h2></div>
+    </div>
+    <p class="subtitle">Dashboard test requests can go to any iPhone account, including the orderer. Sign in to the test recipient account on the simulator. Normal app orders keep their usual restrictions. These actions do not charge or pay anyone.</p>
+    <form id="testOrderForm" class="admin-test-order-form" novalidate>
+      <label>Orderer email<input name="ordererEmail" type="email" autocomplete="off" required placeholder="student@villanova.edu" /></label>
+      <label>Test recipient email (can be the orderer)<input name="recipientEmail" type="email" autocomplete="off" required placeholder="runner@villanova.edu" /></label>
+      <label>Pickup location<select name="store" required>
+        <option value="">Choose a location</option>
+        <option>COVA</option><option>Cascia</option><option>Connelly Center</option><option>St. Mary's</option><option>Wawa</option><option>Holy Grounds (Bartley)</option>
+      </select></label>
+      <label>Order number<input name="orderNumber" maxlength="100" required placeholder="12345" /></label>
+      <label>Deliver to<input name="hall" maxlength="120" required placeholder="Sullivan Hall" /></label>
+      <label>Describe the order<input name="items" maxlength="500" required placeholder="Pizza and a drink" /></label>
+      <label>Extra notes<input name="details" maxlength="500" placeholder="Where to meet" /></label>
+      <label>Test payout (USD)<input name="payout" type="number" min="0" max="1000" step="0.01" value="5.00" required /></label>
+      <button class="btn" id="createTestOrder" type="submit">Create test request</button>
+    </form>
+    <div id="nativeOrderMessage" role="status" aria-live="polite"></div>
+    <h3 class="admin-test-order-list-heading">Recent native orders</h3>
+    <div id="nativeOrderList" class="admin-recent" aria-live="polite"><div class="empty">Loading native orders…</div></div>
+  </section>
+
   <section class="admin-section" aria-labelledby="recentHeading">
     <div class="admin-section-heading">
       <div><p class="admin-eyebrow">ACTIVITY</p><h2 id="recentHeading">Recent orders</h2></div>
@@ -89,12 +135,20 @@
 </main>
 
 <script src="/app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js" integrity="sha384-KKgyz2mG25bKJ1O2PyqTJPlAF8Kw2BpDmsLTNBXslICOBvhTAyF5F0XhLWF2ZovY" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js" integrity="sha384-8FWZA6BGMXhsfO+BLtrJK0We6gg5o1JyO8xQm6peWDEUs17ACA5ziE/NIAkl9z2k" crossorigin="anonymous"></script>
 <script>
 let user = null;
+// orderID -> { code, expiresAt } for test orders showing a handoff QR code.
+const handoffCodes = new Map();
 let lastOverviewSnapshot = null;
+let lastNativeOrdersSnapshot = null;
+let lastStoreOverridesSnapshot = null;
 const overviewError = document.getElementById("overviewError");
 const reportsError = document.getElementById("reportsError");
 const creditError = document.getElementById("creditError");
+const nativeOrderMessage = document.getElementById("nativeOrderMessage");
+const storeOverrideMessage = document.getElementById("storeOverrideMessage");
 let selectedAccount = null;
 const money = (cents) => new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(cents / 100);
 
@@ -108,19 +162,301 @@ const money = (cents) => new Intl.NumberFormat("en-US", { style: "currency", cur
   }
   document.getElementById("reportsList").innerHTML = skeletonList(2);
   try {
-    await Promise.all([refreshOverview(), refreshReports(), refreshNativeAccounts()]);
+    await Promise.all([refreshOverview(), refreshReports(), refreshNativeAccounts(), refreshNativeOrders(), refreshStoreOverrides(), refreshUserLocations()]);
   } finally {
     hidePageLoader();
   }
   setInterval(refreshReports, 4000);
   setInterval(refreshOverview, 15000);
+  setInterval(refreshNativeOrders, 15000);
+  setInterval(refreshStoreOverrides, 30000);
+  setInterval(refreshUserLocations, 15000);
+  // Poll faster while a handoff QR is on screen so it clears once scanned.
+  setInterval(() => { if (handoffCodes.size) refreshNativeOrders(); }, 4000);
 })();
+
+// ---- User locations ----
+const LIVE_LOCATION_MS = 10 * 60 * 1000;
+let locationMap = null;
+const locationMarkers = new Map();
+let locationMapFitted = false;
+
+// OpenFreeMap "Positron" vector style via MapLibre: clean, crisp, and no API key needed.
+function ensureLocationMap() {
+  if (locationMap || typeof maplibregl === "undefined") return locationMap;
+  locationMap = new maplibregl.Map({
+    container: "userLocationMap",
+    style: "https://tiles.openfreemap.org/styles/positron",
+    center: [-75.3433, 40.0367], // Villanova
+    zoom: 15,
+    attributionControl: false
+  });
+  locationMap.scrollZoom.disable(); // let the page scroll; zoom with the buttons or a pinch
+  locationMap.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+  return locationMap;
+}
+
+async function refreshUserLocations() {
+  const list = document.getElementById("userLocationList");
+  const message = document.getElementById("userLocationMessage");
+  try {
+    const { locations } = await api("/api/admin/native-orders/locations");
+    if (message.querySelector(".error")) message.innerHTML = "";
+    const now = Date.now();
+    const rows = locations.map((location) => ({ ...location, live: now - Date.parse(location.updatedAt) < LIVE_LOCATION_MS }));
+    const liveCount = rows.filter((row) => row.live).length;
+    document.getElementById("userLocationSummary").textContent = `${liveCount} live · ${rows.length} total`;
+
+    // Ages change every refresh, so always re-render the list; markers only move when data changes.
+    list.innerHTML = rows.length ? rows.map((row) => `
+      <div class="admin-location-row" data-user-id="${escapeHtml(row.userID)}">
+        <span class="admin-location-dot ${row.live ? "live" : ""}" aria-hidden="true"></span>
+        <span class="admin-location-who"><strong>${escapeHtml(row.name || "Unnamed account")}</strong><small>${escapeHtml(row.email || row.userID)}</small></span>
+        <span class="admin-location-when">${row.live ? "Live" : "Last seen"} · ${timeAgo(Date.parse(row.updatedAt))}<small>${row.latitude.toFixed(5)}, ${row.longitude.toFixed(5)}</small></span>
+      </div>`).join("") : `<div class="empty">No user locations yet. Locations appear once someone opens the Deliver tab.</div>`;
+    const map = ensureLocationMap();
+    if (!map) {
+      message.innerHTML = `<div class="error">The map library failed to load. Refresh the page.</div>`;
+      return;
+    }
+    list.querySelectorAll(".admin-location-row").forEach((element) => {
+      element.onclick = () => {
+        const marker = locationMarkers.get(element.dataset.userId);
+        if (!marker) return;
+        map.flyTo({ center: marker.getLngLat(), zoom: 17 });
+        if (!marker.getPopup().isOpen()) marker.togglePopup();
+      };
+    });
+
+    const seen = new Set();
+    rows.forEach((row) => {
+      seen.add(row.userID);
+      let marker = locationMarkers.get(row.userID);
+      if (!marker) {
+        const element = document.createElement("span");
+        element.className = "admin-map-pin";
+        marker = new maplibregl.Marker({ element }).setLngLat([row.longitude, row.latitude]).addTo(map);
+        marker.setPopup(new maplibregl.Popup({ offset: 14, closeButton: false }));
+        locationMarkers.set(row.userID, marker);
+      }
+      marker.setLngLat([row.longitude, row.latitude]);
+      const element = marker.getElement();
+      element.classList.toggle("live", row.live);
+      element.style.zIndex = row.live ? "2" : "1";
+      marker.getPopup().setHTML(`<strong>${escapeHtml(row.name || "Unnamed account")}</strong><br>${escapeHtml(row.email || "")}<br>${row.live ? "Live" : "Last seen"} · ${timeAgo(Date.parse(row.updatedAt))}`);
+    });
+    for (const [id, marker] of locationMarkers) {
+      if (!seen.has(id)) { marker.remove(); locationMarkers.delete(id); }
+    }
+    if (!locationMapFitted && rows.length) {
+      locationMapFitted = true;
+      const bounds = new maplibregl.LngLatBounds();
+      rows.forEach((row) => bounds.extend([row.longitude, row.latitude]));
+      map.fitBounds(bounds, { padding: 60, maxZoom: 16, duration: 0 });
+    }
+  } catch (error) {
+    message.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+    list.innerHTML = `<div class="empty">User locations unavailable.</div>`;
+  }
+}
+
+function handoffQRMarkup(orderID) {
+  const handoff = handoffCodes.get(orderID);
+  if (!handoff) return "";
+  let svg = `<div class="error">QR library failed to load. Refresh the page.</div>`;
+  if (typeof qrcode === "function") {
+    const qr = qrcode(0, "M");
+    qr.addData(handoff.code);
+    qr.make();
+    svg = qr.createSvgTag({ cellSize: 5, margin: 4, scalable: true });
+  }
+  const expires = new Date(handoff.expiresAt).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return `<div class="admin-handoff-qr">
+    ${svg}
+    <small>On the deliverer's phone, open this accepted delivery, choose <strong>QR Code</strong>, and scan. One use only · valid until ${escapeHtml(expires)}.</small>
+  </div>`;
+}
 
 document.getElementById("adminRefresh").onclick = () => {
   refreshOverview();
   refreshReports();
   refreshNativeAccounts();
+  refreshNativeOrders();
+  refreshStoreOverrides();
+  refreshUserLocations();
 };
+
+async function refreshStoreOverrides() {
+  const list = document.getElementById("storeOverrideList");
+  try {
+    const { stores } = await api("/api/admin/native-orders/store-overrides");
+    const snapshot = JSON.stringify(stores);
+    if (snapshot === lastStoreOverridesSnapshot) return;
+    lastStoreOverridesSnapshot = snapshot;
+    list.innerHTML = stores.map(({ store, forceOpen, updatedAt }) => `
+      <div class="admin-store-override-row">
+        <div class="admin-store-override-summary">
+          <strong>${escapeHtml(store)}</strong>
+          <span class="admin-override-state ${forceOpen ? "forced" : ""}">${forceOpen ? "FORCED OPEN" : "OFFICIAL SCHEDULE"}</span>
+          ${forceOpen && updatedAt ? `<small>Override updated ${timeAgo(Date.parse(updatedAt))}</small>` : ""}
+        </div>
+        <button class="btn ${forceOpen ? "secondary" : ""} store-override-button" type="button" data-store="${escapeHtml(store)}" data-force-open="${forceOpen ? "false" : "true"}">
+          ${forceOpen ? "Use official hours" : "Force open"}
+        </button>
+      </div>`).join("");
+    list.querySelectorAll(".store-override-button").forEach((button) => {
+      button.onclick = async () => {
+        button.disabled = true;
+        const forceOpen = button.dataset.forceOpen === "true";
+        storeOverrideMessage.textContent = forceOpen ? "Applying override…" : "Removing override…";
+        try {
+          await api(`/api/admin/native-orders/store-overrides/${encodeURIComponent(button.dataset.store)}`, {
+            method: "PUT",
+            body: { forceOpen }
+          });
+          storeOverrideMessage.innerHTML = `<div class="success">${escapeHtml(button.dataset.store)} ${forceOpen ? "is now forced open" : "is back on its official schedule"}.</div>`;
+          lastStoreOverridesSnapshot = null;
+          await refreshStoreOverrides();
+        } catch (error) {
+          storeOverrideMessage.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+          button.disabled = false;
+        }
+      };
+    });
+  } catch (error) {
+    lastStoreOverridesSnapshot = null;
+    storeOverrideMessage.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+    list.innerHTML = `<div class="empty">Store overrides unavailable.</div>`;
+  }
+}
+
+async function refreshNativeOrders() {
+  const list = document.getElementById("nativeOrderList");
+  try {
+    const { orders } = await api("/api/admin/native-orders");
+    if (!nativeOrderMessage.dataset.actionMessage) nativeOrderMessage.textContent = "";
+    const snapshot = JSON.stringify(orders);
+    if (snapshot === lastNativeOrdersSnapshot) return;
+    lastNativeOrdersSnapshot = snapshot;
+    const awaitingHandoff = (order) => order.dashboardTest && ["claimed", "picked_up", "arrived"].includes(order.status);
+    for (const id of handoffCodes.keys()) {
+      if (!orders.some((order) => order.id === id && awaitingHandoff(order))) handoffCodes.delete(id);
+    }
+    list.innerHTML = orders.length ? orders.map((order) => {
+      const active = ["open", "claimed", "picked_up", "arrived"].includes(order.status);
+      return `<div class="admin-native-order-row">
+        <div class="admin-native-order-summary">
+          <strong>${escapeHtml(order.store)} · #${escapeHtml(order.order_number || "—")}</strong>
+          <span>${escapeHtml(order.items)} → ${escapeHtml(order.hall)}</span>
+          <small>Ordered by ${escapeHtml(order.orderer?.email || "Unknown account")} · ${money(Math.round(Number(order.tip) * 100))} test payout · ${timeAgo(Date.parse(order.created_at))}</small>
+          ${order.dashboardTest ? `<small>Dashboard test request · self-delivery allowed</small>` : ""}
+          <span class="badge ${escapeHtml(order.status)}">${escapeHtml(STATUS_LABEL[order.status] || order.status)}</span>
+        </div>
+        ${active ? `<div class="admin-native-order-action">
+          ${order.status === "open" ? `<label>Test recipient / runner email<input type="email" class="native-runner-email" placeholder="runner@villanova.edu" aria-label="Runner email for ${escapeHtml(order.store)} order" /></label>` : `<small>Runner: ${escapeHtml(order.runner?.email || "Assigned account")}</small>`}
+          ${order.status === "open" && order.dashboardTest ? `<button class="btn secondary native-notify" type="button" data-order-id="${escapeHtml(order.id)}">Send test offer</button>` : ""}
+          ${order.status === "open" && order.dashboardTest ? `<small>Accept it on the deliverer's phone to get a handoff QR code.</small>` : ""}
+          ${awaitingHandoff(order) ? `<button class="btn native-handoff" type="button" data-order-id="${escapeHtml(order.id)}">${handoffCodes.has(order.id) ? "New handoff QR" : "Show handoff QR"}</button>` : ""}
+          ${awaitingHandoff(order) ? handoffQRMarkup(order.id) : ""}
+          <button class="btn secondary native-fulfill" type="button" data-order-id="${escapeHtml(order.id)}">Fulfill for test</button>
+        </div>` : `<small>Runner: ${escapeHtml(order.runner?.email || "None")}</small>`}
+      </div>`;
+    }).join("") : `<div class="empty">No native orders yet.</div>`;
+    list.querySelectorAll(".native-fulfill").forEach((button) => {
+      button.onclick = async () => {
+        const row = button.closest(".admin-native-order-row");
+        const runnerEmail = row.querySelector(".native-runner-email")?.value.trim() || "";
+        if (row.querySelector(".native-runner-email") && !runnerEmail) {
+          nativeOrderMessage.innerHTML = `<div class="error">Enter a runner email to fulfill an open request.</div>`;
+          return;
+        }
+        if (!confirm("Mark this native order delivered for testing? This bypasses the normal delivery flow and adds the payout to the runner's test balance. No real money moves.")) return;
+        button.disabled = true;
+        try {
+          const result = await api(`/api/admin/native-orders/${button.dataset.orderId}/fulfill`, { method: "POST", body: { runnerEmail } });
+          nativeOrderMessage.dataset.actionMessage = "true";
+          nativeOrderMessage.innerHTML = `<div class="success">Test request fulfilled.${result.warning ? ` ${escapeHtml(result.warning)}` : ""}</div>`;
+          await Promise.all([refreshNativeOrders(), refreshNativeAccounts()]);
+        } catch (error) {
+          nativeOrderMessage.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+          button.disabled = false;
+        }
+      };
+    });
+    list.querySelectorAll(".native-handoff").forEach((button) => {
+      button.onclick = async () => {
+        button.disabled = true;
+        try {
+          const handoff = await api(`/api/admin/native-orders/${button.dataset.orderId}/handoff-code`, { method: "POST" });
+          handoffCodes.set(button.dataset.orderId, handoff);
+          nativeOrderMessage.dataset.actionMessage = "true";
+          nativeOrderMessage.innerHTML = `<div class="success">Handoff QR ready. Scan it from the deliverer's phone to complete the order.</div>`;
+          lastNativeOrdersSnapshot = null;
+          await refreshNativeOrders();
+        } catch (error) {
+          nativeOrderMessage.dataset.actionMessage = "true";
+          nativeOrderMessage.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+          button.disabled = false;
+        }
+      };
+    });
+    list.querySelectorAll(".native-notify").forEach((button) => {
+      button.onclick = async () => {
+        const recipientEmail = button.closest(".admin-native-order-row").querySelector(".native-runner-email")?.value.trim() || "";
+        if (!recipientEmail) {
+          nativeOrderMessage.dataset.actionMessage = "true";
+          nativeOrderMessage.innerHTML = `<div class="error">Enter a native account email to send a test offer.</div>`;
+          return;
+        }
+        button.disabled = true;
+        nativeOrderMessage.dataset.actionMessage = "true";
+        nativeOrderMessage.textContent = "Sending test offer…";
+        try {
+          const result = await api(`/api/admin/native-orders/${button.dataset.orderId}/notify`, { method: "POST", body: { recipientEmail } });
+          nativeOrderMessage.innerHTML = `<div class="success">${result.alreadySent ? "A pending test offer already exists for this account." : "Test offer sent. Keep the app open to see the simulator banner."}</div>`;
+        } catch (error) {
+          nativeOrderMessage.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+        } finally {
+          button.disabled = false;
+        }
+      };
+    });
+  } catch (error) {
+    lastNativeOrdersSnapshot = null;
+    nativeOrderMessage.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+    list.innerHTML = `<div class="empty">Native orders unavailable.</div>`;
+  }
+}
+
+document.getElementById("testOrderForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  if (!form.checkValidity()) {
+    const invalid = [...form.elements].find((element) => element.willValidate && !element.validity.valid);
+    nativeOrderMessage.dataset.actionMessage = "true";
+    nativeOrderMessage.innerHTML = `<div class="error">Complete the required fields with valid values before creating a test request.</div>`;
+    invalid?.focus();
+    return;
+  }
+  const data = Object.fromEntries(new FormData(form));
+  const button = document.getElementById("createTestOrder");
+  button.disabled = true;
+  button.textContent = "Creating request…";
+  nativeOrderMessage.dataset.actionMessage = "true";
+  nativeOrderMessage.textContent = "Creating test request…";
+  try {
+    const result = await api("/api/admin/native-orders", { method: "POST", body: { ...data, payout: String(data.payout), requestId: crypto.randomUUID() } });
+    form.reset();
+    nativeOrderMessage.dataset.actionMessage = "true";
+    nativeOrderMessage.innerHTML = `<div class="success">Test request created.${result.warning ? ` ${escapeHtml(result.warning)}` : " Test offer sent to the recipient account."}</div>`;
+    await refreshNativeOrders();
+  } catch (error) {
+    nativeOrderMessage.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+  } finally {
+    button.disabled = false;
+    button.textContent = "Create test request";
+  }
+});
 
 document.getElementById("accountSearch").addEventListener("submit", (event) => {
   event.preventDefault();
