@@ -7,7 +7,7 @@
     "start": "node server.js",
     "percentle": "node percentle/server.js",
     "compare-pricing": "node compare-pricing.js",
-    "test": "node --test native-credits.test.js native-orders.test.js percentle/*.test.*",
+    "test": "node --test admin-accounts.test.js native-credits.test.js native-orders.test.js percentle/*.test.*",
     "mobile:sync": "sh -c 'if [ -f .env.mobile ]; then set -a; . ./.env.mobile; set +a; fi; npx cap copy'",
     "mobile:update-native": "npx cap sync",
     "mobile:ios": "open ios/App/App.xcodeproj",

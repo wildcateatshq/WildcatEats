@@ -21,11 +21,19 @@ app remains separate from the retired website ordering routes.
 
 ## Admin dashboard
 
-Set `ADMIN_EMAIL` and a strong `ADMIN_PASSWORD` in `.env` (or as environment
-variables on your host). Restart the server, then sign in directly at `/admin`.
-No web account or student signup is required. Keep both values private and do
-not commit `.env`. A successful sign-in creates an internal admin record only
-if the legacy dashboard database needs one for report messages.
+Anyone who opens `/admin` sees the sign-in page; only admin credentials get
+past it. Set `ADMIN_EMAIL` and a strong `ADMIN_PASSWORD` in `.env` (or as
+environment variables on your host) for the owner account, then restart the
+server. No web account or student signup is required. Keep both values private
+and do not commit `.env`. A successful sign-in creates an internal admin record
+only if the legacy dashboard database needs one for report messages.
+
+The dashboard's **Admins** section lets any admin add more admins (name, email,
+and a password of 12+ characters) or remove them. Added admins are stored in
+Supabase, so apply `supabase/migrations/010_admin_accounts.sql` and set
+`SUPABASE_URL` and `SUPABASE_SECRET_KEY`. The owner can't be removed from the
+dashboard, and admins can't remove themselves. A removed admin loses access
+within 30 seconds.
 
 The overview and reported-order sections read the website's legacy database
 (`db.json` locally, or Postgres with `DATABASE_URL`). Native iPhone orders are

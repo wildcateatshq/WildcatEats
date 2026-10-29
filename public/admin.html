@@ -132,6 +132,21 @@
     <div id="reportsError" role="alert"></div>
     <div id="reportsList" aria-live="polite"></div>
   </section>
+
+  <section class="admin-section" id="adminAccounts" aria-labelledby="adminAccountsHeading">
+    <div class="admin-section-heading">
+      <div><p class="admin-eyebrow">ACCESS</p><h2 id="adminAccountsHeading">Admins</h2></div>
+    </div>
+    <p class="subtitle">People who can sign in at /admin. Share the password with the new admin privately. Removing an admin signs them out within 30 seconds.</p>
+    <form id="addAdminForm" class="admin-test-order-form" novalidate>
+      <label>Name<input id="newAdminName" type="text" maxlength="100" required autocomplete="off" placeholder="Jordan Smith" /></label>
+      <label>Email<input id="newAdminEmail" type="email" maxlength="254" required autocomplete="off" placeholder="jordan@villanova.edu" /></label>
+      <label>Password (12+ characters)<input id="newAdminPassword" type="password" minlength="12" maxlength="200" required autocomplete="new-password" /></label>
+      <button class="btn" id="addAdminButton" type="submit">Add admin</button>
+    </form>
+    <div id="adminAccountsMessage" role="status" aria-live="polite"></div>
+    <div id="adminAccountList" class="admin-recent" aria-live="polite"><div class="empty">Loading admins…</div></div>
+  </section>
 </main>
 
 <script src="/app.js"></script>
@@ -162,7 +177,7 @@ const money = (cents) => new Intl.NumberFormat("en-US", { style: "currency", cur
   }
   document.getElementById("reportsList").innerHTML = skeletonList(2);
   try {
-    await Promise.all([refreshOverview(), refreshReports(), refreshNativeAccounts(), refreshNativeOrders(), refreshStoreOverrides(), refreshUserLocations()]);
+    await Promise.all([refreshOverview(), refreshReports(), refreshNativeAccounts(), refreshNativeOrders(), refreshStoreOverrides(), refreshUserLocations(), refreshAdminAccounts()]);
   } finally {
     hidePageLoader();
   }
@@ -285,6 +300,66 @@ document.getElementById("adminRefresh").onclick = () => {
   refreshStoreOverrides();
   refreshUserLocations();
 };
+
+
+const adminAccountsMessage = document.getElementById("adminAccountsMessage");
+
+async function refreshAdminAccounts() {
+  const list = document.getElementById("adminAccountList");
+  try {
+    const { admins, you, canAdd } = await api("/api/admin/admins");
+    document.getElementById("addAdminButton").disabled = !canAdd;
+    if (!canAdd) adminAccountsMessage.innerHTML = `<div class="error">Adding admins needs SUPABASE_URL and SUPABASE_SECRET_KEY on the server.</div>`;
+    list.innerHTML = admins.length ? admins.map((admin) => `
+      <div class="admin-store-override-row">
+        <div class="admin-store-override-summary">
+          <strong>${escapeHtml(admin.name)}</strong>
+          <span>${escapeHtml(admin.email)}</span>
+          ${admin.owner ? `<span class="admin-override-state">OWNER</span>` : ""}
+          ${admin.email === you ? `<span class="admin-override-state forced">YOU</span>` : ""}
+          ${admin.createdBy ? `<small>Added by ${escapeHtml(admin.createdBy)}${admin.createdAt ? " " + timeAgo(Date.parse(admin.createdAt)) : ""}</small>` : ""}
+        </div>
+        ${admin.owner || admin.email === you ? "" : `<button class="btn secondary remove-admin-button" type="button" data-email="${escapeHtml(admin.email)}">Remove</button>`}
+      </div>`).join("") : `<div class="empty">No admins yet.</div>`;
+    list.querySelectorAll(".remove-admin-button").forEach((button) => {
+      button.onclick = async () => {
+        if (!confirm(`Remove admin access for ${button.dataset.email}?`)) return;
+        button.disabled = true;
+        try {
+          await api(`/api/admin/admins/${encodeURIComponent(button.dataset.email)}`, { method: "DELETE" });
+          adminAccountsMessage.innerHTML = `<div class="success">${escapeHtml(button.dataset.email)} is no longer an admin.</div>`;
+          await refreshAdminAccounts();
+        } catch (error) {
+          adminAccountsMessage.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+          button.disabled = false;
+        }
+      };
+    });
+  } catch (error) {
+    adminAccountsMessage.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+    list.innerHTML = `<div class="empty">Admins unavailable.</div>`;
+  }
+}
+
+document.getElementById("addAdminForm").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = document.getElementById("addAdminButton");
+  const name = document.getElementById("newAdminName");
+  const email = document.getElementById("newAdminEmail");
+  const password = document.getElementById("newAdminPassword");
+  button.disabled = true;
+  adminAccountsMessage.textContent = "Adding admin…";
+  try {
+    await api("/api/admin/admins", { method: "POST", body: { name: name.value, email: email.value, password: password.value } });
+    adminAccountsMessage.innerHTML = `<div class="success">${escapeHtml(email.value.trim().toLowerCase())} can now sign in at /admin.</div>`;
+    event.target.reset();
+    await refreshAdminAccounts();
+  } catch (error) {
+    adminAccountsMessage.innerHTML = `<div class="error">${escapeHtml(error.message)}</div>`;
+  } finally {
+    button.disabled = false;
+  }
+});
 
 async function refreshStoreOverrides() {
   const list = document.getElementById("storeOverrideList");

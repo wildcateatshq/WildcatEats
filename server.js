@@ -16,6 +16,7 @@ const percentleCrowd = require("./percentle/crowd").createCrowdStore();
 const { createCrowdRouter } = require("./percentle/crowd-router");
 const { createNativeCreditsRouter } = require("./native-credits");
 const { createNativeOrdersRouter } = require("./native-orders");
+const { createAdminAccountsRouter, checkCredentials, isAdminEmail, adminsConfigured } = require("./admin-accounts");
 const percentlePuzzles = require("./percentle/puzzles").createPuzzleStore();
 const { createPuzzleRouter } = require("./percentle/puzzle-router");
 const percentleEndless = require("./percentle/endless").createEndlessStore();
@@ -116,10 +117,9 @@ function getPresentRunnerIds() {
 
 // Legacy helper for web-database report threads and admin notifications.
 async function isUserAdmin(userId) {
-  const adminEmail = (process.env.ADMIN_EMAIL || "").toLowerCase();
-  if (!adminEmail || !userId) return false;
+  if (!userId) return false;
   const user = await db.getUserById(userId);
-  return Boolean(user) && user.email.toLowerCase() === adminEmail;
+  return Boolean(user) && await isAdminEmail(user.email);
 }
 
 // For pushing a notification to "the admin" — there's exactly one, the
@@ -131,36 +131,33 @@ async function getAdminUserId() {
   return user ? user.id : null;
 }
 
-function adminConfigured() {
-  return Boolean(process.env.ADMIN_EMAIL && process.env.ADMIN_PASSWORD);
-}
-
-function isAdminSession(req) {
-  return adminConfigured() && req.session.adminEmail === process.env.ADMIN_EMAIL.toLowerCase() &&
-    req.session.adminUnlockedFor === req.session.userId && Boolean(req.session.userId);
+// The owner (ADMIN_EMAIL) or an admin added from the dashboard. Rechecked on
+// every request so removing an admin ends their access.
+async function isAdminSession(req) {
+  if (!req.session.userId || req.session.adminUnlockedFor !== req.session.userId) return false;
+  return isAdminEmail(req.session.adminEmail);
 }
 
 async function requireAdmin(req, res, next) {
-  if (!adminConfigured()) {
-    return res.status(403).json({ error: "Admin tools aren't configured on this server." });
-  }
-  if (!isAdminSession(req)) return res.status(401).json({ error: "Admin sign-in required." });
+  if (!(await isAdminSession(req))) return res.status(401).json({ error: "Admin sign-in required." });
   next();
 }
 
+// Anyone with the link sees the sign-in page; only admin credentials get past it.
 app.get("/admin", async (req, res) => {
   res.set("Cache-Control", "no-store");
-  if (!adminConfigured()) return res.status(503).send("Admin sign-in is not configured on this server.");
-  if (!isAdminSession(req)) return res.sendFile(path.join(__dirname, "admin-login.html"));
+  if (!(await isAdminSession(req))) return res.sendFile(path.join(__dirname, "admin-login.html"));
   res.sendFile(path.join(__dirname, "public", "admin.html"));
 });
 
-// Only the configured email/password can create an admin session. No prior
-// website account is needed; a legacy DB identity is provisioned after a
-// successful sign-in so existing report-message actions retain a sender ID.
+// Admins sign in with the owner's server-configured email/password or with an
+// account added from the dashboard. No website account is needed; a legacy DB
+// identity is provisioned after sign-in so report-message actions keep a sender ID.
 const adminLoginAttempts = new Map(); // IP -> { failures, lockedUntil }
 app.post("/api/admin/login", async (req, res, next) => {
-  if (!adminConfigured()) return res.status(503).json({ error: "Admin sign-in is not configured." });
+  if (!adminsConfigured()) {
+    return res.status(503).json({ error: "No admin accounts are set up yet. Set ADMIN_EMAIL and ADMIN_PASSWORD on the server." });
+  }
   const now = Date.now();
   const client = req.ip || "unknown";
   let attempts = adminLoginAttempts.get(client) || { failures: 0, lockedUntil: 0 };
@@ -171,10 +168,13 @@ app.post("/api/admin/login", async (req, res, next) => {
 
   const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
   const supplied = typeof req.body?.password === "string" ? req.body.password : "";
-  const expectedHash = crypto.createHash("sha256").update(process.env.ADMIN_PASSWORD).digest();
-  const suppliedHash = crypto.createHash("sha256").update(supplied).digest();
-  const passwordMatches = crypto.timingSafeEqual(expectedHash, suppliedHash);
-  if (email !== process.env.ADMIN_EMAIL.toLowerCase() || !passwordMatches) {
+  let signedIn = null;
+  try {
+    signedIn = await checkCredentials(email, supplied);
+  } catch (error) {
+    return res.status(503).json({ error: error.message });
+  }
+  if (!signedIn) {
     attempts.failures += 1;
     if (attempts.failures >= 5) {
       attempts.lockedUntil = now + 15 * 60 * 1000;
@@ -204,7 +204,7 @@ app.post("/api/admin/login", async (req, res, next) => {
   req.session.regenerate((err) => {
     if (err) return next(err);
     req.session.userId = adminUser.id;
-    req.session.adminEmail = email;
+    req.session.adminEmail = signedIn;
     req.session.adminUnlockedFor = adminUser.id;
     res.json({ ok: true });
   });
@@ -421,8 +421,9 @@ app.post("/api/logout", (req, res) => {
 });
 
 app.get("/api/me", async (req, res) => {
-  const user = isAdminSession(req) ? await db.getUserById(req.session.userId) : null;
-  res.json({ user: publicUser(user) });
+  const admin = await isAdminSession(req);
+  const user = admin ? await db.getUserById(req.session.userId) : null;
+  res.json({ user: user ? { ...publicUser(user), isAdmin: true, email: req.session.adminEmail } : null });
 });
 
 // Percentle crowd comparisons store only anonymous daily totals under random,
@@ -1085,6 +1086,7 @@ app.post("/api/orders/:id/report", requireAuth, async (req, res) => {
 
 app.use("/api/admin/native-accounts", createNativeCreditsRouter(requireAdmin));
 app.use("/api/admin/native-orders", createNativeOrdersRouter(requireAdmin));
+app.use("/api/admin/admins", createAdminAccountsRouter(requireAdmin));
 
 app.get("/api/admin/overview", requireAdmin, async (req, res) => {
   const overview = await db.getAdminOverview();
