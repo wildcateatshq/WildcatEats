@@ -3,65 +3,116 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#00205b" />
+  <meta name="theme-color" content="#fffcf7" />
   <meta name="description" content="NovaDash is a campus delivery app built for Villanova students." />
   <title>NovaDash — campus delivery, made for Villanova</title>
-  <link rel="icon" href="/wildcat-eats-logo.png" type="image/png" />
+  <link rel="icon" href="/novadash/icon-192.png" type="image/png" />
+  <link rel="apple-touch-icon" href="/novadash/apple-touch-icon.png" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/landing.css" />
 </head>
 <body>
   <header class="site-header">
-    <a class="wordmark" href="/" aria-label="NovaDash home">NovaDash<span class="wordmark-dot">.</span></a>
+    <a class="logo" href="/"><img src="/novadash/logo.png" alt="NovaDash" width="671" height="154" /></a>
     <nav aria-label="Main navigation">
       <a href="#about">About</a>
-      <a href="#how-it-works">How it works</a>
+      <a href="#how-it-works">Ordering</a>
+      <a href="#dashing">Dashing</a>
     </nav>
   </header>
 
   <main>
     <section class="hero" aria-labelledby="hero-title">
       <div class="hero-copy">
-        <p class="eyebrow"><span class="eyebrow-line"></span> MADE FOR VILLANOVA</p>
-        <h1 id="hero-title">Good food.<br /><em>Less running.</em></h1>
+        <p class="eyebrow">MADE FOR VILLANOVA</p>
+        <h1 id="hero-title">Dining hall food,<br />delivered to you.</h1>
         <p class="hero-description">The campus delivery app that connects Wildcats who need a meal with Wildcats already on the move.</p>
-        <a class="primary-link" href="#how-it-works">See how it works <span aria-hidden="true">↗</span></a>
-        <p class="hero-footnote">Ordering and deliveries happen in the NovaDash app, not on this website.</p>
+        <a class="pill-link" href="#how-it-works">SEE HOW IT WORKS <span class="triangle" aria-hidden="true"></span></a>
+        <p class="hero-footnote">Ordering and deliveries happen in the NovaDash iPhone app, not on this website.</p>
       </div>
       <div class="hero-visual">
-        <img src="/campus.jpg" alt="Villanova campus and church on a clear day" />
-        <div class="image-card">
-          <span class="image-card-icon" aria-hidden="true">↗</span>
-          <div><strong>Made for the spaces between classes.</strong><span>Campus life moves quickly. Your food can, too.</span></div>
-        </div>
+        <figure class="phone">
+          <img src="/novadash/screen-order.jpg" alt="NovaDash order screen asking “late night snack?” above a list of campus dining spots" width="600" height="1305" />
+        </figure>
+        <img class="mascot" src="/novadash/mascot.png" alt="" width="640" height="585" />
       </div>
     </section>
 
-    <section class="intro" id="about" aria-labelledby="intro-title">
-      <p class="section-label">A CAMPUS-FIRST IDEA</p>
-      <div class="intro-grid">
-        <h2 id="intro-title">A better way to get food across campus.</h2>
+    <section class="spots" id="about" aria-labelledby="spots-title">
+      <div class="spots-copy">
+        <p class="eyebrow">A CAMPUS-FIRST IDEA</p>
+        <h2 id="spots-title">a better way to get food across campus.</h2>
         <p>NovaDash brings ordering and delivery together in one iPhone app. Students can request food from familiar campus spots, and nearby students can choose to take the delivery.</p>
       </div>
+      <ul class="spot-list" aria-label="Campus dining spots in the app">
+        <li class="solid">COVA</li>
+        <li class="outline">CASCIA</li>
+        <li class="solid">CONNELLY CENTER</li>
+        <li class="solid">ST. MARY’S</li>
+        <li class="outline">WAWA</li>
+        <li class="solid">HOLY GROUNDS</li>
+      </ul>
     </section>
 
-    <section class="how" id="how-it-works" aria-labelledby="how-title">
+    <section class="how ordering" id="how-it-works" aria-labelledby="ordering-title">
       <div class="how-heading">
-        <p class="section-label">HOW IT WORKS</p>
-        <h2 id="how-title">Two sides of the same campus.</h2>
+        <p class="eyebrow">HOW ORDERING WORKS</p>
+        <h2 id="ordering-title">hungry? stay put.</h2>
       </div>
       <div class="how-grid">
-        <article class="how-card"><span class="card-number">01 / ORDER</span><div class="card-symbol" aria-hidden="true">↗</div><h3>Pick a place.</h3><p>Choose a dining spot, describe your order, and set where to meet—all in the app.</p></article>
-        <article class="how-card"><span class="card-number">02 / DELIVER</span><div class="card-symbol" aria-hidden="true">→</div><h3>Make the run.</h3><p>Nearby students can see open requests and accept a delivery that fits their route.</p></article>
-        <article class="how-card"><span class="card-number">03 / CONNECT</span><div class="card-symbol" aria-hidden="true">✓</div><h3>Meet up.</h3><p>Order details and delivery updates help both students stay on the same page.</p></article>
+        <article class="how-card">
+          <figure class="phone small"><img src="/novadash/screen-order.jpg" alt="Order tab listing campus dining spots" width="600" height="1305" loading="lazy" /></figure>
+          <span class="card-number">01 / PICK</span>
+          <h3>pick a place.</h3>
+          <p>Choose from COVA, Cascia, Connelly, St. Mary’s, Wawa, or Holy Grounds.</p>
+        </article>
+        <article class="how-card">
+          <figure class="phone small"><img src="/novadash/step-order.jpg" alt="Order ticket for COVA with an order number, the food, and where to meet" width="600" height="1305" loading="lazy" /></figure>
+          <span class="card-number">02 / ORDER</span>
+          <h3>tell us what you want.</h3>
+          <p>Add your order number, describe the food, and say where to meet. You’re only charged once a student accepts.</p>
+        </article>
+        <article class="how-card">
+          <figure class="phone small"><img src="/novadash/step-handoff.jpg" alt="Your Order has been accepted: tap your phone to the dasher’s or use a QR code" width="600" height="1305" loading="lazy" /></figure>
+          <span class="card-number">03 / RECEIVE</span>
+          <h3>meet your dasher.</h3>
+          <p>When your food arrives, tap phones with your dasher or show your QR code to confirm the handoff.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="how dashing" id="dashing" aria-labelledby="dashing-title">
+      <div class="how-heading">
+        <p class="eyebrow">HOW DASHING WORKS</p>
+        <h2 id="dashing-title">already walking? get paid.</h2>
+      </div>
+      <div class="how-grid">
+        <article class="how-card">
+          <figure class="phone small"><img src="/novadash/step-requests.jpg" alt="Delivery Requests list with four open orders and their payouts" width="600" height="1305" loading="lazy" /></figure>
+          <span class="card-number">01 / BROWSE</span>
+          <h3>see who’s hungry.</h3>
+          <p>Open requests show the pickup spot, the drop-off, and what you’ll earn.</p>
+        </article>
+        <article class="how-card">
+          <figure class="phone small"><img src="/novadash/step-accept.jpg" alt="Delivery request from COVA to Sheehan Hall with a $6.00 payout and Swipe to Accept Order" width="600" height="1305" loading="lazy" /></figure>
+          <span class="card-number">02 / ACCEPT</span>
+          <h3>swipe to take it.</h3>
+          <p>Pick one that fits your route and swipe up to accept the delivery.</p>
+        </article>
+        <article class="how-card">
+          <figure class="phone small"><img src="/novadash/step-payout.jpg" alt="Delivery complete screen: Sending you $6.00 payout now" width="600" height="1305" loading="lazy" /></figure>
+          <span class="card-number">03 / GET PAID</span>
+          <h3>hand it off.</h3>
+          <p>Scan the orderer’s QR code or tap phones, and your payout lands in your balance.</p>
+        </article>
       </div>
     </section>
   </main>
 
   <footer class="site-footer">
-    <a class="wordmark" href="/">NovaDash<span class="wordmark-dot">.</span></a>
+    <a class="logo" href="/"><img src="/novadash/logo.png" alt="NovaDash" width="671" height="154" loading="lazy" /></a>
     <p>Built for Wildcats, by Wildcats.</p>
   </footer>
   <script>if ("serviceWorker" in navigator) navigator.serviceWorker.register("/sw.js").catch(() => {});</script>

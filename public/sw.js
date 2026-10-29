@@ -2,12 +2,15 @@
 // shell available offline. Deliberately never caches /api/* — this app
 // leans on live polling for order/runner state, so a cached API response
 // would be actively misleading, not just stale.
-const CACHE_NAME = "novadash-v6";
+const CACHE_NAME = "novadash-v7";
 const APP_SHELL = [
   "/",
   "/index.html",
   "/landing.css",
-  "/campus.jpg",
+  "/novadash/logo.png",
+  "/novadash/mascot.png",
+  "/novadash/screen-order.jpg",
+  "/novadash/icon-192.png",
   "/manifest.json",
   "/wildcat-eats-logo.png",
   "/icon-192.png",
