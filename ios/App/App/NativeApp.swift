@@ -2038,10 +2038,18 @@ struct OrderDetailsView: View {
                 .offset(x: 36, y: 300.72)
                 .accessibilityLabel("Describe your order")
 
-            TextEditor(text: $form.details)
+            Group {
+                if #available(iOS 16.0, *) {
+                    TextEditor(text: $form.details)
+                        .scrollContentBackground(.hidden)
+                } else {
+                    TextEditor(text: $form.details)
+                }
+            }
                 .font(.custom("Georgia-Italic", size: 19.997))
                 .foregroundColor(.novaDashNavy)
-                .multilineTextAlignment(.center)
+                .multilineTextAlignment(.leading)
+                .environment(\.layoutDirection, .leftToRight)
                 .padding(.horizontal, 20)
                 .padding(.vertical, 7)
                 .frame(width: 354, height: 165)
