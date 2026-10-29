@@ -82,6 +82,37 @@ shows the updated test balance when reopened or pulled to refresh. Credits are
 not real deposits, cannot yet pay for orders, and cannot be withdrawn. Future
 refunds will need a separate payment-aware flow rather than using this tool.
 
+### Native card payments (Stripe)
+
+The iPhone app charges real money through the server's Stripe account
+(`native-payments.js`):
+
+- **Orderers** add a card from Account → Add/Edit Payment Method, or when they
+  first place an order. The card is entered on a Stripe-hosted page, so card
+  numbers never reach NovaDash.
+- **Runners** tap Account → Set Up Payouts to create a Stripe Express account
+  for their bank details. Afterwards that row reads **Withdraw** and opens their
+  Stripe dashboard. Stripe pays out to their bank automatically.
+- When a runner **accepts** a request, the orderer's card is charged the
+  delivery fee. The runner's 75% goes straight to their Stripe account, and the
+  platform keeps 25% (`PLATFORM_CUT` in `payments.js`), which also covers
+  Stripe's processing fee. Releasing within the 30-second window refunds the
+  full fee. Dashboard test orders are never charged.
+
+To turn it on:
+
+1. Enable Connect (Express accounts) in the Stripe dashboard.
+2. Set `STRIPE_SECRET_KEY` on Render. Use an `sk_test_` key first and save
+   card `4242 4242 4242 4242`, then switch to the `sk_live_` key.
+3. Run `supabase/migrations/011_native_payments.sql`. It also stops the app
+   from accepting or releasing deliveries without the server, so app builds
+   from before this change can no longer accept requests.
+
+Without `STRIPE_SECRET_KEY`, deliveries are accepted without a charge and runners
+earn test credits as before. There are no webhooks to configure. To refund an
+order after the 30-second window, refund it in the Stripe dashboard with
+**Reverse transfer** checked, so the runner's share comes back too.
+
 ## Deploying
 
 `render.yaml` is a blueprint for [Render](https://render.com). Configure

@@ -352,4 +352,4 @@ function createNativeOrdersRouter(requireAdmin) {
   return router;
 }
 
-module.exports = { createNativeOrdersRouter, dollars, STORES };
+module.exports = { createNativeOrdersRouter, dollars, STORES, nativeRequest, isDashboardTestOrder };

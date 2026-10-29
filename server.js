@@ -16,6 +16,7 @@ const percentleCrowd = require("./percentle/crowd").createCrowdStore();
 const { createCrowdRouter } = require("./percentle/crowd-router");
 const { createNativeCreditsRouter } = require("./native-credits");
 const { createNativeOrdersRouter } = require("./native-orders");
+const { createNativePaymentsRouter, nativeStripeReturn } = require("./native-payments");
 const { createAdminAccountsRouter, checkCredentials, isAdminEmail, adminsConfigured } = require("./admin-accounts");
 const percentlePuzzles = require("./percentle/puzzles").createPuzzleStore();
 const { createPuzzleRouter } = require("./percentle/puzzle-router");
@@ -74,7 +75,7 @@ app.use(
 app.use("/api", (req, res, next) => {
   const route = req.path;
   if (route === "/admin/login" || route === "/logout" || route === "/me" ||
-      route.startsWith("/admin/") || route.startsWith("/percentle/") ||
+      route.startsWith("/admin/") || route.startsWith("/percentle/") || route.startsWith("/native/") ||
       (req.method === "POST" && /^\/messages\/threads\/[^/]+\/read$/.test(route))) return next();
   res.status(404).json({ error: "This feature is available in the NovaDash app." });
 });
@@ -1087,6 +1088,9 @@ app.post("/api/orders/:id/report", requireAuth, async (req, res) => {
 app.use("/api/admin/native-accounts", createNativeCreditsRouter(requireAdmin));
 app.use("/api/admin/native-orders", createNativeOrdersRouter(requireAdmin));
 app.use("/api/admin/admins", createAdminAccountsRouter(requireAdmin));
+// The native app's card payments and runner payouts (Supabase sign-in, not the web session).
+app.use("/api/native", createNativePaymentsRouter());
+app.get("/native/stripe/return", nativeStripeReturn);
 
 app.get("/api/admin/overview", requireAdmin, async (req, res) => {
   const overview = await db.getAdminOverview();

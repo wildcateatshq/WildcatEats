@@ -381,7 +381,7 @@ struct HandoffRunnerView: View {
             }
 
             if showPayout {
-                HandoffPayoutView(amount: order.tip, onDone: onComplete)
+                HandoffPayoutView(amount: order.runnerPayout, onDone: onComplete)
                     .transition(.novaDashSlide(.bottom))
             }
         }
@@ -591,8 +591,10 @@ struct HandoffRunnerView: View {
                 // The server credits the payout on delivery; pick it up while the
                 // green confirmation registers.
                 async let balance: Void = model.loadTestBalance()
+                async let earnings: Void = model.loadPaymentStatus()
                 try? await Task.sleep(nanoseconds: 900_000_000)
                 await balance
+                await earnings
                 withAnimation(.novaDashSlide) { showPayout = true }
             } catch {
                 self.error = error.localizedDescription

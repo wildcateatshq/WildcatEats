@@ -4,6 +4,7 @@ import SwiftUI
 import MapKit
 import CoreLocation
 import UserNotifications
+import AuthenticationServices
 
 extension Notification.Name {
     static let novaDashSelectTab = Notification.Name("NovaDashSelectTab")
@@ -14,6 +15,12 @@ extension Notification.Name {
 enum SupabaseConfig {
     static let projectURL = "https://kdtjyxcblcluuynvqmvh.supabase.co"
     static let anonKey = "sb_publishable_FCQ3PBykEfYE2hOSMNKBlw_yNLDmGrF"
+}
+
+// The NovaDash server holds the Stripe secret key, so card payments, payouts,
+// and accepting or releasing a delivery go through it.
+enum NovaDashServer {
+    static let baseURL = "https://novadash.online"
 }
 
 struct UserSession: Codable {
@@ -44,6 +51,35 @@ struct Profile: Codable, Identifiable {
 
 struct NativeTestBalance: Decodable {
     let balanceCents: Int64
+}
+
+struct PaymentStatus: Decodable {
+    struct Card: Decodable {
+        let brand: String
+        let last4: String
+    }
+    struct Payouts: Decodable {
+        let connected: Bool
+        let ready: Bool
+    }
+    let enabled: Bool
+    let card: Card?
+    let payouts: Payouts
+    let balanceCents: Int64?
+}
+
+private struct HostedPageLink: Decodable {
+    let url: String
+    let kind: String?
+}
+
+extension Order {
+    // The runner keeps 75% of the delivery fee; the server's PLATFORM_CUT
+    // (payments.js) keeps the rest. Rounded the same way the server does.
+    var runnerPayout: Double {
+        let cents = (tip * 100).rounded()
+        return (cents - (cents * 0.25).rounded()) / 100
+    }
 }
 
 struct Order: Codable, Identifiable {
@@ -565,20 +601,33 @@ final class SupabaseClient {
         guard let session else { throw SupabaseError.server("Please sign in again.") }
         let selfTestOffer = notification?.orderID == order.id && notification?.isDashboardTestOffer == true
         guard order.ordererID != session.userID || selfTestOffer else { throw SupabaseError.server("You can't accept your own order.") }
-        let body = ["p_order_id": AnyEncodable(order.id.uuidString)]
-        let claimed: Bool = try await send("/rest/v1/rpc/claim_native_delivery", method: "POST", body: body, authenticated: true)
-        guard claimed else { throw SupabaseError.server("Another student has already accepted this request.") }
+        // The server charges the orderer's card in the same step.
+        let _: EmptyResponse = try await serverSend("/api/native/orders/\(order.id.uuidString.lowercased())/claim", method: "POST")
     }
 
     func releaseDelivery(_ orderID: UUID) async throws {
-        let body = ["p_order_id": AnyEncodable(orderID.uuidString)]
-        let released: Bool = try await send(
-            "/rest/v1/rpc/release_native_delivery",
+        // The server refunds the orderer in the same step.
+        let _: EmptyResponse = try await serverSend("/api/native/orders/\(orderID.uuidString.lowercased())/release", method: "POST")
+    }
+
+    func paymentStatus() async throws -> PaymentStatus {
+        try await serverSend("/api/native/payments")
+    }
+
+    fileprivate func cardSetupLink() async throws -> HostedPageLink {
+        try await serverSend("/api/native/payments/card", method: "POST")
+    }
+
+    func confirmCard(sessionID: String) async throws {
+        let _: EmptyResponse = try await serverSend(
+            "/api/native/payments/card/confirm",
             method: "POST",
-            body: body,
-            authenticated: true
+            body: ["sessionId": AnyEncodable(sessionID)]
         )
-        guard released else { throw SupabaseError.server("The delivery could not be released.") }
+    }
+
+    fileprivate func payoutsLink() async throws -> HostedPageLink {
+        try await serverSend("/api/native/payments/payouts", method: "POST")
     }
 
     func startHandoff(for orderID: UUID) async throws -> String {
@@ -686,6 +735,40 @@ final class SupabaseClient {
             )
             self.save(renewed)
             return renewed
+        }
+    }
+
+    // Calls the NovaDash server with this Supabase sign-in, renewing it once if expired.
+    private func serverSend<T: Decodable>(
+        _ path: String,
+        method: String = "GET",
+        body: [String: AnyEncodable]? = nil
+    ) async throws -> T {
+        guard let url = URL(string: NovaDashServer.baseURL + path) else { throw SupabaseError.invalidResponse("The NovaDash server URL is invalid.") }
+        guard let token = session?.accessToken else { throw SupabaseError.server("Please sign in again.") }
+        var request = URLRequest(url: url)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        if method != "GET" {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.httpBody = try JSONEncoder().encode(body ?? [:])
+        }
+        var (data, response) = try await URLSession.shared.data(for: request)
+        if (response as? HTTPURLResponse)?.statusCode == 401 {
+            let renewed = try await renewedSession(after: token)
+            request.setValue("Bearer \(renewed.accessToken)", forHTTPHeaderField: "Authorization")
+            (data, response) = try await URLSession.shared.data(for: request)
+        }
+        guard let http = response as? HTTPURLResponse else { throw SupabaseError.invalidResponse("The NovaDash server did not return an HTTP response.") }
+        guard (200..<300).contains(http.statusCode) else {
+            let details = try? JSONDecoder().decode(SupabaseMessage.self, from: data)
+            throw SupabaseError.server(details?.bestMessage ?? "The NovaDash server could not complete that request.")
+        }
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            throw SupabaseError.invalidResponse("The NovaDash server returned an unreadable response.")
         }
     }
 
@@ -810,12 +893,49 @@ private extension JSONDecoder {
     }()
 }
 
+// Shows a Stripe-hosted page (card entry, payout setup) in a secure browser
+// sheet. The server sends Stripe's return links on to novadash://, which
+// closes the sheet and hands that address back here.
+final class StripeHostedPage: NSObject, ASWebAuthenticationPresentationContextProviding {
+    private var session: ASWebAuthenticationSession?
+
+    /// The novadash:// address the page finished on, or nil if it was closed.
+    @MainActor static func open(_ url: URL) async throws -> URL? {
+        let page = StripeHostedPage()
+        return try await withCheckedThrowingContinuation { continuation in
+            let session = ASWebAuthenticationSession(url: url, callbackURLScheme: "novadash") { callback, error in
+                if let error = error as? ASWebAuthenticationSessionError, error.code == .canceledLogin {
+                    continuation.resume(returning: nil)
+                } else if let error {
+                    continuation.resume(throwing: error)
+                } else {
+                    continuation.resume(returning: callback)
+                }
+                page.session = nil
+            }
+            session.presentationContextProvider = page
+            session.prefersEphemeralWebBrowserSession = true
+            page.session = session
+            if !session.start() {
+                page.session = nil
+                continuation.resume(throwing: SupabaseError.server("The secure Stripe page couldn't be opened."))
+            }
+        }
+    }
+
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        return scenes.compactMap(\.keyWindow).first ?? scenes.first?.windows.first ?? ASPresentationAnchor()
+    }
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     @Published var session: UserSession?
     @Published var profile: Profile?
     @Published var authDisplayName: String?
     @Published var testBalanceCents: Int64?
+    @Published var paymentStatus: PaymentStatus?
     @Published var errorMessage: String?
     @Published var isWorking = false
     let client = SupabaseClient()
@@ -850,7 +970,37 @@ final class AppModel: ObservableObject {
         if session != nil { AppDelegate.requestNotificationAuthorization() }
     }
 
-    func signOut() { client.signOut(); session = nil; profile = nil; authDisplayName = nil; testBalanceCents = nil }
+    func signOut() { client.signOut(); session = nil; profile = nil; authDisplayName = nil; testBalanceCents = nil; paymentStatus = nil }
+
+    func loadPaymentStatus() async {
+        if let status = try? await client.paymentStatus() { paymentStatus = status }
+    }
+
+    /// Opens Stripe's card page. Returns true once a card is saved, false if
+    /// the person closed the page.
+    func addCard() async throws -> Bool {
+        let link = try await client.cardSetupLink()
+        guard let url = URL(string: link.url) else { throw SupabaseError.invalidResponse("Stripe returned an invalid card page.") }
+        guard let callback = try await StripeHostedPage.open(url) else { return false }
+        let items = URLComponents(url: callback, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        guard items.first(where: { $0.name == "kind" })?.value == "card",
+              let sessionID = items.first(where: { $0.name == "session_id" })?.value else { return false }
+        try await client.confirmCard(sessionID: sessionID)
+        await loadPaymentStatus()
+        return true
+    }
+
+    /// Payout setup on Stripe's page, or the runner's Stripe dashboard once set up.
+    func openPayouts() async throws {
+        let link = try await client.payoutsLink()
+        guard let url = URL(string: link.url) else { throw SupabaseError.invalidResponse("Stripe returned an invalid payouts page.") }
+        if link.kind == "dashboard" {
+            await UIApplication.shared.open(url)
+        } else {
+            _ = try await StripeHostedPage.open(url)
+            await loadPaymentStatus()
+        }
+    }
 
     func loadTestBalance() async {
         do { testBalanceCents = try await client.testBalanceCents() }
@@ -2059,9 +2209,9 @@ struct OrderDetailsView: View {
 
             if form.details.isEmpty {
                 ticketPrompt("EXTRA NOTES\n(EG. WHERE TO MEET)")
-                    .multilineTextAlignment(.center)
-                    .frame(width: 314, height: 165, alignment: .center)
-                    .offset(x: 44, y: 368.72)
+                    .multilineTextAlignment(.leading)
+                    .frame(width: 304, height: 135, alignment: .topLeading)
+                    .offset(x: 50, y: 384.72)
                     .allowsHitTesting(false)
             }
 
@@ -2127,6 +2277,16 @@ struct OrderDetailsView: View {
         form.isPosting = true
         form.notice = nil
         do {
+            // With card payments on, an order needs a saved card to charge
+            // when a student accepts it.
+            let payments = try await model.client.paymentStatus()
+            if payments.enabled && payments.card == nil {
+                guard try await model.addCard() else {
+                    form.notice = "Add a card to place your order."
+                    form.isPosting = false
+                    return
+                }
+            }
             let order = try await model.client.createOrder(
                 store: form.store,
                 orderNumber: orderNumber,
@@ -2535,7 +2695,7 @@ private struct DeliveryRequestsListView: View {
                     .frame(width: 172, alignment: .leading)
                     .offset(x: 43, y: 45)
 
-                Text(String(format: "$%.2f", order.tip))
+                Text(String(format: "$%.2f", order.runnerPayout))
                     .font(.custom("Inter-Regular", size: 30.311))
                     .foregroundColor(.novaDashIvory)
                     .frame(width: 88, alignment: .leading)
@@ -2713,7 +2873,7 @@ private struct DeliveryRequestDetailsView: View {
             deliveryLabel("PAYOUT:")
                 .frame(width: 235, height: 50, alignment: .center)
                 .offset(x: 24, y: 381)
-            deliveryLabel(String(format: "$%.2f", order.tip))
+            deliveryLabel(String(format: "$%.2f", order.runnerPayout))
                 .frame(width: 121, height: 50, alignment: .center)
                 .offset(x: 257, y: 381)
             deliveryLabel("ESTIMATED TIME:")
@@ -2865,9 +3025,12 @@ private struct DeliveryDetailsBottomCorners: Shape {
 
 @MainActor private final class AccountScreenState: ObservableObject {
     @Published var showUnavailable = false
+    @Published var alertTitle = "Not available yet"
     @Published var unavailableMessage = ""
+    @Published var isWorking = false
 
-    func unavailable(_ message: String) {
+    func show(_ title: String, _ message: String) {
+        alertTitle = title
         unavailableMessage = message
         showUnavailable = true
     }
@@ -2931,10 +3094,11 @@ struct AccountView: View {
                         .offset(y: 379)
 
                         Button {
-                            state.unavailable("Payment methods are not connected in the native app yet.")
+                            Task { await addCard() }
                         } label: {
-                            AccountMenuRow(title: "Add/Edit Payment Method", height: 64)
+                            AccountMenuRow(title: paymentMethodTitle, height: 64)
                         }
+                        .disabled(state.isWorking)
                         .offset(y: 443)
 
                         NavigationLink(destination: AccountInfoView()) {
@@ -2943,10 +3107,11 @@ struct AccountView: View {
                         .offset(y: 507)
 
                         Button {
-                            state.unavailable("Test credits cannot be withdrawn. Payments and real balances are not connected yet.")
+                            Task { await openPayouts() }
                         } label: {
-                            AccountMenuRow(title: "Withdraw", height: 64)
+                            AccountMenuRow(title: model.paymentStatus?.payouts.ready == true ? "Withdraw" : "Set Up Payouts", height: 64)
                         }
+                        .disabled(state.isWorking)
                         .offset(y: 571)
 
                         Button {
@@ -2962,9 +3127,13 @@ struct AccountView: View {
             .task {
                 await model.loadProfile()
                 await model.loadTestBalance()
+                await model.loadPaymentStatus()
             }
-            .refreshable { await model.loadTestBalance() }
-            .alert("Not available yet", isPresented: $state.showUnavailable) {
+            .refreshable {
+                await model.loadTestBalance()
+                await model.loadPaymentStatus()
+            }
+            .alert(state.alertTitle, isPresented: $state.showUnavailable) {
                 Button("OK", role: .cancel) { }
             } message: {
                 Text(state.unavailableMessage)
@@ -2974,8 +3143,45 @@ struct AccountView: View {
         .preferredColorScheme(.light)
     }
 
+    // Real earnings once payouts are connected; test credits until then.
     private var balanceText: String {
-        model.testBalanceCents.map { String(format: "$%.2f", Double($0) / 100) } ?? "$0.00"
+        let cents = model.paymentStatus?.balanceCents ?? model.testBalanceCents
+        return cents.map { String(format: "$%.2f", Double($0) / 100) } ?? "$0.00"
+    }
+
+    private var paymentMethodTitle: String {
+        guard let card = model.paymentStatus?.card else { return "Add/Edit Payment Method" }
+        return "\(card.brand.capitalized) •••• \(card.last4)"
+    }
+
+    private func addCard() async {
+        if model.paymentStatus == nil { await model.loadPaymentStatus() }
+        guard model.paymentStatus?.enabled == true else {
+            state.show("Not available yet", "Card payments aren't turned on yet.")
+            return
+        }
+        state.isWorking = true
+        do {
+            if try await model.addCard() { state.show("Card saved", "You'll be charged the delivery fee when a student accepts your order.") }
+        } catch {
+            state.show("Card not saved", error.localizedDescription)
+        }
+        state.isWorking = false
+    }
+
+    private func openPayouts() async {
+        if model.paymentStatus == nil { await model.loadPaymentStatus() }
+        guard model.paymentStatus?.enabled == true else {
+            state.show("Not available yet", "Test credits can't be withdrawn, and payouts aren't turned on yet.")
+            return
+        }
+        state.isWorking = true
+        do {
+            try await model.openPayouts()
+        } catch {
+            state.show("Payouts", error.localizedDescription)
+        }
+        state.isWorking = false
     }
 
     private func profileDivider(y: CGFloat) -> some View {

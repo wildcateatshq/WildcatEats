@@ -97,7 +97,9 @@ async function chargeDeliveryFee({ customerId, paymentMethodId, runnerAccountId,
 async function refundPayment(paymentIntentId) {
   const s = requireStripe();
   try {
-    const refund = await s.refunds.create({ payment_intent: paymentIntentId, reverse_transfer: true });
+    // refund_application_fee hands the platform's cut back too, so the runner
+    // isn't left covering it.
+    const refund = await s.refunds.create({ payment_intent: paymentIntentId, reverse_transfer: true, refund_application_fee: true });
     return { refund, transferReversed: true };
   } catch (err) {
     const refund = await s.refunds.create({ payment_intent: paymentIntentId });
@@ -106,6 +108,7 @@ async function refundPayment(paymentIntentId) {
 }
 
 module.exports = {
+  client: stripe,
   enabled: Boolean(stripe),
   publishableKey: process.env.STRIPE_PUBLISHABLE_KEY || "",
   PLATFORM_CUT,
