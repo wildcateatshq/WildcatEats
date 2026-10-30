@@ -64,6 +64,20 @@ const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").match
 // run up to about half a day either side of that average, which can't be seen at this size.
 const KNOWN_NEW_MOON = Date.UTC(2000, 0, 6, 18, 14);
 const LUNAR_MONTH_DAYS = 29.530588853;
+// The moon's darker "seas" (maria), roughly where they sit on the real moon's near side, as
+// ellipses on a unit disc: [center x, center y, radius x, radius y], with y pointing down.
+const MARIA = [
+  [-0.35, -0.38, 0.27, 0.22], // Sea of Rains
+  [-0.58, 0.05, 0.22, 0.38], // Ocean of Storms
+  [0.12, -0.33, 0.15, 0.14], // Sea of Serenity
+  [0.3, -0.04, 0.2, 0.17], // Sea of Tranquility
+  [0.52, 0.22, 0.13, 0.15], // Sea of Fertility
+  [0.68, -0.3, 0.1, 0.09], // Sea of Crises
+  [-0.15, 0.42, 0.17, 0.12] // Sea of Clouds
+];
+// The bright young crater Tycho, near the bottom.
+const TYCHO = [-0.12, 0.74, 0.13];
+
 export function moonPhase(date = new Date()) {
   const months = (date.getTime() - KNOWN_NEW_MOON) / 86400000 / LUNAR_MONTH_DAYS;
   return ((months % 1) + 1) % 1;
@@ -95,7 +109,8 @@ export function createCity(root) {
     // The moon as it really is tonight, and a pixel sun, drawn around (0, 0) and moved into place
     // later. Each pixel of the moon is lit or in shadow by the phase: a waxing moon is lit on the
     // right, a waning one on the left (as seen from the US), and the shadowed part shows faintly.
-    const moonR = phone ? 12 : 22;
+    // The lit part shows the darker seas and the bright crater Tycho.
+    const moonR = phone ? 14 : 22;
     const phase = moonPhase();
     const terminator = Math.cos(2 * Math.PI * phase);
     let moon = "";
@@ -104,7 +119,13 @@ export function createCity(root) {
       if (cx * cx + cy * cy > moonR * moonR) continue;
       const edge = Math.sqrt(moonR * moonR - cy * cy) * terminator;
       const lit = phase < 0.5 ? cx >= edge : cx <= -edge;
-      moon += `<rect class="${lit ? "moon-lit" : "moon-dark"}" x="${x}" y="${y}" width="${P}" height="${P}"/>`;
+      let kind = lit ? "moon-lit" : "moon-dark";
+      if (lit) {
+        const u = cx / moonR, v = cy / moonR;
+        if (Math.hypot(u - TYCHO[0], v - TYCHO[1]) <= TYCHO[2]) kind = "moon-crater";
+        else if (MARIA.some(([mx, my, rx, ry]) => ((u - mx) / rx) ** 2 + ((v - my) / ry) ** 2 <= 1)) kind = "moon-sea";
+      }
+      moon += `<rect class="${kind}" x="${x}" y="${y}" width="${P}" height="${P}"/>`;
     }
     const sunR = phone ? 11 : 24;
     let sun = `<circle r="${sunR * 3}" class="sun-glow"/>`;
