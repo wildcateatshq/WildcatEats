@@ -136,17 +136,13 @@ const ANSWER_SHOWN_MS = 1450;
 // ...and the Next button fades in this long after that.
 const NEXT_BUTTON_DELAY_MS = 1000;
 let nextButtonTimer;
-// Running out of charge: the battery above drains to empty and shows "!", and the dark city
-// struggles to come back (its windows flicker faintly). Then the lights flicker (once, a beat,
-// twice quickly), the city flashing back on with them, and everything goes out; the
-// out-of-charge screen comes up. The flicker starts POWER_OUT_DELAY_MS after the guess is locked;
-// the other two count from the start of the flicker (1.7s long in percentle.css, with the lights
-// going out for good 75% of the way through).
-const POWER_OUT_DELAY_MS = 3300;
-const LIGHTS_OUT_MS = 1275;
-const POWER_OUT_MS = 2660;
+// Running out of charge: the battery above drains to empty (the city's tower is the last building
+// lit) and shows "!"; sparks burst from the tower as it goes dark, and a second later it crumbles
+// (city.powerFail). Once it has fallen, POWER_OUT_DELAY_MS after the guess was locked, the screen
+// dims for POWER_OUT_MS and the out-of-charge screen comes up.
+const POWER_OUT_DELAY_MS = 4200;
+const POWER_OUT_MS = 800;
 let powerOutTimer;
-let lightsOutTimer;
 
 // Answers always have exactly one decimal place, even if a puzzle was stored with more.
 function withRoundedAnswers(questions) {
@@ -384,8 +380,7 @@ function render() {
   applyHardLook();
   const index = view.index;
   clearTimeout(powerOutTimer);
-  clearTimeout(lightsOutTimer);
-  document.body.classList.remove("power-out", "lights-out", "struggling");
+  document.body.classList.remove("power-out");
   // Only shown while replaying an archived puzzle, so players can leave it at any time.
   document.querySelector("#returnButton").hidden = !practiceMode;
   if (practiceMode || endlessMode) leaveStartScreen();
@@ -492,7 +487,7 @@ function renderScoreBox(progress, view, animate) {
 
 function soundAlarm(battery) {
   battery.classList.add("alarm");
-  document.body.classList.add("struggling");
+  city.powerFail();
 }
 
 // Slides the guess sideways away from the answer, then fades in the arrow and the real answer.
@@ -558,10 +553,7 @@ const ZAP = `<svg class="zap" viewBox="0 0 26 48" preserveAspectRatio="none" ari
 
 function powerOut() {
   const progress = progressFor();
-  // The struggle ends as the lights start to go: the city flashes with the flicker instead.
-  document.body.classList.remove("struggling");
   document.body.classList.add("power-out");
-  lightsOutTimer = setTimeout(() => document.body.classList.add("lights-out"), LIGHTS_OUT_MS);
   powerOutTimer = setTimeout(() => {
     progress.revealed = progress.guesses.length;
     save();

@@ -158,8 +158,8 @@ golds purple, and locks in once a puzzle's first guess is made; hard players get
 line (`mode` on crowd submissions) and their games are marked in stats and sharing. The switch is
 locked only while today's puzzle is under way: before it starts it sets the mode for the daily and
 for endless runs, and once it's finished it sets the mode for endless runs only.
-Dropping below 0% ends the game early: the empty battery blinks "!" while the dark city struggles
-to come back, the city flashes on with the screen's last flicker before the lights cut out, and
+Dropping below 0% ends the game early: the city's tower, the last building with power, sparks and
+goes dark as the battery empties, crumbles into itself a second later, the screen dims, and
 the player sees an "Out of charge" screen. Exactly 0.0% survives.
 
 ### Daily puzzles come from an AI agent
