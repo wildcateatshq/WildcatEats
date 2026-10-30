@@ -63,21 +63,10 @@ main{padding:47px 0 34px}
 .reveal-guess{transition:color .9s ease,text-shadow .9s ease}
 /* The guess lights up by how close it was (litStyle in percentle.mjs). */
 .reveal-row.go .reveal-guess{color:var(--lit-color);text-shadow:var(--lit-glow)}
-/* A supercharged guess (no charge lost) is struck by lightning just as the answer appears: the bolt
-   cracks down from the top of the card and flickers, the card flashes and jolts, the numbers flare
-   white-hot, and "SUPERCHARGED" lands above them. */
-.strike{--strike-core:#fff6dc;position:absolute;left:50%;bottom:50%;width:210px;height:min(330px,62vw);transform:translateX(-50%);overflow:visible;pointer-events:none;z-index:4;opacity:0}
-.strike polyline{fill:none;stroke-linejoin:miter;stroke-linecap:round;vector-effect:non-scaling-stroke}
-.strike-glow{stroke:var(--halo);stroke-width:18;opacity:.75;filter:blur(4px)}
-.strike-core{stroke:var(--strike-core);stroke-width:5}
-.reveal-row.go .strike{animation:strike-draw .1s ease-in 1.3s both,strike-flash .65s linear 1.3s both}
-.reveal-row.instant .strike{display:none}
-@keyframes strike-draw{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0)}}
-@keyframes strike-flash{0%,22%{opacity:1}28%{opacity:.15}34%{opacity:1}55%{opacity:.8}100%{opacity:0}}
+/* A supercharged guess (no charge lost): lightning strikes the city behind the game (city.mjs),
+   the card jolts, the numbers flare white-hot, and "SUPERCHARGED" lands above them. */
 .game-card.struck{animation:jolt .35s ease-out 1.38s}
 @keyframes jolt{0%,100%{transform:none}25%{transform:translateY(5px)}55%{transform:translateY(-2px)}}
-.game-card.struck::after{content:"";position:absolute;inset:0;z-index:5;pointer-events:none;background:radial-gradient(closest-side at 50% 52%,color-mix(in srgb,var(--charge) 60%,#fff),transparent);opacity:0;animation:card-flash .5s ease-out 1.38s both}
-@keyframes card-flash{0%{opacity:0}12%{opacity:.55}100%{opacity:0}}
 .reveal-row.struck.go .reveal-num{animation:white-hot .8s ease-out 1.38s}
 @keyframes white-hot{0%{filter:brightness(2.2) drop-shadow(0 0 12px var(--charge))}100%{filter:none}}
 .supercharged{--glow-core:#fffaf0;position:absolute;left:50%;top:-12px;z-index:3;transform:translate(-50%,-100%);font:700 clamp(20px,5.6vw,30px)/1 var(--display);letter-spacing:clamp(3px,1vw,6px);text-transform:uppercase;white-space:nowrap;color:var(--glow-core);text-shadow:0 0 3px var(--charge),0 0 10px var(--charge),0 0 24px var(--charge),0 0 46px var(--charge-glow);opacity:0;pointer-events:none}
@@ -392,20 +381,33 @@ body:not(.starting):has(.question-body) .source-note{padding:9px 12px;line-heigh
 .city.low .bw.on:nth-child(3n){animation:city-flicker 2.2s steps(1) infinite}
 .city-glow{position:absolute;left:-10%;right:-10%;bottom:0;height:46%;background:radial-gradient(ellipse 60% 70% at 50% 100%,rgba(255,200,110,.38),transparent 70%);opacity:var(--glow,1);transition:opacity 1s}
 .city-scan{position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 3px);mix-blend-mode:screen}
-.bolt-glow{fill:none;stroke:#ffd56a;stroke-width:8;opacity:.25}
-.bolt-core{fill:none;stroke:#fffaf0;stroke-width:2.5;opacity:.9}
-.city-bolt{animation:city-bolt .9s ease-out forwards}
+.city-bolt{--bolt-glow:#ffd56a;filter:drop-shadow(0 0 4px var(--bolt-glow)) drop-shadow(0 0 14px color-mix(in srgb,var(--bolt-glow) 70%,transparent))}
+.bolt-glow{fill:none;stroke:var(--bolt-glow);opacity:.16;stroke-linejoin:round;stroke-linecap:round}
+.bolt-core{fill:none;stroke:#fffaf0;stroke-linejoin:round;stroke-linecap:round}
+.city-bolt{animation:city-bolt-in .12s linear both,city-bolt 1s ease-out .12s forwards}
+.city-bolt.perfect{animation:city-bolt-in .1s linear both,city-bolt-perfect 1.4s ease-out .1s forwards}
+.city-bolt .impact{transform-box:fill-box;transform-origin:center;animation:city-impact .8s ease-out both}
+.city-bolt.perfect .impact{animation-duration:1.3s}
+.spark{fill:#fffaf0;animation:city-spark .9s ease-out both}
+.city .bw.hit{opacity:1!important;transition:none}
+.city .bw.hit rect{fill:#fffaf0}
 .city-flash{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at var(--x,50%) 10%,rgba(255,238,200,.34),transparent 70%);animation:city-flash .9s ease-out forwards}
+.city-flash.perfect{background:radial-gradient(ellipse 110% 80% at var(--x,50%) 15%,rgba(255,244,214,.55),transparent 75%);animation:city-flash-perfect 1.4s ease-out forwards}
 .burst{fill:#ffe9a6;transform-box:fill-box;transform-origin:center;opacity:0;animation:city-burst 1.8s ease-out 2 both}
 .burst-1{fill:#ffb43a}.burst-2{fill:#fffaf0}.burst-core{fill:#fff}
 body.hard .city .storm{display:inline}
 body.hard .city .moon{fill:#e9d6ff}
 body.hard .city .w0{fill:#d9a8ff}body.hard .city .w1{fill:#b77bff}body.hard .city .w2{fill:#ff8ad8}body.hard .city .wn{fill:#c45cff}
 body.hard .city-glow{background:radial-gradient(ellipse 60% 70% at 50% 100%,rgba(170,90,255,.55),transparent 70%)}
-body.hard .bolt-glow{stroke:#b46bff}body.hard .bolt-core{stroke:#f0dcff}
+body.hard .city-bolt{--bolt-glow:#b46bff}body.hard .bolt-core{stroke:#f0dcff}body.hard .spark,body.hard .city .bw.hit rect{fill:#f0dcff}
 body.hard .city-flash{background:radial-gradient(ellipse 80% 60% at var(--x,50%) 10%,rgba(225,190,255,.32),transparent 70%)}
 body.hard .burst{fill:#c45cff}body.hard .burst-1{fill:#ff8ad8}body.hard .burst-2{fill:#e9d6ff}
+@keyframes city-bolt-in{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0)}}
 @keyframes city-bolt{0%,8%{opacity:1}12%{opacity:.2}16%,40%{opacity:1}100%{opacity:0}}
+@keyframes city-bolt-perfect{0%,6%{opacity:1}9%{opacity:.15}12%,22%{opacity:1}25%{opacity:.25}29%,55%{opacity:1}100%{opacity:0}}
+@keyframes city-impact{0%{transform:scale(.2);opacity:0}15%{transform:scale(1);opacity:1}100%{transform:scale(1.25);opacity:0}}
+@keyframes city-spark{0%{transform:translate(0,0);opacity:1}100%{transform:translate(var(--dx),calc(var(--dy) + 40px));opacity:0}}
+@keyframes city-flash-perfect{0%{opacity:0}5%{opacity:1}10%{opacity:.2}16%{opacity:1}24%{opacity:.4}30%{opacity:.9}100%{opacity:0}}
 @keyframes city-flash{0%{opacity:0}6%{opacity:1}14%{opacity:.3}20%{opacity:.9}100%{opacity:0}}
 @keyframes city-burst{0%{transform:scale(.15);opacity:0}12%{opacity:1}70%{opacity:.9}100%{transform:scale(1.12);opacity:0}}
 @keyframes city-rain{to{transform:translate(-4px,24px)}}

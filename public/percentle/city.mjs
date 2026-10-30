@@ -130,10 +130,12 @@ export function createCity(root) {
     const scale = phone ? 0.62 : 1;
     const dim = phone ? 0.62 : 0.85;
     let city = "";
+    const layout = []; // each building's place, in the same order as its windows group
     layers.forEach((layer, n) => {
       const lr = random(layer.seed);
       const base = H - (H - H * (layer.top + 0.12)) * scale;
       let shapes = "", lights = "", beacons = "";
+      const placed = [];
       let antennas = 0;
       let x = -px(10);
       while (x < W) {
@@ -159,8 +161,10 @@ export function createCity(root) {
           }
         }
         lights += `<g class="bw" data-cutoff="${cutoff}">${windows}</g>`;
+        placed.push({ x, w: bw, top: by, row: n });
         x += bw + (lr() < 0.3 ? P * 2 : 0);
       }
+      layout.push(...placed);
       city += `<g class="row row-${n}">${shapes}</g><g class="lights">${lights}</g><g class="beacons">${beacons}</g>`;
     });
 
@@ -176,7 +180,7 @@ export function createCity(root) {
         ${city}
       </svg>
       <div class="city-scan"></div>`;
-    buildings = [...root.querySelectorAll(".bw")].map(el => ({ el, cutoff: Number(el.dataset.cutoff) }));
+    buildings = [...root.querySelectorAll(".bw")].map((el, i) => ({ el, cutoff: Number(el.dataset.cutoff), ...layout[i] }));
     refresh();
   }
 
@@ -229,28 +233,85 @@ export function createCity(root) {
     }
   }
 
-  // A lightning bolt down to the skyline, along the edge of the game so it never crosses text.
-  function strike() {
+  // A jagged line between two points: the midpoint of every segment is pushed sideways a little,
+  // again and again, which gives lightning its natural crooked shape.
+  function jagged(x1, y1, x2, y2, roughness) {
+    let points = [[x1, y1], [x2, y2]];
+    for (let pass = 0; pass < 6; pass++) {
+      const next = [points[0]];
+      for (let i = 1; i < points.length; i++) {
+        const [ax, ay] = points[i - 1], [bx, by] = points[i];
+        const length = Math.hypot(bx - ax, by - ay);
+        const push = (Math.random() - 0.5) * length * roughness;
+        next.push([(ax + bx) / 2 + push * (ay - by) / (length || 1), (ay + by) / 2 + push * (bx - ax) / (length || 1)], points[i]);
+      }
+      points = next;
+    }
+    return points;
+  }
+
+  // Branches split off the main bolt (and, for a perfect answer, off the branches too).
+  function branches(points, count, reach, depth, out) {
+    for (let b = 0; b < count; b++) {
+      const at = Math.floor(points.length * (0.15 + Math.random() * 0.6));
+      const [x, y] = points[at];
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const angle = (20 + Math.random() * 45) * (Math.PI / 180);
+      const length = reach * (0.5 + Math.random() * 0.5);
+      const branch = jagged(x, y, x + side * Math.sin(angle) * length, y + Math.cos(angle) * length, 0.35);
+      out.push({ points: branch, depth });
+      if (depth < 2 && out.length < 40) branches(branch, depth === 1 ? 2 : 0, length * 0.55, depth + 1, out);
+    }
+    return out;
+  }
+
+  // Lightning striking the city: a bolt from the sky down onto a rooftop, a flash across the sky,
+  // a burst of light where it lands, and the struck building lit up for a moment. A perfect answer
+  // (exact to the tenth) gets a bigger, wider, more branched bolt, a double flicker and sparks.
+  function strike({ perfect = false } = {}) {
     if (!buildings.length) return;
     const phone = W < 600;
-    const side = Math.random() < 0.5;
-    // On a phone the bolt hugs the screen edge (inside the 14px gutter); on a wide screen it
-    // strikes the open sky beside the game.
-    const edge = phone ? (side ? W - 6 : 6) : side ? (W - 720) / 4 : W - (W - 720) / 4;
-    let x = edge;
-    let y = 0;
-    const end = H * (phone ? 0.84 : 0.72);
-    const points = [[x, y]];
-    while (y < end) {
-      y += 18 + Math.random() * 26;
-      x = phone ? edge + (Math.random() - 0.5) * 8 : x + (Math.random() - 0.5) * 46;
-      points.push([x, y]);
+    // Lightning finds tall things: pick among the taller front buildings, away from the screen edges.
+    const candidates = buildings.filter(b => b.row > 0 && b.x + b.w / 2 > W * 0.12 && b.x + b.w / 2 < W * 0.88)
+      .sort((a, b) => a.top - b.top).slice(0, 6);
+    const target = candidates[Math.floor(Math.random() * candidates.length)] || buildings[0];
+    const hitX = target.x + target.w / 2;
+    const hitY = target.top;
+    const startX = Math.min(W * 0.95, Math.max(W * 0.05, hitX + (Math.random() - 0.5) * W * (perfect ? 0.5 : 0.35)));
+    const main = jagged(startX, -10, hitX, hitY, 0.22);
+    const reach = H * (perfect ? 0.32 : 0.16) * (phone ? 1 : 0.8);
+    const forks = branches(main, perfect ? 7 : 3, reach, perfect ? 1 : 2, []);
+    const path = points => points.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join("");
+    const width = { core: perfect ? 3.5 : 2.5, glow: perfect ? 18 : 11 };
+    const forkLines = forks.map(({ points, depth }) => {
+      const scale = depth === 1 ? 0.55 : 0.35;
+      return `<path class="bolt-glow" d="${path(points)}" stroke-width="${(width.glow * scale).toFixed(1)}"/><path class="bolt-core" d="${path(points)}" stroke-width="${(width.core * scale).toFixed(1)}" opacity="${depth === 1 ? 0.85 : 0.6}"/>`;
+    }).join("");
+    let sparks = "";
+    if (perfect) {
+      for (let i = 0; i < 18; i++) {
+        const angle = Math.PI + Math.random() * Math.PI; // up and out from the roof
+        const distance = 30 + Math.random() * (phone ? 60 : 110);
+        sparks += `<rect class="spark" x="${(hitX - P / 2).toFixed(0)}" y="${(hitY - P / 2).toFixed(0)}" width="${P}" height="${P}" style="--dx:${(Math.cos(angle) * distance).toFixed(0)}px;--dy:${(Math.sin(angle) * distance).toFixed(0)}px;animation-delay:${(Math.random() * 0.12).toFixed(2)}s"/>`;
+      }
     }
-    const d = points.map(([a, b], i) => `${i ? "L" : "M"}${a.toFixed(0)},${b.toFixed(0)}`).join("");
-    root.insertAdjacentHTML("beforeend", `<svg class="city-bolt" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice"><path class="bolt-glow" d="${d}"/><path class="bolt-core" d="${d}"/></svg><div class="city-flash" style="--x:${((x / W) * 100).toFixed(1)}%"></div>`);
+    root.insertAdjacentHTML("beforeend", `<svg class="city-bolt${perfect ? " perfect" : ""}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">
+        <defs><radialGradient id="impact"><stop offset="0" stop-color="#fffaf0" stop-opacity=".9"/><stop offset=".4" stop-color="var(--bolt-glow, #ffd56a)" stop-opacity=".45"/><stop offset="1" stop-color="var(--bolt-glow, #ffd56a)" stop-opacity="0"/></radialGradient></defs>
+        <circle class="impact" cx="${hitX.toFixed(0)}" cy="${hitY.toFixed(0)}" r="${perfect ? 90 : 50}" fill="url(#impact)"/>
+        ${forkLines}
+        <path class="bolt-glow" d="${path(main)}" stroke-width="${width.glow}"/><path class="bolt-core" d="${path(main)}" stroke-width="${width.core}"/>
+        ${sparks}
+      </svg><div class="city-flash${perfect ? " perfect" : ""}" style="--x:${((hitX / W) * 100).toFixed(1)}%"></div>`);
     const flash = root.lastElementChild;
     const bolt = flash.previousElementSibling;
-    setTimeout(() => { bolt?.remove(); flash?.remove(); }, reducedMotion() ? 500 : 900);
+    // The struck building lights up, even if the battery had already switched it off.
+    target.el.classList.add("hit");
+    const duration = reducedMotion() ? 600 : perfect ? 1500 : 1000;
+    setTimeout(() => {
+      bolt?.remove();
+      flash?.remove();
+      target.el.classList.remove("hit");
+    }, duration);
   }
 
   // Pixel fireworks in the open sky beside the final battery.

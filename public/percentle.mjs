@@ -533,7 +533,14 @@ function playReveal(animate) {
     if (drainTo !== null) battery.style.setProperty("--level", drainTo);
     if (row.classList.contains("struck")) card.classList.add("struck");
   });
-  if (row.classList.contains("struck")) setTimeout(city.strike, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1300);
+  // A supercharge strikes the city with lightning as the reveal lands; a perfect answer (exact to
+  // the tenth) gets the big, branching strike.
+  if (row.classList.contains("struck")) {
+    const progress = progressFor();
+    const last = progress.guesses.length - 1;
+    const perfect = progress.guesses[last] === currentQuestions[last].answer;
+    setTimeout(() => city.strike({ perfect }), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1300);
+  }
 }
 
 // The electric end of the guess bar. The fill's own edge is jagged and snaps between three
@@ -629,11 +636,6 @@ function reactionLine(question, guess) {
   return reaction ? `<span class="reaction">${escapeHtml(reaction)}</span>` : "";
 }
 
-// A supercharged guess is struck by lightning: a jagged bolt (with a fork) cracks down from the
-// top of the card onto the numbers. Each line is drawn twice: a blurred glow, then a bright core.
-const BOLT_LINES = ["27,0 13,24 29,30 7,56 25,62 11,84 20,100", "13,24 1,37 8,41 0,55"];
-const STRIKE = `<svg class="strike" viewBox="-15 0 70 100" preserveAspectRatio="none" aria-hidden="true">${BOLT_LINES.map(points =>
-  `<polyline class="strike-glow" points="${points}"/><polyline class="strike-core" points="${points}"/>`).join("")}</svg>`;
 
 // A guess's number glows like it's charged: bright and glowing when close, dimming toward a
 // drained gray the further off it is (litLevel in game.mjs).
@@ -663,7 +665,7 @@ function reveal(question, guess, index) {
       <span class="reveal-num reveal-guess" style="--lit-color:${lit.color};--lit-glow:${lit.glow}">${Number(guess).toFixed(1)}<small>%</small></span>
       <span class="reveal-arrow" aria-hidden="true">${arrow}</span>
       <span class="reveal-num reveal-answer">${question.answer.toFixed(1)}<small>%</small></span>
-      ${off === 0 ? `${STRIKE}<span class="supercharged" role="status">${NO_DRAIN_WORD}</span>` : ""}
+      ${off === 0 ? `<span class="supercharged" role="status">${NO_DRAIN_WORD}</span>` : ""}
     </div>
     <div class="comparison ${answerHigher ? "too-low" : "too-high"}" data-answer="${answerX}" aria-hidden="true">
       <div class="battery bar-battery" id="revealBattery" style="--level:${guessX}"><div class="battery-cell">
