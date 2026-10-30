@@ -1351,14 +1351,15 @@ function chargeUp() {
   }, CHARGE_UP_DELAY_MS);
 }
 
-// Pressing Play (or Endless): the start screen fades and lifts away while the city's lights power
-// down, then the game rises into place and charges up. No motion when the player prefers less.
+// Pressing Play (or Endless): the start screen fades and lifts away over the dark city, then the
+// game rises into place and its battery charges up, lighting the city. No motion when the player
+// prefers less.
 const START_EXIT_MS = 340;
 function enterFromStart(enter) {
   const body = document.body;
   if (body.classList.contains("leaving")) return;
   if (matchMedia("(prefers-reduced-motion: reduce)").matches) return enter();
-  city.setLevel(0);
+  city.setLevel(0); // the city stays dark until the battery starts charging
   body.classList.add("leaving");
   setTimeout(() => {
     enter();

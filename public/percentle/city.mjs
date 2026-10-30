@@ -194,9 +194,9 @@ export function createCity(root) {
   function refresh() {
     const body = document.body;
     const hard = body.classList.contains("hard");
-    // The start screen shows the city at full power; the game shows the real charge. While the start
-    // screen is fading away (body.leaving) the city follows the battery, so it can power down first.
-    const shown = body.classList.contains("starting") && !body.classList.contains("leaving") ? 100 : Math.max(0, Math.min(100, level));
+    // On the start screen the city is dark: nothing powers it until the battery charges up on Play.
+    // In the game it shows the real charge.
+    const shown = body.classList.contains("starting") ? 0 : Math.max(0, Math.min(100, level));
     const out = shown <= 0;
     for (const building of buildings) building.el.classList.toggle("on", building.cutoff < shown);
     root.classList.toggle("out", out);
