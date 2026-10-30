@@ -85,6 +85,8 @@ function recordVisit(day) {
 recordVisit(easternDate());
 // The night city behind the game (public/percentle/city.mjs). It follows the main battery.
 const city = createCity(document.querySelector("#city"));
+// Its power line plugs into the battery on screen: the running one, or the final one on the results.
+city.connect(() => [...document.querySelectorAll("#scoreBattery, .result-battery")].find(battery => battery.offsetParent !== null));
 // A finish with at least this much charge left sets off fireworks over the city.
 const FIREWORKS_AT = 60;
 
@@ -210,8 +212,9 @@ function setBattery(battery, charge) {
   // The running battery's label takes its colour, and turns into a warning once the charge is low.
   const label = battery.id === "scoreBattery" ? document.querySelector("#scoreLabel") : null;
   if (label) {
-    label.style.color = chargeColor(charge);
-    label.textContent = charge <= LOW_BATTERY ? "WARNING: LOW BATTERY" : "YOUR CHARGE";
+    const charging = battery.classList.contains("charging");
+    label.style.color = charging ? "" : chargeColor(charge);
+    label.textContent = charging ? "CHARGING" : charge <= LOW_BATTERY ? "WARNING: LOW BATTERY" : "YOUR CHARGE";
   }
   // The results battery's "CHARGE LEFT" label takes its colour too (its wording stays the same).
   if (battery.id === "resultBattery") {
@@ -233,8 +236,11 @@ function chargeColor(charge) {
   return CHARGE_COLORS.at(-1).color;
 }
 
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+const easeInOut = t => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
 // Drains (or fills) a battery from one charge to another, moving the number with it.
-function animateBattery(battery, from, to, duration) {
+function animateBattery(battery, from, to, duration, ease = easeOut) {
   const run = (battery.drainRun = (battery.drainRun || 0) + 1);
   return new Promise(resolve => {
     if (from === to || matchMedia("(prefers-reduced-motion: reduce)").matches) {
@@ -246,7 +252,7 @@ function animateBattery(battery, from, to, duration) {
     function tick(now) {
       if (run !== battery.drainRun) return resolve(false);
       const ratio = Math.min(1, (now - start) / duration);
-      setBattery(battery, Math.round((from + (to - from) * (1 - Math.pow(1 - ratio, 3))) * 10) / 10);
+      setBattery(battery, Math.round((from + (to - from) * ease(ratio)) * 10) / 10);
       if (ratio < 1) requestAnimationFrame(tick);
       else resolve(true);
     }
@@ -422,6 +428,7 @@ function render() {
     playReveal(animate);
     bindNext(index);
   }
+  city.layout();
 }
 
 // The question's main button (Lock in, or Next) sits at the top right, on the line with the big
@@ -1321,6 +1328,44 @@ function toggleHardMode() {
 
 function leaveStartScreen() {
   document.body.classList.remove("starting");
+  city.layout();
+}
+
+// Going into a game, the battery charges up from empty (with "CHARGING" above it) and the city's
+// lights come on block by block as it fills, since the city runs on the battery.
+const CHARGE_UP_MS = 2200;
+const CHARGE_UP_DELAY_MS = 180;
+function chargeUp() {
+  const battery = document.querySelector("#scoreBattery");
+  if (document.querySelector("#scoreBox").hidden) return;
+  const target = shownScore?.value ?? 100;
+  battery.classList.add("charging");
+  setBattery(battery, 0);
+  const run = (battery.drainRun = (battery.drainRun || 0) + 1);
+  setTimeout(() => {
+    if (run !== battery.drainRun) return;
+    animateBattery(battery, 0, target, CHARGE_UP_MS, easeInOut).then(() => {
+      battery.classList.remove("charging");
+      setBattery(battery, target);
+    });
+  }, CHARGE_UP_DELAY_MS);
+}
+
+// Pressing Play (or Endless): the start screen fades and lifts away while the city's lights power
+// down, then the game rises into place and charges up. No motion when the player prefers less.
+const START_EXIT_MS = 340;
+function enterFromStart(enter) {
+  const body = document.body;
+  if (body.classList.contains("leaving")) return;
+  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return enter();
+  city.setLevel(0);
+  body.classList.add("leaving");
+  setTimeout(() => {
+    enter();
+    body.classList.remove("leaving");
+    body.classList.add("entering");
+    setTimeout(() => body.classList.remove("entering"), 700);
+  }, START_EXIT_MS);
 }
 
 function showHowToPlay() {
@@ -1349,10 +1394,11 @@ function escapeAttr(value) { return escapeHtml(value); }
 document.querySelector("#howButton").addEventListener("click", showHowToPlay);
 document.querySelector("#endlessButton").addEventListener("click", async () => {
   if (!(await startEndless())) return;
-  playChargeFlash(() => {
+  enterFromStart(() => {
     leaveStartScreen();
     window.scrollTo({ top: 0 });
     render();
+    chargeUp();
   });
 });
 document.querySelector("#startButton").addEventListener("click", () => {
@@ -1363,26 +1409,11 @@ document.querySelector("#startButton").addEventListener("click", () => {
     if (!practiceMode && isTodayFinished()) {
       animateResults = true;
       render();
-    }
+    } else chargeUp();
   };
-  playChargeFlash(enterGame);
+  enterFromStart(enterGame);
 });
 
-// The whole screen floods with charge until it's solid. Only then does the game swap in
-// underneath, and once it has painted, the glow fades off it, so the switch is never seen.
-function playChargeFlash(swap) {
-  if (matchMedia("(prefers-reduced-motion: reduce)").matches) return swap();
-  if (document.querySelector(".charge-flash")) return;
-  const flash = document.createElement("div");
-  flash.className = "charge-flash";
-  flash.setAttribute("aria-hidden", "true");
-  flash.addEventListener("animationend", () => {
-    if (flash.classList.contains("fading")) return flash.remove();
-    swap();
-    requestAnimationFrame(() => requestAnimationFrame(() => flash.classList.add("fading")));
-  });
-  document.body.append(flash);
-}
 document.querySelector("#statsButton").addEventListener("click", showStats);
 document.querySelector("#returnButton").addEventListener("click", () => {
   returnToToday();

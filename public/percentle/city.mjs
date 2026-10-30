@@ -4,6 +4,9 @@
 // fireworks, hard mode turns the night into a purple storm, and in endless mode the clock moves on
 // each round (night, dawn, day, dusk, night again).
 //
+// A power line runs from the player's battery down into a rooftop, with current flowing along it:
+// bright and fast when charged, slower and dimmer as the battery drains, dark when it's empty.
+//
 // The scene is drawn once per screen width; after that, changing the charge only switches whole
 // buildings on or off, and changing the time only updates a few colors and positions.
 
@@ -64,6 +67,8 @@ export function createCity(root) {
   let W = 0;
   let H = 0;
   let P = 3;
+  let cableSource = null; // returns the battery element the power line plugs into
+  let cableFrame = 0;
 
   function build() {
     W = window.innerWidth;
@@ -179,16 +184,19 @@ export function createCity(root) {
         <g class="pylon">${pylon}</g>
         ${city}
       </svg>
+      <svg class="city-cable" aria-hidden="true"><path class="cable-wire"/><path class="cable-glow"/><path class="cable-flow"/></svg>
       <div class="city-scan"></div>`;
     buildings = [...root.querySelectorAll(".bw")].map((el, i) => ({ el, cutoff: Number(el.dataset.cutoff), ...layout[i] }));
     refresh();
+    placeCable();
   }
 
   function refresh() {
     const body = document.body;
     const hard = body.classList.contains("hard");
-    // The start screen shows the city at full power; the game shows the real charge.
-    const shown = body.classList.contains("starting") ? 100 : Math.max(0, Math.min(100, level));
+    // The start screen shows the city at full power; the game shows the real charge. While the start
+    // screen is fading away (body.leaving) the city follows the battery, so it can power down first.
+    const shown = body.classList.contains("starting") && !body.classList.contains("leaving") ? 100 : Math.max(0, Math.min(100, level));
     const out = shown <= 0;
     for (const building of buildings) building.el.classList.toggle("on", building.cutoff < shown);
     root.classList.toggle("out", out);
@@ -214,6 +222,8 @@ export function createCity(root) {
     style.setProperty("--windows", (1 - sky.day * 0.7).toFixed(3));
     style.setProperty("--glow", out ? "0" : (night * (0.25 + (shown / 100) * 0.75)).toFixed(3));
     style.setProperty("--daylight", sky.day.toFixed(3));
+    style.setProperty("--flow", out ? "0" : (0.35 + (shown / 100) * 0.65).toFixed(3));
+    style.setProperty("--flow-time", `${(2.6 - (shown / 100) * 2).toFixed(2)}s`);
 
     // The moon and sun cross the sky. The daily puzzle's moon sits still in a fixed spot.
     const moon = root.querySelector(".moon");
@@ -304,8 +314,11 @@ export function createCity(root) {
       </svg><div class="city-flash${perfect ? " perfect" : ""}" style="--x:${((hitX / W) * 100).toFixed(1)}%"></div>`);
     const flash = root.lastElementChild;
     const bolt = flash.previousElementSibling;
-    // The struck building lights up, even if the battery had already switched it off.
+    // The struck building lights up, even if the battery had already switched it off, and a surge
+    // of current runs down the power line.
     target.el.classList.add("hit");
+    root.classList.add("surge");
+    setTimeout(() => root.classList.remove("surge"), perfect ? 1400 : 900);
     const duration = reducedMotion() ? 600 : perfect ? 1500 : 1000;
     setTimeout(() => {
       bolt?.remove();
@@ -337,13 +350,48 @@ export function createCity(root) {
     setTimeout(() => svg?.remove(), 5200);
   }
 
+  // The power line: from the battery's tip out to the side (the screen edge on a phone, the open
+  // sky beside the game on a wide screen), then down into the roof of the building below.
+  function placeCable() {
+    cancelAnimationFrame(cableFrame);
+    cableFrame = requestAnimationFrame(() => {
+      const svg = root.querySelector(".city-cable");
+      if (!svg) return;
+      const battery = cableSource?.();
+      const box = battery?.getBoundingClientRect();
+      if (!box || !box.width || document.body.classList.contains("starting")) {
+        svg.classList.add("off");
+        return;
+      }
+      const vw = window.innerWidth, vh = window.innerHeight;
+      const phone = vw < 600;
+      const startX = box.right + 8, startY = box.top + box.height / 2;
+      const edgeX = phone ? vw - 7 : Math.min(vw - 24, Math.max(box.right + 60, (vw + 720) / 2 + 48));
+      // The roof under the line: the tallest building it would run into.
+      const under = buildings.filter(b => b.x <= edgeX && edgeX <= b.x + b.w);
+      const roof = under.length ? Math.min(...under.map(b => b.top)) : H;
+      const endY = vh - (H - roof);
+      const bend = Math.min(14, Math.abs(edgeX - startX) / 2, Math.max(0, endY - startY) / 2);
+      const d = endY > startY + bend
+        ? `M${startX.toFixed(1)},${startY.toFixed(1)} H${(edgeX - bend).toFixed(1)} Q${edgeX.toFixed(1)},${startY.toFixed(1)} ${edgeX.toFixed(1)},${(startY + bend).toFixed(1)} V${endY.toFixed(1)}`
+        : `M${startX.toFixed(1)},${startY.toFixed(1)} H${edgeX.toFixed(1)}`;
+      svg.setAttribute("viewBox", `0 0 ${vw} ${vh}`);
+      svg.querySelectorAll("path").forEach(path => path.setAttribute("d", d));
+      svg.classList.remove("off");
+    });
+  }
+
   build();
   // Hard mode, the start screen and the out-of-charge screen are all body classes.
-  new MutationObserver(refresh).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  new MutationObserver(() => { refresh(); placeCable(); }).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+  // The line follows the battery as the page scrolls or its layout changes.
+  window.addEventListener("scroll", placeCable, { passive: true });
+  new ResizeObserver(placeCable).observe(document.body);
+  document.fonts?.ready.then(placeCable);
   let resizeTimer;
   window.addEventListener("resize", () => {
     clearTimeout(resizeTimer);
-    resizeTimer = setTimeout(() => { if (window.innerWidth !== builtWidth) build(); }, 200);
+    resizeTimer = setTimeout(() => { if (window.innerWidth !== builtWidth) build(); else placeCable(); }, 200);
   });
 
   return {
@@ -357,6 +405,12 @@ export function createCity(root) {
       hour = next;
       refresh();
     },
+    // Plugs the power line into a battery (a function returning the element, checked on each update).
+    connect(source) {
+      cableSource = source;
+      placeCable();
+    },
+    layout: placeCable,
     strike,
     fireworks
   };
