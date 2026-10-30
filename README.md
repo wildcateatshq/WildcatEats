@@ -154,7 +154,7 @@ starts at 100% charge and drains by how far off each guess is (`DRAIN_RATE` in
 A SUPERCHARGED answer (within 0.5) recharges the battery by 5% (`SUPERCHARGE_BONUS`), never above
 100%; because of that cap, charge is worked out question by question (`chargeTrack`), and each
 saved game keeps its final charge (older games are re-scored from their total points off). **Hard mode** (a switch on the start screen) drains twice as fast (`HARD_DRAIN_RATE`), turns the
-greens purple, and locks in once a puzzle's first guess is made; hard players get their own crowd
+golds purple, and locks in once a puzzle's first guess is made; hard players get their own crowd
 line (`mode` on crowd submissions) and their games are marked in stats and sharing. The switch is
 locked only while today's puzzle is under way: before it starts it sets the mode for the daily and
 for endless runs, and once it's finished it sets the mode for endless runs only.
@@ -218,6 +218,22 @@ curl -X PUT -H "Authorization: Bearer $PERCENTLE_PUBLISH_TOKEN" \
   -H "Content-Type: application/json" --data @puzzle.json \
   http://localhost:3000/api/percentle/puzzles/2026-10-06
 ```
+
+### The night city and the bright-light look
+
+A pixel-art city sits behind the game (`public/percentle/city.mjs`). It runs on the main battery:
+every building has its own charge cut-off, so blocks go dark as the charge drains and the stars come
+out as the city's glow fades. A supercharge strikes it with lightning along the screen edge, under
+20% the last lights flicker, 0% is a blackout, and finishing with 60% or more (`FIREWORKS_AT`) sets
+off fireworks. Hard mode turns it into a purple storm. In endless mode a clock runs from 9 PM, 45
+minutes per round (`endlessClock` in `game.mjs`), through dawn, day and dusk into night 2, and the
+sky, sun and moon follow it. The scene is drawn once per screen width and then only switches
+buildings and colors, and it holds still under reduced motion.
+
+The palette is bright light rather than green: lit things look like a bulb, a white-hot face with a
+gold halo, warming to amber (40%), orange (20%) and deep red (5%) as the battery drains. The
+question's main button (Lock in, or Next) sits at the top right beside the question number, so the
+bottom of the screen is left to the city.
 
 ### Endless mode
 

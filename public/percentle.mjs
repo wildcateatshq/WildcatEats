@@ -1,4 +1,5 @@
-import { achievementsForGame, ACHIEVEMENTS, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, reactionFor, easternDate, finalCharge, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { achievementsForGame, ACHIEVEMENTS, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, reactionFor, easternDate, endlessClock, finalCharge, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { createCity } from "/percentle/city.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
 const GAME_NAME = "Chargle";
@@ -82,6 +83,10 @@ function recordVisit(day) {
   try { localStorage.setItem("percentle.visited", day); } catch {}
 }
 recordVisit(easternDate());
+// The night city behind the game (public/percentle/city.mjs). It follows the main battery.
+const city = createCity(document.querySelector("#city"));
+// A finish with at least this much charge left sets off fireworks over the city.
+const FIREWORKS_AT = 60;
 
 let todayPuzzle;
 try {
@@ -199,6 +204,7 @@ function batteryMarkup(className, id, charge = 100) {
 
 function setBattery(battery, charge) {
   battery.style.setProperty("--level", Math.max(0, Math.min(100, charge)));
+  if (battery.id === "scoreBattery" || battery.id === "resultBattery") city.setLevel(charge);
   battery.style.setProperty("--fill", chargeColor(charge));
   battery.querySelectorAll(".battery-value").forEach(value => { value.textContent = formatCharge(charge); });
   // The running battery's label takes its colour, and turns into a warning once the charge is low.
@@ -380,7 +386,11 @@ function render() {
   document.querySelector("#returnButton").hidden = !practiceMode;
   if (practiceMode || endlessMode) leaveStartScreen();
   document.querySelector("#puzzleNumber").innerHTML = endlessMode ? INFINITY_ICON : `NO. ${currentNumber}`;
-  document.querySelector("#puzzleDate").textContent = endlessMode ? (endlessHard ? "ENDLESS · HARD MODE" : "ENDLESS MODE") : currentDate === today ? (currentTheme || "Today's edition").toUpperCase() : `${currentDate} · PRACTICE`;
+  // Endless runs keep a clock: 9 PM at the start, 45 minutes on with each round.
+  const clock = endlessMode ? endlessClock(view.index) : null;
+  city.setTime(clock ? clock.hour : null);
+  document.querySelector("#puzzleDate").textContent = endlessMode ? `${endlessHard ? "HARD · " : ""}${clock.label} · ${clock.time}`.toUpperCase() : currentDate === today ? (currentTheme || "Today's edition").toUpperCase() : `${currentDate} · PRACTICE`;
+  setAction("");
   const animate = justLocked;
   justLocked = false;
   // Reloading part-way through a power-out goes straight to the out-of-charge screen.
@@ -404,11 +414,25 @@ function render() {
       <div class="hint-row"><p class="question-hint">0-100%</p>${view.phase === "reveal" ? reactionLine(question, progress.guesses[index]) : ""}</div>
       ${view.phase === "reveal" ? reveal(question, progress.guesses[index], index) : guessForm(guess)}
     </div>`;
+  setAction(view.phase === "reveal"
+    ? actionButton("next-button", "nextButton", index === currentQuestions.length - 1 ? ["Battery report", "Report"] : ["Next question", "Next"])
+    : actionButton("lock-button", "lockButton", ["Lock in my guess", "Lock in"]));
   if (view.phase === "guess") bindGuessControls(guess, index);
   else {
     playReveal(animate);
     bindNext(index);
   }
+}
+
+// The question's main button (Lock in, or Next) sits at the top right, on the line with the big
+// question number, so the bottom of the screen is left to the city. Very narrow phones get the
+// short label.
+function actionButton(className, id, [long, short]) {
+  return `<button class="${className}" id="${id}"><span class="label-long">${long}</span><span class="label-short">${short}</span> ${ICONS.right}</button>`;
+}
+
+function setAction(html) {
+  document.querySelector("#questionAction").innerHTML = html;
 }
 
 // The battery above the card shows the charge left so far. It starts full, and each time a guess
@@ -509,6 +533,7 @@ function playReveal(animate) {
     if (drainTo !== null) battery.style.setProperty("--level", drainTo);
     if (row.classList.contains("struck")) card.classList.add("struck");
   });
+  if (row.classList.contains("struck")) setTimeout(city.strike, matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1300);
 }
 
 // The electric end of the guess bar. The fill's own edge is jagged and snaps between three
@@ -536,8 +561,7 @@ function guessForm(guess) {
   return `<div class="guess-display"><input class="guess-input" id="guessInput" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="${Number(guess).toFixed(1)}" aria-label="Your percentage guess, from 0 to 100"><span class="percent-sign">%</span></div>
     <div class="range-wrap"><div class="battery bar-battery" id="guessBattery" style="--level:${guess}"><div class="battery-cell"><span class="battery-fill"></span>${ZAP}
         <input class="battery-range" id="guessRange" type="range" min="0" max="100" step="0.1" value="${guess}" aria-label="Adjust your percentage guess from 0 to 100"></div></div>
-      <div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div></div>
-    <button class="lock-button" id="lockButton">Lock in my guess ${ICONS.right}</button>`;
+      <div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div></div>`;
 }
 
 function bindGuessControls(initial, index) {
@@ -648,8 +672,7 @@ function reveal(question, guess, index) {
         <span class="marker answer" style="left:${answerX}%"><span class="marker-caption">ANSWER</span></span></div></div>
       <div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div>
     </div>
-    <p class="source-note">${escapeHtml(question.funFact)}</p>
-    <button class="next-button" id="nextButton">${index === currentQuestions.length - 1 ? "Battery report" : "Next question"} ${ICONS.right}</button>`;
+    <p class="source-note">${escapeHtml(question.funFact)}</p>`;
 }
 
 function bindNext(index) {
@@ -785,6 +808,7 @@ function renderResults() {
   if (out) setTimeout(announceAchievements, 1200);
   else playResultDrain(charge, animate).then(finished => {
     if (!finished) return;
+    if (animate && charge >= FIREWORKS_AT) city.fireworks();
     if (animate && lowBatteryTier(charge)) showLowBatteryAlert(charge, announceAchievements);
     else announceAchievements();
   });

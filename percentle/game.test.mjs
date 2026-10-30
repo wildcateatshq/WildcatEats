@@ -12,6 +12,7 @@ import {
   REACTIONS,
   reactionFor,
   roundsSurvived,
+  endlessClock,
   dailyTotal,
   guessEntryFrom,
   guessEntryText,
@@ -217,4 +218,17 @@ test("hard mode and endless runs earn their own achievements", () => {
   assert.deepEqual(endlessAchievements({ rounds: 4 }), ["first-run"]);
   assert.deepEqual(endlessAchievements({ rounds: 26, supercharged: 3, betterThan: 92 }), ["first-run", "ten-strong", "unplugged", "overclocked", "top-charger"]);
   assert.deepEqual(endlessAchievements({ rounds: 12, betterThan: 89.9 }), ["first-run", "ten-strong"]);
+});
+
+test("endless mode's clock runs from 9 PM through the night, the next day and into night 2", () => {
+  assert.deepEqual(endlessClock(0), { hour: 21, time: "9:00 PM", label: "Night 1" });
+  assert.equal(endlessClock(4).time, "12:00 AM");
+  assert.equal(endlessClock(4).label, "Night 1", "past midnight is still the first night");
+  assert.equal(endlessClock(12).time, "6:00 AM");
+  assert.equal(endlessClock(12).label, "Day 1", "morning");
+  assert.equal(endlessClock(20).time, "12:00 PM");
+  assert.equal(endlessClock(28).time, "6:00 PM");
+  assert.equal(endlessClock(28).label, "Night 2", "sunset starts the second night");
+  assert.equal(endlessClock(1).time, "9:45 PM");
+  assert.equal(endlessClock(45).label, "Day 2");
 });

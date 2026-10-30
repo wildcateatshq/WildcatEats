@@ -1,9 +1,9 @@
-:root{color-scheme:dark;--paper:#000;--card:#101412;--ink:#f3f3e9;--muted:#9aa39c;--line:#262d29;--charge:#39ff88;--charge-glow:#39ff8873;--charge-ink:#04220f;--drained:#3a3e3c;--shell:#3d4842;--negative:#ff4d4d;--charge-yellow:#ffd23f;--charge-orange:#ff9a2e;--lit:#effff4;--unlit:#4d544f;--green:#39ff88;--lime:#0f2a1b;--orange:#ffd23f;--red:#df8a75;--display:"Chakra Petch","Arial Narrow",sans-serif;--sans:"Space Grotesk",Arial,sans-serif;--mono:"JetBrains Mono",monospace;--shadow:0 0 0 1px #39ff880d,0 24px 70px #000}
+:root{color-scheme:dark;--paper:#000;--sky:#03060b;--card:#13110c;--ink:#f7f3e8;--muted:#aaa494;--line:#2e2a20;--charge:#fff4d2;--charge-glow:#ffc93ccc;--charge-ink:#2a1c00;--halo:#ffc22e;--drained:#3d3a33;--shell:#4d4734;--negative:#ee3a2c;--charge-yellow:#ffb52e;--charge-orange:#ff7424;--lit:#fffaf0;--unlit:#5a533f;--green:#ffd86b;--lime:#2a2108;--orange:#ffb52e;--red:#df8a75;--display:"Chakra Petch","Arial Narrow",sans-serif;--sans:"Space Grotesk",Arial,sans-serif;--mono:"JetBrains Mono",monospace;--shadow:0 0 0 1px #fff4d20d,0 24px 70px #000}
 *{box-sizing:border-box}
-body{margin:0;background:radial-gradient(ellipse 90% 340px at 50% -60px,color-mix(in srgb,var(--charge) 13%,transparent),transparent) no-repeat,var(--paper);color:var(--ink);font-family:var(--sans);min-height:100vh;transition:background .25s,color .25s}
+body{margin:0;background:var(--sky);color:var(--ink);font-family:var(--sans);min-height:100vh;transition:background .25s,color .25s}
 button,input{font:inherit}
 button{color:inherit}
-.site-shell{width:min(100% - 40px,720px);margin:auto}
+.site-shell{position:relative;z-index:1;width:min(100% - 40px,720px);margin:auto}
 .topbar{position:relative;height:76px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line)}
 .return-button{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid var(--line);border-radius:6px;text-transform:uppercase;letter-spacing:1px;font-family:var(--display);background:var(--card);color:var(--ink);font-size:12px;font-weight:600;white-space:nowrap;cursor:pointer;transition:border-color .2s}
 .return-button:hover{border-color:var(--green)}
@@ -66,9 +66,9 @@ main{padding:47px 0 34px}
 /* A supercharged guess (no charge lost) is struck by lightning just as the answer appears: the bolt
    cracks down from the top of the card and flickers, the card flashes and jolts, the numbers flare
    white-hot, and "SUPERCHARGED" lands above them. */
-.strike{--strike-core:#fff;position:absolute;left:50%;bottom:50%;width:210px;height:min(330px,62vw);transform:translateX(-50%);overflow:visible;pointer-events:none;z-index:4;opacity:0}
+.strike{--strike-core:#fff6dc;position:absolute;left:50%;bottom:50%;width:210px;height:min(330px,62vw);transform:translateX(-50%);overflow:visible;pointer-events:none;z-index:4;opacity:0}
 .strike polyline{fill:none;stroke-linejoin:miter;stroke-linecap:round;vector-effect:non-scaling-stroke}
-.strike-glow{stroke:var(--charge);stroke-width:16;opacity:.6;filter:blur(5px)}
+.strike-glow{stroke:var(--halo);stroke-width:18;opacity:.75;filter:blur(4px)}
 .strike-core{stroke:var(--strike-core);stroke-width:5}
 .reveal-row.go .strike{animation:strike-draw .1s ease-in 1.3s both,strike-flash .65s linear 1.3s both}
 .reveal-row.instant .strike{display:none}
@@ -80,7 +80,7 @@ main{padding:47px 0 34px}
 @keyframes card-flash{0%{opacity:0}12%{opacity:.55}100%{opacity:0}}
 .reveal-row.struck.go .reveal-num{animation:white-hot .8s ease-out 1.38s}
 @keyframes white-hot{0%{filter:brightness(2.2) drop-shadow(0 0 12px var(--charge))}100%{filter:none}}
-.supercharged{--glow-core:#effff4;position:absolute;left:50%;top:-12px;z-index:3;transform:translate(-50%,-100%);font:700 clamp(20px,5.6vw,30px)/1 var(--display);letter-spacing:clamp(3px,1vw,6px);text-transform:uppercase;white-space:nowrap;color:var(--glow-core);text-shadow:0 0 3px var(--charge),0 0 10px var(--charge),0 0 24px var(--charge),0 0 46px var(--charge-glow);opacity:0;pointer-events:none}
+.supercharged{--glow-core:#fffaf0;position:absolute;left:50%;top:-12px;z-index:3;transform:translate(-50%,-100%);font:700 clamp(20px,5.6vw,30px)/1 var(--display);letter-spacing:clamp(3px,1vw,6px);text-transform:uppercase;white-space:nowrap;color:var(--glow-core);text-shadow:0 0 3px var(--charge),0 0 10px var(--charge),0 0 24px var(--charge),0 0 46px var(--charge-glow);opacity:0;pointer-events:none}
 .supercharged::before{content:"";position:absolute;inset:-22px -46px;z-index:-1;background:radial-gradient(closest-side,var(--charge-glow),transparent)}
 .reveal-row.go .supercharged{animation:land .4s cubic-bezier(.3,1.5,.5,1) 1.42s both}
 .reveal-row.instant .supercharged{opacity:1;animation:none}
@@ -186,7 +186,7 @@ body.starting .intro,body.starting #gameCard,body.starting #recap{display:none}
 /* On the white light-mode card a white-hot tip just looks washed out, so it stays solid green. */
 /* The fill heats toward its tip, matching the white-hot jagged edge. */
 #guessBattery .battery-fill{border-radius:4px 0 0 4px;box-shadow:0 0 16px var(--charge-glow);background:linear-gradient(90deg,var(--charge) 0,var(--charge) calc(100% - 70px),var(--zap-core) calc(100% - 10px))}
-.zap{--zap-hot:#f2fff6;position:absolute;left:max(-4px,calc(var(--level) * 1% - 11px));top:0;width:26px;height:100%;overflow:visible;z-index:3;pointer-events:none}
+.zap{--zap-hot:#fffdf5;position:absolute;left:max(-4px,calc(var(--level) * 1% - 11px));top:0;width:26px;height:100%;overflow:visible;z-index:3;pointer-events:none}
 .zap polygon{fill:var(--zap-core)}
 .zap polyline{fill:none;stroke:var(--zap-hot);stroke-width:1.7;stroke-linejoin:round;stroke-linecap:round;vector-effect:non-scaling-stroke;filter:drop-shadow(0 0 2px var(--charge)) drop-shadow(0 0 7px var(--charge))}
 .zap-frame{opacity:0;animation:zap-frame .24s steps(1) infinite}
@@ -273,7 +273,7 @@ body.dead,body.power-out{background:var(--paper)}
 .start-special::before{content:"";width:9px;height:13px;background:currentColor;clip-path:polygon(60% 0,0 58%,45% 58%,30% 100%,100% 38%,55% 38%,75% 0)}
 .start-special[hidden]{display:none}
 /* Hard mode: the same look in purple (every --charge and --green becomes purple). */
-body.hard{--charge:#b85cff;--charge-glow:#b85cff73;--charge-ink:#1c0630;--green:#c98bff;--lime:#2a0f3d;--lit:#f6ecff;--shadow:0 0 0 1px #b85cff0d,0 24px 70px #000}
+body.hard{--halo:#b85cff;--charge:#b85cff;--charge-glow:#b85cff73;--charge-ink:#1c0630;--green:#c98bff;--lime:#2a0f3d;--lit:#f6ecff;--shadow:0 0 0 1px #b85cff0d,0 24px 70px #000}
 .hard-row{display:flex;align-items:center;justify-content:center;gap:10px;margin:0 0 18px}
 .hard-switch{position:relative;width:46px;height:26px;padding:0;border:2px solid var(--shell);border-radius:99px;background:var(--card);cursor:pointer;transition:background .25s,border-color .25s,box-shadow .25s}
 .hard-knob{position:absolute;left:2px;top:2px;width:18px;height:18px;border-radius:50%;background:var(--muted);transition:transform .25s,background .25s}
@@ -284,7 +284,7 @@ body.hard{--charge:#b85cff;--charge-glow:#b85cff73;--charge-ink:#1c0630;--green:
 .hard-switch:disabled+.hard-label{cursor:default}
 .mode-flash{position:fixed;inset:0;z-index:55;display:grid;place-items:center;pointer-events:none;opacity:0;animation:charge-in .4s ease-in both}
 .mode-flash.to-hard{background:radial-gradient(circle at 50% 50%,#ecd4ff 0%,#b85cff 42%,#3d0b66 100%)}
-.mode-flash.to-normal{background:radial-gradient(circle at 50% 58%,#c8ffe0 0%,#39ff88 45%,#0f5a2e 100%)}
+.mode-flash.to-normal{background:radial-gradient(circle at 50% 58%,#ffffff 0%,#fff4d2 35%,#ffc22e 70%,#6b4a10 100%)}
 .mode-flash.fading{animation:charge-out .9s ease-out both}
 .devil{width:min(300px,72vw);filter:blur(.7px) drop-shadow(0 0 10px #000) drop-shadow(0 0 28px #000b);animation:devil-in .55s cubic-bezier(.2,1.4,.4,1) .1s both}
 @keyframes devil-in{from{opacity:0;transform:scale(.4) rotate(-14deg)}to{opacity:1;transform:none}}
@@ -350,10 +350,66 @@ body:not(.starting):has(.question-body) .guess-input{font-size:40px}
 body:not(.starting):has(.question-body) .range-wrap{padding-top:6px}
 body:not(.starting):has(.question-body) .bar-battery{height:40px}
 body:not(.starting):has(.question-body) .range-labels{margin-top:8px}
-body:not(.starting):has(.question-body) .range-wrap+.lock-button{margin-top:calc(16px + var(--room)*.35)}
-body:not(.starting):has(.question-body) .lock-button,body:not(.starting):has(.question-body) .next-button{padding:13px 18px}
 body:not(.starting):has(.question-body) .comparison{padding:calc(12px + var(--room)*.1) 0 0}
 body:not(.starting):has(.question-body) .reveal-row{margin:10px 0 0}
 body:not(.starting):has(.question-body) .source-note{padding:9px 12px;line-height:1.45;margin-top:calc(var(--room)*.06)}
-body:not(.starting):has(.question-body) .next-button{margin-top:calc(12px + var(--room)*.12)}
 }
+
+/* The question's main button sits at the top right, on the line with the big question number. */
+.progress-row{justify-content:space-between;gap:12px}
+.q-action:empty{display:none}
+.q-action>.lock-button,.q-action>.next-button{width:auto;flex:none;margin:0 0 4px;padding:11px 16px;font-size:13px;letter-spacing:1.5px;white-space:nowrap;border-radius:8px;display:inline-flex;align-items:center;gap:6px}
+.label-short{display:none}
+@media(max-width:374px){.label-long{display:none}.label-short{display:inline}}
+
+/* Bright light: lit things look like a bulb, a white-hot face with a gold halo. The gradients are
+   built from the current charge color, so a low battery glows orange and hard mode glows purple. */
+.battery-fill{background:linear-gradient(180deg,#fffef8 0%,var(--fill,var(--charge)) 42%,color-mix(in srgb,var(--fill,var(--charge)) 70%,var(--halo)) 100%);box-shadow:0 0 18px color-mix(in srgb,var(--fill,var(--charge)) 55%,var(--halo)),0 0 44px color-mix(in srgb,var(--halo) 45%,transparent),inset 0 0 6px #fff8}
+#guessBattery .battery-fill{background:linear-gradient(180deg,#fffef8 0%,var(--charge) 45%,color-mix(in srgb,var(--charge) 65%,var(--halo)) 100%);box-shadow:0 0 18px var(--charge-glow),0 0 40px color-mix(in srgb,var(--halo) 40%,transparent)}
+.lock-button,.next-button:not(.secondary-button),.share-button,.brand-mark,.start-mark{background:linear-gradient(180deg,#fffef8 0%,var(--charge) 55%,color-mix(in srgb,var(--charge) 75%,var(--halo)) 100%);box-shadow:0 0 0 1px color-mix(in srgb,var(--halo) 55%,transparent),0 0 24px color-mix(in srgb,var(--halo) 60%,transparent),0 8px 36px color-mix(in srgb,var(--halo) 35%,transparent)}
+.q-num{-webkit-text-stroke:1.5px color-mix(in srgb,var(--halo) 80%,#fff);filter:drop-shadow(0 0 6px color-mix(in srgb,var(--halo) 45%,transparent))}
+
+/* The night city behind the game (public/percentle/city.mjs). */
+.city{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:linear-gradient(180deg,var(--sky-top,#03060b) 0%,color-mix(in srgb,var(--sky-top,#03060b) 50%,var(--sky-bottom,#0b1c26)) 55%,var(--sky-bottom,#0b1c26) 100%);transition:background 1s}
+.city-scene,.city-bolt,.city-fireworks{position:absolute;inset:0;width:100%;height:100%}
+.city-scene{shape-rendering:crispEdges}
+.city .stars{fill:#cfe3ff;opacity:var(--stars,.3);transition:opacity 1s}
+.city .moon{fill:#fff6d8;opacity:calc(1 - var(--daylight,0) * 1.6)}
+.city .sun{fill:#ffe9a0;opacity:var(--daylight,0)}
+.city .sun-glow{fill:url(#sunGlow)}
+.city .clouds{fill:#e8eefc;opacity:calc(var(--daylight,0) * .3);animation:city-drift 90s ease-in-out infinite alternate}
+.city .storm{display:none}
+.city .storm-clouds{fill:#1d0e31;opacity:.28}
+.city .rain{fill:#b78cff;opacity:.18;animation:city-rain .9s linear infinite}
+.city .row-0,.city .pylon{fill:var(--row-0,#0b151b)}
+.city .row-1{fill:var(--row-1,#081014)}
+.city .row-2{fill:var(--row-2,#05090c)}
+.city .bw{opacity:0;transition:opacity .45s}
+.city .bw.on{opacity:var(--windows,1)}
+.city .w0{fill:#ffe09a}.city .w1{fill:#ffd27a}.city .w2{fill:#fff2c9}.city .wn{fill:#fff3c4}
+.city .beacons{fill:#ff4d4d;animation:city-beacon 1.6s steps(1) infinite}
+.city.out .beacons{display:none}
+.city.low .bw.on:nth-child(3n){animation:city-flicker 2.2s steps(1) infinite}
+.city-glow{position:absolute;left:-10%;right:-10%;bottom:0;height:46%;background:radial-gradient(ellipse 60% 70% at 50% 100%,rgba(255,200,110,.38),transparent 70%);opacity:var(--glow,1);transition:opacity 1s}
+.city-scan{position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 3px);mix-blend-mode:screen}
+.bolt-glow{fill:none;stroke:#ffd56a;stroke-width:8;opacity:.25}
+.bolt-core{fill:none;stroke:#fffaf0;stroke-width:2.5;opacity:.9}
+.city-bolt{animation:city-bolt .9s ease-out forwards}
+.city-flash{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at var(--x,50%) 10%,rgba(255,238,200,.34),transparent 70%);animation:city-flash .9s ease-out forwards}
+.burst{fill:#ffe9a6;transform-box:fill-box;transform-origin:center;opacity:0;animation:city-burst 1.8s ease-out 2 both}
+.burst-1{fill:#ffb43a}.burst-2{fill:#fffaf0}.burst-core{fill:#fff}
+body.hard .city .storm{display:inline}
+body.hard .city .moon{fill:#e9d6ff}
+body.hard .city .w0{fill:#d9a8ff}body.hard .city .w1{fill:#b77bff}body.hard .city .w2{fill:#ff8ad8}body.hard .city .wn{fill:#c45cff}
+body.hard .city-glow{background:radial-gradient(ellipse 60% 70% at 50% 100%,rgba(170,90,255,.55),transparent 70%)}
+body.hard .bolt-glow{stroke:#b46bff}body.hard .bolt-core{stroke:#f0dcff}
+body.hard .city-flash{background:radial-gradient(ellipse 80% 60% at var(--x,50%) 10%,rgba(225,190,255,.32),transparent 70%)}
+body.hard .burst{fill:#c45cff}body.hard .burst-1{fill:#ff8ad8}body.hard .burst-2{fill:#e9d6ff}
+@keyframes city-bolt{0%,8%{opacity:1}12%{opacity:.2}16%,40%{opacity:1}100%{opacity:0}}
+@keyframes city-flash{0%{opacity:0}6%{opacity:1}14%{opacity:.3}20%{opacity:.9}100%{opacity:0}}
+@keyframes city-burst{0%{transform:scale(.15);opacity:0}12%{opacity:1}70%{opacity:.9}100%{transform:scale(1.12);opacity:0}}
+@keyframes city-rain{to{transform:translate(-4px,24px)}}
+@keyframes city-drift{from{transform:translateX(-30px)}to{transform:translateX(30px)}}
+@keyframes city-beacon{50%{opacity:.15}}
+@keyframes city-flicker{0%,100%{opacity:var(--windows,1)}40%{opacity:.15}46%{opacity:var(--windows,1)}70%{opacity:.3}74%{opacity:var(--windows,1)}}
+@media(prefers-reduced-motion:reduce){.city *{animation:none!important;transition:none!important}}

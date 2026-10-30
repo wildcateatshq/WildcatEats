@@ -295,3 +295,20 @@ export function endlessOrder(questions, seenKeys, random = Math.random) {
 export function roundsSurvived(guesses, questions, rate = DRAIN_RATE) {
   return isOutOfCharge(guesses, questions, rate) ? guesses.length - 1 : guesses.length;
 }
+
+// Endless mode's clock: a run starts at 9 PM and every round moves time on 45 minutes, so a long
+// run reaches morning (round 12), noon (round 20), and sunset, where night 2 starts (round 28).
+export const ENDLESS_START_HOUR = 21;
+export const ENDLESS_MINUTES_PER_ROUND = 45;
+
+export function endlessClock(round) {
+  const total = ENDLESS_START_HOUR + (round * ENDLESS_MINUTES_PER_ROUND) / 60;
+  const hour = total % 24;
+  const daysPassed = Math.floor(total / 24);
+  const isNight = hour >= 18 || hour < 6;
+  const count = isNight ? (hour >= 18 ? daysPassed + 1 : daysPassed) : daysPassed;
+  const minutes = Math.round((hour % 1) * 60);
+  const shown = Math.floor(hour) % 12 || 12;
+  const time = `${shown}:${String(minutes).padStart(2, "0")} ${hour < 12 ? "AM" : "PM"}`;
+  return { hour, time, label: `${isNight ? "Night" : "Day"} ${count}` };
+}

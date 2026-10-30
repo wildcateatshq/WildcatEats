@@ -47,6 +47,7 @@
   <script type="module" src="/percentle.mjs"></script>
 </head>
 <body class="starting">
+  <div class="city" id="city" aria-hidden="true"></div>
   <div class="site-shell">
     <header class="topbar">
       <a class="wordmark" href="/percentle.html" aria-label="Chargle home"><span class="brand-mark" aria-hidden="true"><span class="battery-glyph"></span></span><span data-game-name="lower">chargle</span></a>
@@ -94,6 +95,7 @@
       <section class="game-card" id="gameCard" aria-live="polite">
         <div class="progress-row">
           <div class="q-counter" id="questionCounter"></div>
+          <div class="q-action" id="questionAction"></div>
         </div>
         <div id="questionStage"></div>
       </section>
