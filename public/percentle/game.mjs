@@ -296,10 +296,10 @@ export function roundsSurvived(guesses, questions, rate = DRAIN_RATE) {
   return isOutOfCharge(guesses, questions, rate) ? guesses.length - 1 : guesses.length;
 }
 
-// Endless mode's clock: a run starts at 9 PM and every round moves time on 45 minutes, so a long
-// run reaches morning (round 12), noon (round 20), and sunset, where night 2 starts (round 28).
+// Endless mode's clock: a run starts at 9 PM and every round moves time on an hour, so a long run
+// reaches morning (round 9), noon (round 15), and sunset, where night 2 starts (round 21).
 export const ENDLESS_START_HOUR = 21;
-export const ENDLESS_MINUTES_PER_ROUND = 45;
+export const ENDLESS_MINUTES_PER_ROUND = 60;
 
 export function endlessClock(round) {
   const total = ENDLESS_START_HOUR + (round * ENDLESS_MINUTES_PER_ROUND) / 60;

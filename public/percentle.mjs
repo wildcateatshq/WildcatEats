@@ -390,7 +390,7 @@ function render() {
   document.querySelector("#returnButton").hidden = !practiceMode;
   if (practiceMode || endlessMode) leaveStartScreen();
   document.querySelector("#puzzleNumber").innerHTML = endlessMode ? INFINITY_ICON : `NO. ${currentNumber}`;
-  // Endless runs keep a clock: 9 PM at the start, 45 minutes on with each round.
+  // Endless runs keep a clock: 9 PM at the start, an hour on with each round.
   const clock = endlessMode ? endlessClock(view.index) : null;
   city.setTime(clock ? clock.hour : null);
   document.querySelector("#puzzleDate").textContent = endlessMode ? `${endlessHard ? "HARD · " : ""}${clock.label} · ${clock.time}`.toUpperCase() : currentDate === today ? (currentTheme || "Today's edition").toUpperCase() : `${currentDate} · PRACTICE`;

@@ -222,15 +222,15 @@ test("hard mode and endless runs earn their own achievements", () => {
 
 test("endless mode's clock runs from 9 PM through the night, the next day and into night 2", () => {
   assert.deepEqual(endlessClock(0), { hour: 21, time: "9:00 PM", label: "Night 1" });
-  assert.equal(endlessClock(4).time, "12:00 AM");
-  assert.equal(endlessClock(4).label, "Night 1", "past midnight is still the first night");
-  assert.equal(endlessClock(12).time, "6:00 AM");
-  assert.equal(endlessClock(12).label, "Day 1", "morning");
-  assert.equal(endlessClock(20).time, "12:00 PM");
-  assert.equal(endlessClock(28).time, "6:00 PM");
-  assert.equal(endlessClock(28).label, "Night 2", "sunset starts the second night");
-  assert.equal(endlessClock(1).time, "9:45 PM");
-  assert.equal(endlessClock(45).label, "Day 2");
+  assert.equal(endlessClock(3).time, "12:00 AM");
+  assert.equal(endlessClock(3).label, "Night 1", "past midnight is still the first night");
+  assert.equal(endlessClock(9).time, "6:00 AM");
+  assert.equal(endlessClock(9).label, "Day 1", "morning");
+  assert.equal(endlessClock(15).time, "12:00 PM");
+  assert.equal(endlessClock(21).time, "6:00 PM");
+  assert.equal(endlessClock(21).label, "Night 2", "sunset starts the second night");
+  assert.equal(endlessClock(1).time, "10:00 PM");
+  assert.equal(endlessClock(34).label, "Day 2");
 });
 
 test("the moon's phase matches the U.S. Naval Observatory's 2026 phase times", async () => {
