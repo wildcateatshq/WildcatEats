@@ -136,8 +136,9 @@ const ANSWER_SHOWN_MS = 1450;
 // ...and the Next button fades in this long after that.
 const NEXT_BUTTON_DELAY_MS = 1000;
 let nextButtonTimer;
-// Running out of charge: the battery above drains to empty, shows "!" and the alarms go off.
-// While they're going, the lights flicker (once, a beat, twice quickly) and go out, and the
+// Running out of charge: the battery above drains to empty and shows "!", and the dark city
+// struggles to come back (its windows flicker faintly). Then the lights flicker (once, a beat,
+// twice quickly), the city flashing back on with them, and everything goes out; the
 // out-of-charge screen comes up. The flicker starts POWER_OUT_DELAY_MS after the guess is locked;
 // the other two count from the start of the flicker (1.7s long in percentle.css, with the lights
 // going out for good 75% of the way through).
@@ -384,8 +385,7 @@ function render() {
   const index = view.index;
   clearTimeout(powerOutTimer);
   clearTimeout(lightsOutTimer);
-  document.body.classList.remove("power-out", "lights-out");
-  document.querySelector(".alarm-lights")?.remove();
+  document.body.classList.remove("power-out", "lights-out", "struggling");
   // Only shown while replaying an archived puzzle, so players can leave it at any time.
   document.querySelector("#returnButton").hidden = !practiceMode;
   if (practiceMode || endlessMode) leaveStartScreen();
@@ -492,9 +492,7 @@ function renderScoreBox(progress, view, animate) {
 
 function soundAlarm(battery) {
   battery.classList.add("alarm");
-  if (!document.querySelector(".alarm-lights")) {
-    document.body.insertAdjacentHTML("beforeend", '<div class="alarm-lights" aria-hidden="true"><div class="alarm-glow"></div></div>');
-  }
+  document.body.classList.add("struggling");
 }
 
 // Slides the guess sideways away from the answer, then fades in the arrow and the real answer.
@@ -560,6 +558,8 @@ const ZAP = `<svg class="zap" viewBox="0 0 26 48" preserveAspectRatio="none" ari
 
 function powerOut() {
   const progress = progressFor();
+  // The struggle ends as the lights start to go: the city flashes with the flicker instead.
+  document.body.classList.remove("struggling");
   document.body.classList.add("power-out");
   lightsOutTimer = setTimeout(() => document.body.classList.add("lights-out"), LIGHTS_OUT_MS);
   powerOutTimer = setTimeout(() => {
