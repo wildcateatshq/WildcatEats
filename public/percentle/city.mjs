@@ -264,7 +264,6 @@ export function createCity(root) {
     const moon = root.querySelector(".moon");
     const sun = root.querySelector(".sun");
     if (!moon || !sun) return;
-    const place = (el, { x, y }) => { el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`; };
     if (hour === null) {
       // The daily puzzle's moon keeps its own fixed spot: top right on a wide screen, top left
       // beside the edition line on a phone.
@@ -276,6 +275,34 @@ export function createCity(root) {
     const h = ((hour % 24) + 24) % 24;
     place(moon, moonSpot(h));
     place(sun, sunSpot(h));
+  }
+
+  // Moves the moon or sun to a spot. Small moves glide straight there (the CSS transition); a long
+  // trip across the sky, like the moon's when Endless starts, follows a low rainbow arc instead,
+  // peaking a little below the top of the screen so it never leaves it.
+  const lastSpot = new WeakMap();
+  function place(el, to) {
+    const from = lastSpot.get(el);
+    lastSpot.set(el, to);
+    const at = p => `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px)`;
+    const far = from && Math.abs(to.x - from.x) > W * 0.3;
+    if (!far || reducedMotion() || root.classList.contains("placing") || !el.animate) {
+      el.style.transform = at(to);
+      return;
+    }
+    const margin = (W < 600 ? 16 : 30) + 12; // the moon's radius, plus a little sky above it
+    const peak = Math.max(margin, Math.min(from.y, to.y) - H * 0.07);
+    const control = { x: (from.x + to.x) / 2, y: (4 * peak - from.y - to.y) / 2 };
+    const frames = Array.from({ length: 31 }, (_, i) => {
+      const t = i / 30, u = 1 - t;
+      return { transform: at({ x: u * u * from.x + 2 * u * t * control.x + t * t * to.x, y: u * u * from.y + 2 * u * t * control.y + t * t * to.y }) };
+    });
+    el.getAnimations().forEach(animation => animation.cancel());
+    el.style.transition = "none"; // the arc animation does the moving; the CSS glide would fight it
+    el.style.transform = at(to);
+    el.animate(frames, { duration: 2000, easing: "cubic-bezier(.45,0,.25,1)" }).finished
+      .then(() => { el.style.transition = ""; })
+      .catch(() => {});
   }
 
   // Where the endless moon is at an hour. Every run starts at 9 PM with the moon in the top left, so
