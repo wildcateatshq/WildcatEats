@@ -134,6 +134,7 @@ export function createCity(root) {
       const lr = random(layer.seed);
       const base = H - (H - H * (layer.top + 0.12)) * scale;
       let shapes = "", lights = "", beacons = "";
+      let antennas = 0;
       let x = -px(10);
       while (x < W) {
         const bw = px(layer.w[0] + lr() * (layer.w[1] - layer.w[0]));
@@ -145,7 +146,8 @@ export function createCity(root) {
         if (lr() < 0.35) {
           const ax = x + px(bw / 2);
           shapes += `<rect x="${ax}" y="${by - P * 7}" width="${P / 1.5}" height="${P * 7}"/>`;
-          beacons += `<rect x="${ax - 1}" y="${by - P * 8}" width="${P}" height="${P}"/>`;
+          // Only every other antenna carries a warning light, so they stay a quiet detail.
+          if (antennas++ % 2 === 0) beacons += `<rect x="${ax - 1}" y="${by - P * 8}" width="${P}" height="${P}"/>`;
         }
         let windows = "";
         const cols = Math.max(1, Math.floor((bw - P * 2) / (P * 3)));

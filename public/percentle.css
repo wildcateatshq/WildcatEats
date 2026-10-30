@@ -387,7 +387,7 @@ body:not(.starting):has(.question-body) .source-note{padding:9px 12px;line-heigh
 .city .bw{opacity:0;transition:opacity .45s}
 .city .bw.on{opacity:var(--windows,1)}
 .city .w0{fill:#ffe09a}.city .w1{fill:#ffd27a}.city .w2{fill:#fff2c9}.city .wn{fill:#fff3c4}
-.city .beacons{fill:#ff4d4d;animation:city-beacon 1.6s steps(1) infinite}
+.city .beacons{fill:#d9473a;opacity:.55;animation:city-beacon 3.2s ease-in-out infinite}
 .city.out .beacons{display:none}
 .city.low .bw.on:nth-child(3n){animation:city-flicker 2.2s steps(1) infinite}
 .city-glow{position:absolute;left:-10%;right:-10%;bottom:0;height:46%;background:radial-gradient(ellipse 60% 70% at 50% 100%,rgba(255,200,110,.38),transparent 70%);opacity:var(--glow,1);transition:opacity 1s}
@@ -410,6 +410,6 @@ body.hard .burst{fill:#c45cff}body.hard .burst-1{fill:#ff8ad8}body.hard .burst-2
 @keyframes city-burst{0%{transform:scale(.15);opacity:0}12%{opacity:1}70%{opacity:.9}100%{transform:scale(1.12);opacity:0}}
 @keyframes city-rain{to{transform:translate(-4px,24px)}}
 @keyframes city-drift{from{transform:translateX(-30px)}to{transform:translateX(30px)}}
-@keyframes city-beacon{50%{opacity:.15}}
+@keyframes city-beacon{0%,100%{opacity:.55}50%{opacity:.08}}
 @keyframes city-flicker{0%,100%{opacity:var(--windows,1)}40%{opacity:.15}46%{opacity:var(--windows,1)}70%{opacity:.3}74%{opacity:var(--windows,1)}}
 @media(prefers-reduced-motion:reduce){.city *{animation:none!important;transition:none!important}}
