@@ -110,7 +110,7 @@ export function createCity(root) {
     // later. Each pixel of the moon is lit or in shadow by the phase: a waxing moon is lit on the
     // right, a waning one on the left (as seen from the US), and the shadowed part shows faintly.
     // The lit part shows the darker seas and the bright crater Tycho.
-    const moonR = phone ? 14 : 22;
+    const moonR = phone ? 16 : 30;
     const phase = moonPhase();
     const terminator = Math.cos(2 * Math.PI * phase);
     let moon = "";
