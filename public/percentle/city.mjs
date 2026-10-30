@@ -222,7 +222,10 @@ export function createCity(root) {
       </svg>
       <div class="city-scan"></div>`;
     buildings = [...root.querySelectorAll(".bw")].map((el, i) => ({ el, cutoff: Number(el.dataset.cutoff), ...layout[i] }));
+    // Place the moon and sun without gliding in from the corner.
+    root.classList.add("placing");
     refresh();
+    requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("placing")));
   }
 
   function refresh() {
@@ -257,22 +260,48 @@ export function createCity(root) {
     style.setProperty("--glow", out ? "0" : (night * (0.25 + (shown / 100) * 0.75)).toFixed(3));
     style.setProperty("--daylight", sky.day.toFixed(3));
 
-    // The moon and sun cross the sky. The daily puzzle's moon sits still in a fixed spot.
+    // The moon and sun cross the sky, gliding from spot to spot (see .moon/.sun in percentle.css).
     const moon = root.querySelector(".moon");
     const sun = root.querySelector(".sun");
     if (!moon || !sun) return;
+    const place = (el, { x, y }) => { el.style.transform = `translate(${x.toFixed(1)}px, ${y.toFixed(1)}px)`; };
     if (hour === null) {
+      // The daily puzzle's moon keeps its own fixed spot: top right on a wide screen, top left
+      // beside the edition line on a phone.
       const phone = W < 600;
-      moon.setAttribute("transform", `translate(${phone ? W * 0.075 : W * 0.84} ${phone ? H * 0.125 : H * 0.12})`);
-      sun.setAttribute("transform", `translate(${W / 2} ${H * 2})`);
-    } else {
-      const h = ((hour % 24) + 24) % 24;
-      const arc = (progress, low, high) => `translate(${(W * (0.08 + 0.84 * progress)).toFixed(1)} ${(H * (low - (low - high) * Math.sin(Math.PI * progress))).toFixed(1)})`;
-      const nightProgress = ((h - 18 + 24) % 24) / 12; // 6 PM to 6 AM
-      const dayProgress = (h - 6) / 12; // 6 AM to 6 PM
-      moon.setAttribute("transform", nightProgress <= 1 ? arc(nightProgress, 0.3, 0.06) : `translate(${W / 2} ${H * 2})`);
-      sun.setAttribute("transform", dayProgress >= 0 && dayProgress <= 1 ? arc(dayProgress, 0.3, 0.05) : `translate(${W / 2} ${H * 2})`);
+      place(moon, { x: W * (phone ? 0.075 : 0.84), y: H * (phone ? 0.125 : 0.12) });
+      place(sun, sunSpot(21));
+      return;
     }
+    const h = ((hour % 24) + 24) % 24;
+    place(moon, moonSpot(h));
+    place(sun, sunSpot(h));
+  }
+
+  // Where the endless moon is at an hour. Every run starts at 9 PM with the moon in the top left, so
+  // pressing Endless glides it across the sky from the daily spot. From 6 PM it rises to that spot;
+  // through the night it drifts across the sky, a little higher around midnight, and sets on the
+  // far side by dawn. In daylight it waits below the horizon on the left, where it rises again.
+  function moonSpot(h) {
+    const phone = W < 600;
+    const nine = { x: W * (phone ? 0.075 : 0.16), y: H * (phone ? 0.125 : 0.12) };
+    const rise = { x: W * 0.02, y: H * 0.34 };
+    const since = (h - 18 + 24) % 24; // hours since 6 PM
+    if (since > 12) return { x: rise.x, y: H * 0.62 };
+    if (since <= 3) {
+      const t = 1 - (1 - since / 3) ** 2;
+      return { x: rise.x + (nine.x - rise.x) * t, y: rise.y + (nine.y - rise.y) * t };
+    }
+    const t = (since - 3) / 9; // 9 PM to 6 AM
+    return { x: nine.x + (W * 0.95 - nine.x) * t, y: nine.y - H * 0.05 * Math.sin(Math.PI * t) + (H * 0.36 - nine.y) * t * t };
+  }
+
+  // Where the sun is at an hour: rising on the left at 6 AM, highest at noon, setting on the right
+  // at 6 PM. At night it waits below the horizon on the left, where it rises next.
+  function sunSpot(h) {
+    const t = (h - 6) / 12;
+    if (t < 0 || t > 1) return { x: W * 0.08, y: H * 0.62 };
+    return { x: W * (0.08 + 0.84 * t), y: H * (0.3 - 0.25 * Math.sin(Math.PI * t)) };
   }
 
   // A wave through the windows, rippling out from a point on the skyline (the middle by default).
