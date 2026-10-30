@@ -136,13 +136,16 @@ const ANSWER_SHOWN_MS = 1450;
 // ...and the Next button fades in this long after that.
 const NEXT_BUTTON_DELAY_MS = 1000;
 let nextButtonTimer;
-// Running out of charge: the battery above drains to empty and shows a blinking "!", the city
-// blacks out, and the view rises into the night sky above it (city.outOfCharge). Partway up,
-// POWER_OUT_DELAY_MS after the guess was locked, the screen dims for POWER_OUT_MS and the
-// out-of-charge screen comes up over the sky.
-const POWER_OUT_DELAY_MS = 4800;
-const POWER_OUT_MS = 800;
+// Running out of charge: the battery drains to empty and the city blacks out (city.outOfCharge).
+// After a beat (HIDE_GAME_MS) the whole game fades away, leaving just the city, and the view drifts
+// slowly up into the night sky. Once it's at the top, the out-of-charge screen pops up over the
+// sky. POWER_OUT_DELAY_MS after the guess was locked is only a safety net, in case the blackout
+// never started (say, the battery's drain was cut short).
+const HIDE_GAME_MS = 1000;
+const POWER_OUT_DELAY_MS = 13000;
+const POWER_OUT_DELAY_REDUCED_MS = 4000;
 let powerOutTimer;
+let hideGameTimer;
 
 // Answers always have exactly one decimal place, even if a puzzle was stored with more.
 function withRoundedAnswers(questions) {
@@ -380,7 +383,8 @@ function render() {
   applyHardLook();
   const index = view.index;
   clearTimeout(powerOutTimer);
-  document.body.classList.remove("power-out");
+  clearTimeout(hideGameTimer);
+  document.body.classList.remove("ascending");
   // Only shown while replaying an archived puzzle, so players can leave it at any time.
   document.querySelector("#returnButton").hidden = !practiceMode;
   if (practiceMode || endlessMode) leaveStartScreen();
@@ -479,15 +483,15 @@ function renderScoreBox(progress, view, animate) {
   const shown = Math.max(0, charge);
   const from = shownScore?.key === key ? shownScore.value : animate ? Math.max(0, previous) : shown;
   shownScore = { key, value: shown };
-  // Only the reveal of a guess that runs the battery out sounds the alarm, once it has drained to empty.
+  // Only the reveal of a guess that runs the battery out starts the blackout, once it has drained to empty.
   const alarm = animate && view.phase === "reveal" && charge < 0;
   if (animate && view.phase === "reveal" && lastOff > 0) city.wave("down");
-  animateBattery(battery, from, shown, 1400).then(finished => { if (finished && alarm) soundAlarm(battery); });
+  animateBattery(battery, from, shown, 1400).then(finished => { if (finished && alarm) soundAlarm(); });
 }
 
-function soundAlarm(battery) {
-  battery.classList.add("alarm");
-  city.outOfCharge();
+function soundAlarm() {
+  city.outOfCharge(powerOut);
+  hideGameTimer = setTimeout(() => document.body.classList.add("ascending"), HIDE_GAME_MS);
 }
 
 // Slides the guess sideways away from the answer, then fades in the arrow and the real answer.
@@ -506,7 +510,7 @@ function playReveal(animate) {
   clearTimeout(nextButtonTimer);
   if (isOutOfCharge(progressFor().guesses, currentQuestions, rateOf())) {
     next.remove();
-    powerOutTimer = setTimeout(powerOut, POWER_OUT_DELAY_MS);
+    powerOutTimer = setTimeout(powerOut, matchMedia("(prefers-reduced-motion: reduce)").matches ? POWER_OUT_DELAY_REDUCED_MS : POWER_OUT_DELAY_MS);
   }
   if (!animate) {
     row.classList.add("instant", "go");
@@ -553,12 +557,11 @@ const ZAP = `<svg class="zap" viewBox="0 0 26 48" preserveAspectRatio="none" ari
 
 function powerOut() {
   const progress = progressFor();
-  document.body.classList.add("power-out");
-  powerOutTimer = setTimeout(() => {
-    progress.revealed = progress.guesses.length;
-    save();
-    render();
-  }, POWER_OUT_MS);
+  if (progress.revealed >= progress.guesses.length) return; // already showing the results
+  progress.revealed = progress.guesses.length;
+  save();
+  window.scrollTo({ top: 0 });
+  render();
 }
 
 function guessForm(guess) {

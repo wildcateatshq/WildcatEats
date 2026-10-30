@@ -198,20 +198,13 @@ body.starting .intro,body.starting #gameCard,body.starting #recap{display:none}
 .battery-glyph::after{content:"";position:absolute;left:100%;top:50%;width:2px;height:4px;margin-left:1px;transform:translateY(-50%);border-radius:0 1px 1px 0;background:currentColor}
 .start-mark .battery-glyph{transform:scale(2)}
 @media(max-width:520px){.bar-battery{height:44px}.score-battery{height:66px}.result-battery{height:90px}.battery-value{font-size:26px}}
-/* Out of charge, step 1: the empty battery shows a blinking "!" as the city blacks out and the view
-   rises into the sky (see the city section). */
-.battery.alarm{animation:alarm-border .7s steps(1) infinite}
-@keyframes alarm-border{50%{border-color:var(--negative)}}
-.battery.alarm .battery-value{visibility:hidden}
-.battery.alarm .battery-cell::after{content:"!";position:absolute;inset:0;display:grid;place-items:center;z-index:3;font:700 46px/1 var(--display);color:var(--negative);animation:alarm-blink .7s steps(1) infinite}
-@keyframes alarm-blink{50%{opacity:.2}}
-/* Step 2: the game dims and the out-of-charge screen comes up over the night sky. */
-.power-out .site-shell{animation:power-out .8s ease-in forwards}
-@keyframes power-out{to{filter:grayscale(1) brightness(.25)}}
-/* The out-of-charge screen stays powered down: all gray, no glow, and it fades up out of the dark. */
-body.dead,body.power-out{background:var(--paper)}
-.dead .site-shell{filter:grayscale(1) brightness(.82);animation:power-dim .9s ease-out both}
-@keyframes power-dim{from{filter:grayscale(1) brightness(.3)}to{filter:grayscale(1) brightness(.82)}}
+/* Out of charge: the city blacks out, then the whole game fades away (body.ascending) while the
+   view drifts up into the night sky (see the city section). At the top the out-of-charge screen
+   pops up over the sky, in powered-down gray. */
+body.ascending .site-shell{opacity:0;pointer-events:none;transition:opacity 1s ease}
+body.dead{background:var(--paper)}
+.dead .site-shell{filter:grayscale(1) brightness(.82);animation:results-pop .7s cubic-bezier(.2,.9,.3,1.15) both}
+@keyframes results-pop{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
 .dead *{box-shadow:none!important;text-shadow:none!important}
 .dead-score{padding-top:34px}
 .dead-battery .battery-value{display:none}
@@ -452,7 +445,7 @@ body.entering #gameCard{animation-delay:.06s}
    moonlit edge along the rooftops, then the whole view rises by --pan into the sky above the city,
    where the Milky Way, nebulae and a ringed planet are waiting. It stays up through the
    out-of-charge screen. */
-.city-world{position:absolute;inset:0;transition:transform 3.6s cubic-bezier(.45,0,.2,1)}
+.city-world{position:absolute;inset:0;transition:transform 6s cubic-bezier(.4,0,.25,1)}
 .city.skyward .city-world,body.dead .city .city-world{transform:translateY(var(--pan,0))}
 body.dead .city:not(.skyward) .city-world{transition:none}
 .city-space{position:absolute;left:0;width:100%;shape-rendering:crispEdges}

@@ -522,12 +522,18 @@ export function createCity(root) {
   }
 
   // The battery has run out: every building goes black against the sky, and after a beat the view
-  // rises slowly up into the night above the city.
+  // rises slowly up into the night above the city. onTop runs once the view has reached the top.
   const RISE_DELAY_MS = 1100;
-  function outOfCharge() {
+  const RISE_MS = 6000; // keep in step with .city-world's transition in percentle.css
+  function outOfCharge(onTop) {
     rising = true;
     root.classList.add("blackout");
-    setTimeout(() => { if (rising || document.body.classList.contains("dead")) root.classList.add("skyward"); }, reducedMotion() ? 0 : RISE_DELAY_MS);
+    const still = reducedMotion();
+    setTimeout(() => {
+      if (!rising) return;
+      root.classList.add("skyward");
+      setTimeout(() => { if (rising) onTop?.(); }, still ? 600 : RISE_MS + 150);
+    }, still ? 0 : RISE_DELAY_MS);
   }
 
   // Pixel fireworks in the open sky beside the final battery.
