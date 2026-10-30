@@ -4,6 +4,10 @@
 // fireworks, hard mode turns the night into a purple storm, and in endless mode the clock moves on
 // each round (night, dawn, day, dusk, night again).
 //
+// Running out of charge blacks the city out (every building a dead silhouette), then the view
+// rises up into the night sky above it: the Milky Way, nebulae, and a distant ringed planet
+// (outOfCharge). The out-of-charge screen sits over that sky.
+//
 // Every drain sends a wave of dimming out through the windows from the middle of the skyline, and a supercharge sends a wave of
 // light out from where the lightning hit.
 //
@@ -92,6 +96,8 @@ export function createCity(root) {
   let H = 0;
   let P = 3;
   let waveTimer = 0;
+  let rising = false; // from the battery running out until the out-of-charge screen is up
+  let PAN = 0; // how far the view rises
 
   function build() {
     W = window.innerWidth;
@@ -212,7 +218,73 @@ export function createCity(root) {
       city += `<g class="row row-${n}">${shapes}</g><g class="lights">${lights}</g><g class="beacons">${beacons}</g>`;
     });
 
-    root.innerHTML = `<div class="city-glow"></div>
+    // The sky above the view, seen when it rises after the battery runs out.
+    PAN = Math.round(H * 0.8);
+    const sky = random(57);
+    let deepStars = "";
+    for (let i = 0; i < (phone ? 110 : 260); i++) {
+      const size = sky() < 0.12 ? P : P / 1.5;
+      deepStars += `<rect x="${px(sky() * W)}" y="${px(sky() * PAN)}" width="${size}" height="${size}" opacity="${(0.3 + sky() * 0.7).toFixed(2)}"/>`;
+    }
+    // The Milky Way: a soft diagonal band of faint stars and glow.
+    let galaxy = "";
+    for (let i = 0; i < (phone ? 220 : 520); i++) {
+      const t = sky();
+      const spread = (sky() + sky() + sky() - 1.5) * PAN * 0.16;
+      const gx = t * W, gy = PAN * 0.92 - t * PAN * 0.8 + spread;
+      galaxy += `<rect x="${px(gx)}" y="${px(gy)}" width="${P / 1.5}" height="${P / 1.5}" opacity="${(0.15 + sky() * 0.5).toFixed(2)}"/>`;
+    }
+    // A ringed planet in open sky (beside the game on a wide screen), lit from the left, with a moon.
+    const R = phone ? 30 : 56;
+    const gutter = (W - 720) / 2;
+    const planetX = phone ? W * 0.74 : gutter > R * 3.2 ? W - gutter / 2 : W * 0.86;
+    const planetY = PAN * (phone ? 0.3 : 0.42);
+    const bands = ["#7fb8c9", "#9fd0db", "#6aa2b8", "#b8e0e4", "#5b8fa8", "#8cc4d1"];
+    const ringPixel = (back) => {
+      let out = "";
+      for (let a = 0; a < 360; a += 2) {
+        const ang = a * Math.PI / 180;
+        for (const k of [1.55, 1.75, 1.95]) {
+          const rx = Math.cos(ang) * R * k, ry = Math.sin(ang) * R * k * 0.28;
+          const x = rx * 0.97 - ry * 0.26, y = rx * 0.26 + ry * 0.97; // tilted
+          if ((ry < 0) !== back) continue;
+          out += `<rect x="${px(x)}" y="${px(y)}" width="${P}" height="${P}" opacity="${k === 1.75 ? 0.9 : 0.55}"/>`;
+        }
+      }
+      return out;
+    };
+    let planet = "";
+    for (let y = -R; y <= R; y += P) for (let x = -R; x <= R; x += P) {
+      if (x * x + y * y > R * R) continue;
+      const band = bands[Math.floor(((y / R + 1) / 2) * bands.length * 1.5) % bands.length];
+      const light = 0.45 + 0.55 * Math.max(0, (-x / R) * 0.7 + 0.5 - Math.hypot(x, y) / R * 0.25);
+      planet += `<rect x="${x}" y="${y}" width="${P}" height="${P}" fill="${band}" opacity="${Math.min(1, light).toFixed(2)}"/>`;
+    }
+    const mr = Math.round(R * 0.2);
+    const moonlet = `<g transform="translate(${(-R * 2.4).toFixed(0)} ${(-R * 1.2).toFixed(0)})"><circle r="${mr}"/><circle r="${mr}" cx="${(mr * 0.45).toFixed(1)}" fill="#02050c" opacity=".55"/></g>`;
+    const space = `<svg class="city-space" viewBox="0 0 ${W} ${PAN}" preserveAspectRatio="none" style="height:${PAN}px;top:-${PAN}px">
+        <defs>
+          <linearGradient id="spaceFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#010208"/><stop offset=".7" stop-color="#02050c" stop-opacity=".6"/><stop offset="1" stop-color="#02050c" stop-opacity="0"/></linearGradient>
+          <radialGradient id="nebulaA"><stop offset="0" stop-color="#8a5cff" stop-opacity=".22"/><stop offset="1" stop-color="#8a5cff" stop-opacity="0"/></radialGradient>
+          <radialGradient id="nebulaB"><stop offset="0" stop-color="#3fa9d9" stop-opacity=".18"/><stop offset="1" stop-color="#3fa9d9" stop-opacity="0"/></radialGradient>
+          <radialGradient id="planetGlow"><stop offset=".55" stop-color="#9fd0db" stop-opacity=".18"/><stop offset="1" stop-color="#9fd0db" stop-opacity="0"/></radialGradient>
+        </defs>
+        <rect width="${W}" height="${PAN}" fill="url(#spaceFade)"/>
+        <ellipse cx="${(W * 0.3).toFixed(0)}" cy="${(PAN * 0.55).toFixed(0)}" rx="${(W * 0.45).toFixed(0)}" ry="${(PAN * 0.22).toFixed(0)}" fill="url(#nebulaA)"/>
+        <ellipse cx="${(W * 0.62).toFixed(0)}" cy="${(PAN * 0.32).toFixed(0)}" rx="${(W * 0.35).toFixed(0)}" ry="${(PAN * 0.18).toFixed(0)}" fill="url(#nebulaB)"/>
+        <g class="galaxy">${galaxy}</g>
+        <g class="deep-stars">${deepStars}</g>
+        <g class="planet" transform="translate(${planetX.toFixed(0)} ${planetY.toFixed(0)})">
+          <circle r="${R * 1.6}" fill="url(#planetGlow)"/>
+          <g class="planet-ring">${ringPixel(true)}</g>
+          <g class="planet-body">${planet}</g>
+          <g class="planet-ring">${ringPixel(false)}</g>
+          <g class="planet-moon">${moonlet}</g>
+        </g>
+        <path class="shooting-star" d="M${(W * 0.15).toFixed(0)},${(PAN * 0.18).toFixed(0)} l${(W * 0.12).toFixed(0)},${(PAN * 0.06).toFixed(0)}"/>
+      </svg>`;
+
+    root.innerHTML = `<div class="city-world"><div class="city-glow"></div>
       <svg class="city-scene" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">
         <defs><radialGradient id="sunGlow"><stop offset="0" stop-color="#ffd86b" stop-opacity=".35"/><stop offset="1" stop-color="#ffd86b" stop-opacity="0"/></radialGradient></defs>
         <g class="stars">${stars}</g>
@@ -223,8 +295,10 @@ export function createCity(root) {
         <g class="pylon">${pylon}</g>
         ${city}
       </svg>
+      ${space}</div>
       <div class="city-scan"></div>`;
     buildings = [...root.querySelectorAll(".bw")].map((el, i) => ({ el, cutoff: Number(el.dataset.cutoff), ...layout[i] }));
+    root.style.setProperty("--pan", `${PAN}px`);
     // Place the moon and sun without gliding in from the corner.
     root.classList.add("placing");
     refresh();
@@ -241,6 +315,8 @@ export function createCity(root) {
     for (const building of buildings) building.el.classList.toggle("on", building.cutoff < shown);
     root.classList.toggle("out", out);
     root.classList.toggle("low", shown > 0 && shown < 20);
+    if (body.classList.contains("dead")) rising = false;
+    else if (!rising) root.classList.remove("blackout", "skyward");
 
     const sky = skyAt(hour ?? 0);
     const night = 1 - sky.day;
@@ -445,6 +521,15 @@ export function createCity(root) {
     }, duration);
   }
 
+  // The battery has run out: every building goes black against the sky, and after a beat the view
+  // rises slowly up into the night above the city.
+  const RISE_DELAY_MS = 1100;
+  function outOfCharge() {
+    rising = true;
+    root.classList.add("blackout");
+    setTimeout(() => { if (rising || document.body.classList.contains("dead")) root.classList.add("skyward"); }, reducedMotion() ? 0 : RISE_DELAY_MS);
+  }
+
   // Pixel fireworks in the open sky beside the final battery.
   function fireworks() {
     if (reducedMotion() || !buildings.length) return;
@@ -489,6 +574,7 @@ export function createCity(root) {
       refresh();
     },
     wave,
+    outOfCharge,
     strike,
     fireworks
   };

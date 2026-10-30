@@ -136,10 +136,11 @@ const ANSWER_SHOWN_MS = 1450;
 // ...and the Next button fades in this long after that.
 const NEXT_BUTTON_DELAY_MS = 1000;
 let nextButtonTimer;
-// Running out of charge: the battery above drains to empty (the city goes dark with it) and shows
-// a blinking "!". POWER_OUT_DELAY_MS after the guess was locked, the screen dims for POWER_OUT_MS
-// and the out-of-charge screen comes up.
-const POWER_OUT_DELAY_MS = 3300;
+// Running out of charge: the battery above drains to empty and shows a blinking "!", the city
+// blacks out, and the view rises into the night sky above it (city.outOfCharge). Partway up,
+// POWER_OUT_DELAY_MS after the guess was locked, the screen dims for POWER_OUT_MS and the
+// out-of-charge screen comes up over the sky.
+const POWER_OUT_DELAY_MS = 4800;
 const POWER_OUT_MS = 800;
 let powerOutTimer;
 
@@ -486,6 +487,7 @@ function renderScoreBox(progress, view, animate) {
 
 function soundAlarm(battery) {
   battery.classList.add("alarm");
+  city.outOfCharge();
 }
 
 // Slides the guess sideways away from the answer, then fades in the arrow and the real answer.
