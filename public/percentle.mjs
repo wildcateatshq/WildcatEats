@@ -136,11 +136,12 @@ const ANSWER_SHOWN_MS = 1450;
 // ...and the Next button fades in this long after that.
 const NEXT_BUTTON_DELAY_MS = 1000;
 let nextButtonTimer;
-// Running out of charge: the battery above drains to empty (the city's tower is the last building
-// lit) and shows "!"; sparks burst from the tower as it goes dark, and a second later it crumbles
-// (city.powerFail). Once it has fallen, POWER_OUT_DELAY_MS after the guess was locked, the screen
-// dims for POWER_OUT_MS and the out-of-charge screen comes up.
-const POWER_OUT_DELAY_MS = 4200;
+// Running out of charge: the battery above drains to empty (a few of the city tower's windows are
+// the last lights on) and shows "!"; the tower's last lights flicker as it crumbles, and a second
+// after it has fallen a small fire starts on the rubble (city.powerFail). With the fire burning,
+// POWER_OUT_DELAY_MS after the guess was locked, the screen dims for POWER_OUT_MS and the
+// out-of-charge screen comes up.
+const POWER_OUT_DELAY_MS = 5300;
 const POWER_OUT_MS = 800;
 let powerOutTimer;
 
