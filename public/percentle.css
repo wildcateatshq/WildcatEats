@@ -361,6 +361,7 @@ body:not(.starting):has(.question-body) .source-note{padding:9px 12px;line-heigh
 .city-scene{shape-rendering:crispEdges}
 .city .stars{fill:#cfe3ff;opacity:var(--stars,.3);transition:opacity 1s}
 .city .moon{fill:#fff6d8;opacity:calc(1 - var(--daylight,0) * 1.6)}
+.city .moon .moon-dark{opacity:.1}
 .city .sun{fill:#ffe9a0;opacity:var(--daylight,0)}
 .city .sun-glow{fill:url(#sunGlow)}
 .city .clouds{fill:#e8eefc;opacity:calc(var(--daylight,0) * .3);animation:city-drift 90s ease-in-out infinite alternate}

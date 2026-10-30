@@ -59,6 +59,16 @@ function random(seed) {
 
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+// Where the moon is in its cycle at a moment: 0 new, 0.25 first quarter, 0.5 full, 0.75 last
+// quarter. It counts lunar months (29.53 days on average) from a known new moon; the real sky can
+// run up to about half a day either side of that average, which can't be seen at this size.
+const KNOWN_NEW_MOON = Date.UTC(2000, 0, 6, 18, 14);
+const LUNAR_MONTH_DAYS = 29.530588853;
+export function moonPhase(date = new Date()) {
+  const months = (date.getTime() - KNOWN_NEW_MOON) / 86400000 / LUNAR_MONTH_DAYS;
+  return ((months % 1) + 1) % 1;
+}
+
 export function createCity(root) {
   let level = 100;
   let hour = null; // null: the daily puzzle's fixed late night
@@ -82,13 +92,19 @@ export function createCity(root) {
       const size = r() < 0.15 ? P : P / 1.5;
       stars += `<rect x="${px(r() * W)}" y="${px(r() * H * 0.62)}" width="${size}" height="${size}" opacity="${(0.25 + r() * 0.75).toFixed(2)}"/>`;
     }
-    // A pixel crescent moon and a pixel sun, drawn around (0, 0) and moved into place later.
+    // The moon as it really is tonight, and a pixel sun, drawn around (0, 0) and moved into place
+    // later. Each pixel of the moon is lit or in shadow by the phase: a waxing moon is lit on the
+    // right, a waning one on the left (as seen from the US), and the shadowed part shows faintly.
     const moonR = phone ? 12 : 22;
+    const phase = moonPhase();
+    const terminator = Math.cos(2 * Math.PI * phase);
     let moon = "";
     for (let y = -moonR; y <= moonR; y += P) for (let x = -moonR; x <= moonR; x += P) {
-      if (x * x + y * y <= moonR * moonR && (x + moonR * 0.45) ** 2 + (y - moonR * 0.1) ** 2 > (moonR * 0.85) ** 2) {
-        moon += `<rect x="${x}" y="${y}" width="${P}" height="${P}"/>`;
-      }
+      const cx = x + P / 2, cy = y + P / 2;
+      if (cx * cx + cy * cy > moonR * moonR) continue;
+      const edge = Math.sqrt(moonR * moonR - cy * cy) * terminator;
+      const lit = phase < 0.5 ? cx >= edge : cx <= -edge;
+      moon += `<rect class="${lit ? "moon-lit" : "moon-dark"}" x="${x}" y="${y}" width="${P}" height="${P}"/>`;
     }
     const sunR = phone ? 11 : 24;
     let sun = `<circle r="${sunR * 3}" class="sun-glow"/>`;

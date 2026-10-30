@@ -227,7 +227,9 @@ out as the city's glow fades. A supercharge strikes it with lightning along the 
 20% the last lights flicker, 0% is a blackout, and finishing with 60% or more (`FIREWORKS_AT`) sets
 off fireworks. Hard mode turns it into a purple storm. In endless mode a clock runs from 9 PM, 45
 minutes per round (`endlessClock` in `game.mjs`), through dawn, day and dusk into night 2, and the
-sky, sun and moon follow it. The scene is drawn once per screen width and then only switches
+sky, sun and moon follow it. The moon shows its real phase for the night (`moonPhase` in
+`city.mjs`, counted in lunar months from a known new moon and checked in the tests against the U.S.
+Naval Observatory's 2026 phase times). The scene is drawn once per screen width and then only switches
 buildings and colors, and it holds still under reduced motion.
 
 The palette is bright light rather than green: lit things look like a bulb, a white-hot face with a

@@ -232,3 +232,18 @@ test("endless mode's clock runs from 9 PM through the night, the next day and in
   assert.equal(endlessClock(1).time, "9:45 PM");
   assert.equal(endlessClock(45).label, "Day 2");
 });
+
+test("the moon's phase matches the U.S. Naval Observatory's 2026 phase times", async () => {
+  const { moonPhase } = await import("../public/percentle/city.mjs");
+  // [UTC moment, expected phase]: new 0, first quarter 0.25, full 0.5, last quarter 0.75.
+  const official = [
+    ["2026-09-11T03:27Z", 0], ["2026-09-18T20:44Z", 0.25], ["2026-09-26T16:49Z", 0.5], ["2026-10-03T13:25Z", 0.75],
+    ["2026-10-10T15:50Z", 0], ["2026-10-18T16:12Z", 0.25], ["2026-10-26T04:12Z", 0.5], ["2026-11-01T20:28Z", 0.75],
+    ["2026-11-09T07:02Z", 0], ["2026-12-24T01:28Z", 0.5]
+  ];
+  for (const [moment, expected] of official) {
+    const phase = moonPhase(new Date(moment));
+    const gap = Math.min(Math.abs(phase - expected), 1 - Math.abs(phase - expected));
+    assert.ok(gap < 0.035, `${moment}: phase ${phase.toFixed(3)}, expected ${expected}`);
+  }
+});
