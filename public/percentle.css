@@ -413,23 +413,11 @@ body.hard .burst{fill:#c45cff}body.hard .burst-1{fill:#ff8ad8}body.hard .burst-2
 @keyframes city-flicker{0%,100%{opacity:var(--windows,1)}40%{opacity:.15}46%{opacity:var(--windows,1)}70%{opacity:.3}74%{opacity:var(--windows,1)}}
 @media(prefers-reduced-motion:reduce){.city *{animation:none!important;transition:none!important}}
 
-/* The power line from the battery to the city, with current flowing along it (city.mjs). */
-.city-cable{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-.city-cable.off{display:none}
-.city-cable path{fill:none;stroke-linecap:round;stroke-linejoin:round}
-.cable-wire{stroke:#3b3424;stroke-width:2.5}
-.cable-glow{stroke:var(--halo);stroke-width:5;opacity:calc(var(--flow,1) * .18)}
-.cable-flow{stroke:#fff6dc;stroke-width:2.5;stroke-dasharray:4 22;opacity:var(--flow,1);animation:cable-flow var(--flow-time,1s) linear infinite;filter:drop-shadow(0 0 3px var(--halo))}
-.city.out .cable-flow,.city.out .cable-glow{display:none}
-.city.surge .cable-flow{stroke:#fffef8;stroke-width:4;stroke-dasharray:14 10;opacity:1;animation-duration:.22s;filter:drop-shadow(0 0 6px var(--halo)) drop-shadow(0 0 14px var(--halo))}
-.city.surge .cable-glow{opacity:.5}
-body.hard .cable-wire{stroke:#2e2140}body.hard .cable-flow{stroke:#f0dcff}
-@keyframes cable-flow{to{stroke-dashoffset:-26}}
 
 /* Charging up on the way into a game: a bolt beside the battery pulses while it fills. */
 .battery.charging::before{content:"";position:absolute;left:-30px;top:50%;width:16px;height:24px;transform:translateY(-50%);background:var(--halo);clip-path:polygon(60% 0,0 58%,45% 58%,30% 100%,100% 38%,55% 38%,75% 0);filter:drop-shadow(0 0 6px var(--halo));animation:charging-bolt .5s ease-in-out infinite alternate}
 @keyframes charging-bolt{from{opacity:.45;transform:translateY(-50%) scale(.9)}to{opacity:1;transform:translateY(-50%) scale(1.08)}}
-@media(prefers-reduced-motion:reduce){.cable-flow,.battery.charging::before{animation:none}}
+@media(prefers-reduced-motion:reduce){.battery.charging::before{animation:none}}
 
 /* Pressing Play: the start screen fades and lifts away, then the game rises into place. */
 body.leaving .start-screen{animation:start-out .34s ease-in forwards}
@@ -437,3 +425,20 @@ body.entering .intro,body.entering #gameCard{animation:game-in .6s cubic-bezier(
 body.entering #gameCard{animation-delay:.06s}
 @keyframes start-out{to{opacity:0;transform:translateY(-14px) scale(.98)}}
 @keyframes game-in{from{opacity:0;transform:translateY(18px)}}
+
+/* Power lines over the rooftops, with pulses of current riding along the wires (city.mjs). */
+.city .poles{fill:var(--row-1,#081014)}
+.city .wire{fill:none;stroke:#5a523d;stroke-width:1.4;opacity:.85}
+.city .wire-flow{fill:none;stroke:#fff3c4;stroke-width:1.6;stroke-linecap:round;stroke-dasharray:7 44;opacity:var(--flow,1);animation:wire-flow var(--flow-time,1s) linear infinite;filter:drop-shadow(0 0 2px var(--halo))}
+.city.out .wire-flow{display:none}
+.city.surge .wire-flow{stroke:#fffef8;stroke-width:2.4;stroke-dasharray:16 12;opacity:1;animation-duration:.2s;filter:drop-shadow(0 0 4px var(--halo)) drop-shadow(0 0 10px var(--halo))}
+body.hard .city .wire-flow{stroke:#f0dcff}body.hard .city .wire{stroke:#4a3866}
+@keyframes wire-flow{to{stroke-dashoffset:-51}}
+
+/* A wave through the windows (city.mjs wave()): each building's delay grows with its distance from
+   where the wave starts, and lights switching on or off follow the same delay. */
+.city .bw{transition:opacity .45s var(--wave-delay,0s)}
+.city.wave-down .bw.on{animation:wave-dip .9s ease-in-out var(--wave-delay,0s) both}
+.city.wave-up .bw.on{animation:wave-flare .9s ease-out var(--wave-delay,0s) both}
+@keyframes wave-dip{0%,100%{opacity:var(--windows,1)}40%{opacity:calc(var(--windows,1) * .2)}}
+@keyframes wave-flare{0%,100%{filter:none}35%{filter:brightness(1.9)}}

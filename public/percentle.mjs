@@ -85,8 +85,6 @@ function recordVisit(day) {
 recordVisit(easternDate());
 // The night city behind the game (public/percentle/city.mjs). It follows the main battery.
 const city = createCity(document.querySelector("#city"));
-// Its power line plugs into the battery on screen: the running one, or the final one on the results.
-city.connect(() => [...document.querySelectorAll("#scoreBattery, .result-battery")].find(battery => battery.offsetParent !== null));
 // A finish with at least this much charge left sets off fireworks over the city.
 const FIREWORKS_AT = 60;
 
@@ -428,7 +426,6 @@ function render() {
     playReveal(animate);
     bindNext(index);
   }
-  city.layout();
 }
 
 // The question's main button (Lock in, or Next) sits at the top right, on the line with the big
@@ -489,6 +486,7 @@ function renderScoreBox(progress, view, animate) {
   shownScore = { key, value: shown };
   // Only the reveal of a guess that runs the battery out sounds the alarm, once it has drained to empty.
   const alarm = animate && view.phase === "reveal" && charge < 0;
+  if (animate && view.phase === "reveal" && lastOff > 0) city.wave("down");
   animateBattery(battery, from, shown, 1400).then(finished => { if (finished && alarm) soundAlarm(battery); });
 }
 
@@ -1328,7 +1326,6 @@ function toggleHardMode() {
 
 function leaveStartScreen() {
   document.body.classList.remove("starting");
-  city.layout();
 }
 
 // Going into a game, the battery charges up from empty (with "CHARGING" above it) and the city's
@@ -1344,9 +1341,10 @@ function chargeUp() {
   const run = (battery.drainRun = (battery.drainRun || 0) + 1);
   setTimeout(() => {
     if (run !== battery.drainRun) return;
-    animateBattery(battery, 0, target, CHARGE_UP_MS, easeInOut).then(() => {
+    animateBattery(battery, 0, target, CHARGE_UP_MS, easeInOut).then(finished => {
       battery.classList.remove("charging");
       setBattery(battery, target);
+      if (finished) city.wave("up");
     });
   }, CHARGE_UP_DELAY_MS);
 }
