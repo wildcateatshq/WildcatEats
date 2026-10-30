@@ -4,11 +4,6 @@
 // fireworks, hard mode turns the night into a purple storm, and in endless mode the clock moves on
 // each round (night, dawn, day, dusk, night again).
 //
-// One tower on the right side of the skyline, a little taller than the rest, is the city's most
-// important building. Its floors drain with the city, but a few of its windows are the last lights
-// left. When the battery runs out those last lights flicker as the tower crumbles down into itself,
-// and a second later a small fire burns on the rubble (powerFail).
-//
 // Every drain sends a wave of dimming out through the windows from the middle of the skyline, and a supercharge sends a wave of
 // light out from where the lightning hit.
 //
@@ -97,8 +92,6 @@ export function createCity(root) {
   let H = 0;
   let P = 3;
   let waveTimer = 0;
-  let tower = null; // { x, w, top, drop } once drawn
-  let failing = false; // between the battery running out and the out-of-charge screen
 
   function build() {
     W = window.innerWidth;
@@ -175,7 +168,7 @@ export function createCity(root) {
       { top: 0.8, minH: 0.06, maxH: 0.17, win: 0.75, w: [30, 64], seed: 11 },
       { top: 0.88, minH: 0.04, maxH: 0.1, win: 0.95, w: [34, 80], seed: 23 }
     ];
-    const scale = phone ? 0.55 : 1; // a lower skyline on phones, so the tower stands out above it
+    const scale = phone ? 0.62 : 1;
     const dim = phone ? 0.62 : 0.85;
     let city = "";
     const layout = []; // each building's place, in the same order as its windows group
@@ -219,58 +212,6 @@ export function createCity(root) {
       city += `<g class="row row-${n}">${shapes}</g><g class="lights">${lights}</g><g class="beacons">${beacons}</g>`;
     });
 
-    // The tower: on the right side where it's easy to see (beside the game on a wide screen), a little
-    // taller than the tallest building near it, with a stepped crown, a spire with a warning light
-    // and a gold band round the crown. Its windows are split into groups that switch off with the
-    // city's charge like any building, except the last group (and the crown band), which only goes
-    // out when the battery is empty.
-    const tw = px(phone ? 42 : 72);
-    const tx = px(phone ? W * 0.8 : Math.min(W - tw - 24, (W + 720) / 2 + 48));
-    const near = layout.filter(b => b.x < tx + tw + W * 0.15 && b.x + b.w > tx - W * 0.15);
-    const tallest = Math.min(...(near.length ? near : layout).map(b => b.top));
-    const ttop = px(tallest - P * (phone ? 4 : 6));
-    const tr = random(91);
-    let towerShape = `<rect x="${tx}" y="${ttop}" width="${tw}" height="${H - ttop}"/>`;
-    towerShape += `<rect x="${tx + P * 2}" y="${ttop - P * 3}" width="${tw - P * 4}" height="${P * 3}"/>`;
-    towerShape += `<rect x="${tx + P * 4}" y="${ttop - P * 6}" width="${tw - P * 8}" height="${P * 3}"/>`;
-    const spireX = px(tx + tw / 2 - P / 2);
-    towerShape += `<rect x="${spireX}" y="${ttop - P * 12}" width="${P}" height="${P * 6}"/>`;
-    const cutoffs = [0, 8, 22, 40, 60, 80];
-    const groups = cutoffs.map(() => "");
-    groups[0] += `<rect class="tower-crown" x="${tx + P * 2}" y="${ttop - P * 3}" width="${tw - P * 4}" height="${P}"/>`;
-    const towerCols = Math.floor((tw - P * 2) / (P * 3));
-    for (let wy = ttop + P * 2; wy < H - P * 2; wy += P * 3) {
-      for (let col = 0; col < towerCols; col++) {
-        if (tr() < 0.12) continue;
-        // About one window in seven is one of the last lights.
-        const group = tr() < 0.14 ? 0 : 1 + Math.floor(tr() * (cutoffs.length - 1));
-        groups[group] += `<rect class="${tr() < 0.5 ? "w2" : "w0"}" x="${tx + P + col * P * 3 + P / 2}" y="${wy}" width="${P}" height="${P * 1.5}" opacity="${(0.7 + tr() * 0.3).toFixed(2)}"/>`;
-      }
-    }
-    let rubble = "";
-    for (let i = 0; i < 9; i++) {
-      const rw = px(tw * (0.25 + tr() * 0.35));
-      rubble += `<rect x="${px(tx - P * 3 + tr() * (tw + P * 6 - rw))}" y="${H - px(P * (2 + tr() * 5))}" width="${rw}" height="${H}"/>`;
-    }
-    // The fire on the rubble: a few flickering pixel flames with a warm glow.
-    let fire = `<defs><radialGradient id="fireGlow"><stop offset="0" stop-color="#ff8a3d" stop-opacity=".55"/><stop offset="1" stop-color="#ff8a3d" stop-opacity="0"/></radialGradient></defs><ellipse class="fire-glow" cx="${tx + tw / 2}" cy="${H - P * 4}" rx="${tw * 1.3}" ry="${P * 14}" fill="url(#fireGlow)"/>`;
-    for (let f = 0; f < 4; f++) {
-      const fx = px(tx + tw * (0.12 + f * 0.24) + (tr() - 0.5) * P * 2);
-      const fh = P * (6 + Math.floor(tr() * 4));
-      const base = H - px(P * (3 + tr() * 3));
-      let flame = "";
-      for (let row = 0; row < fh / P; row++) {
-        const half = Math.max(0, Math.round((fh / P - row) / 2) - 1);
-        const shade = row < fh / P * 0.35 ? "flame-hot" : row < fh / P * 0.7 ? "flame-mid" : "flame-tip";
-        flame += `<rect class="${shade}" x="${fx - half * P}" y="${base - (row + 1) * P}" width="${(half * 2 + 1) * P}" height="${P}"/>`;
-      }
-      fire += `<g class="flame" style="animation-delay:-${(tr() * 0.6).toFixed(2)}s">${flame}</g>`;
-    }
-    tower = { x: tx, w: tw, top: ttop - P * 6, drop: H - (ttop - P * 13) };
-    city += `<g class="tower"><g class="tower-shape">${towerShape}</g>${groups.map((g, i) => `<g class="bw tower-windows${i === 0 ? " tower-last" : ""}" data-cutoff="${cutoffs[i]}">${g}</g>`).join("")}<rect class="tower-beacon" x="${spireX - 1}" y="${ttop - P * 13}" width="${P}" height="${P}"/></g><g class="rubble">${rubble}</g><g class="fire">${fire}</g>`;
-    for (let i = 0; i < cutoffs.length; i++) layout.push({ x: tx, w: tw, top: ttop, row: 2, tower: true });
-    root.style.setProperty("--tower-drop", `${tower.drop}px`);
-
     root.innerHTML = `<div class="city-glow"></div>
       <svg class="city-scene" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">
         <defs><radialGradient id="sunGlow"><stop offset="0" stop-color="#ffd86b" stop-opacity=".35"/><stop offset="1" stop-color="#ffd86b" stop-opacity="0"/></radialGradient></defs>
@@ -300,9 +241,6 @@ export function createCity(root) {
     for (const building of buildings) building.el.classList.toggle("on", building.cutoff < shown);
     root.classList.toggle("out", out);
     root.classList.toggle("low", shown > 0 && shown < 20);
-    // The tower stays fallen until the out-of-charge screen is left behind.
-    if (body.classList.contains("dead")) failing = false;
-    else if (!failing) root.classList.remove("crumbling", "collapsed", "burning");
 
     const sky = skyAt(hour ?? 0);
     const night = 1 - sky.day;
@@ -507,33 +445,6 @@ export function createCity(root) {
     }, duration);
   }
 
-  // The battery has run out. The tower's last lights flicker as it shakes and sinks down into itself
-  // in a cloud of dust; a second after it has fallen, a small fire starts on the rubble and keeps
-  // burning through the out-of-charge screen.
-  const COLLAPSE_MS = 1500;
-  const FIRE_DELAY_MS = 1000;
-  function powerFail() {
-    if (!tower) return;
-    failing = true;
-    root.classList.add("crumbling");
-    let dust = "";
-    for (let i = 0; i < 26; i++) {
-      const fromX = tower.x + Math.random() * tower.w;
-      const spread = (fromX - (tower.x + tower.w / 2)) * 1.6 + (Math.random() - 0.5) * 60;
-      dust += `<rect class="dust" x="${fromX.toFixed(0)}" y="${(H - P * 2 - Math.random() * P * 6).toFixed(0)}" width="${P * 2}" height="${P * 2}" style="--dx:${spread.toFixed(0)}px;--dy:${(-20 - Math.random() * 70).toFixed(0)}px;animation-delay:${(0.2 + Math.random() * 0.9).toFixed(2)}s"/>`;
-    }
-    root.insertAdjacentHTML("beforeend", `<svg class="city-dust" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">${dust}</svg>`);
-    const cloud = root.lastElementChild;
-    setTimeout(() => cloud.remove(), 3200);
-    setTimeout(() => {
-      root.classList.remove("crumbling");
-      if (failing || document.body.classList.contains("dead")) root.classList.add("collapsed");
-    }, COLLAPSE_MS);
-    setTimeout(() => {
-      if (failing || document.body.classList.contains("dead")) root.classList.add("burning");
-    }, COLLAPSE_MS + FIRE_DELAY_MS);
-  }
-
   // Pixel fireworks in the open sky beside the final battery.
   function fireworks() {
     if (reducedMotion() || !buildings.length) return;
@@ -578,7 +489,6 @@ export function createCity(root) {
       refresh();
     },
     wave,
-    powerFail,
     strike,
     fireworks
   };
