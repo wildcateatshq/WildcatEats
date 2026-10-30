@@ -4,9 +4,7 @@
 // fireworks, hard mode turns the night into a purple storm, and in endless mode the clock moves on
 // each round (night, dawn, day, dusk, night again).
 //
-// Power lines run over the rooftops with current flowing along them: bright and fast when charged,
-// slower and dimmer as the battery drains, dark when it's empty. Every drain sends a wave of
-// dimming out through the windows from the middle of the skyline, and a supercharge sends a wave of
+// Every drain sends a wave of dimming out through the windows from the middle of the skyline, and a supercharge sends a wave of
 // light out from where the lightning hit.
 //
 // The scene is drawn once per screen width; after that, changing the charge only switches whole
@@ -70,38 +68,6 @@ export function createCity(root) {
   let H = 0;
   let P = 3;
   let waveTimer = 0;
-
-  // Power lines over the rooftops: a pole on every few roofs of the middle row, with two sagging
-  // wires strung from the pylon at the left edge from pole to pole across the city. The wires carry
-  // pulses of current (see .wire-flow in percentle.css).
-  function powerLines(roofs) {
-    const phone = W < 600;
-    const px = v => Math.round(v / P) * P;
-    const poleH = P * 6;
-    const gap = W * (phone ? 0.2 : 0.11);
-    const poles = [];
-    for (const roof of roofs) {
-      const cx = px(roof.x + roof.w / 2);
-      if (roof.w < 30 || cx < W * 0.08 || (poles.length && cx - poles.at(-1).x < gap)) continue;
-      poles.push({ x: cx, y: roof.top - poleH });
-    }
-    let shapes = "", wire = "";
-    for (const pole of poles) {
-      shapes += `<rect x="${pole.x}" y="${pole.y}" width="${P}" height="${poleH}"/><rect x="${pole.x - P * 2}" y="${pole.y}" width="${P * 5}" height="${P / 1.5}"/>`;
-    }
-    // Start from the pylon at the left edge.
-    const pylon = { x: px(W * 0.04), y: px(H * (phone ? 0.86 : 0.76)) };
-    const points = [pylon, ...poles];
-    for (let i = 1; i < points.length; i++) {
-      const a = points[i - 1], b = points[i];
-      const sag = Math.min(26, (b.x - a.x) * 0.14);
-      for (const offset of [-P * 1.5, P * 2.5]) {
-        const ax = a.x + offset, bx = b.x + offset;
-        wire += `M${ax},${a.y + 1} Q${((ax + bx) / 2).toFixed(1)},${(Math.max(a.y, b.y) + sag).toFixed(1)} ${bx},${b.y + 1} `;
-      }
-    }
-    return `<g class="power-lines"><path class="wire" d="${wire}"/><g class="poles">${shapes}</g><path class="wire-flow" d="${wire}"/></g>`;
-  }
 
   function build() {
     W = window.innerWidth;
@@ -204,7 +170,6 @@ export function createCity(root) {
       }
       layout.push(...placed);
       city += `<g class="row row-${n}">${shapes}</g><g class="lights">${lights}</g><g class="beacons">${beacons}</g>`;
-      if (n === 1) city += powerLines(placed);
     });
 
     root.innerHTML = `<div class="city-glow"></div>
@@ -254,8 +219,6 @@ export function createCity(root) {
     style.setProperty("--windows", (1 - sky.day * 0.7).toFixed(3));
     style.setProperty("--glow", out ? "0" : (night * (0.25 + (shown / 100) * 0.75)).toFixed(3));
     style.setProperty("--daylight", sky.day.toFixed(3));
-    style.setProperty("--flow", out ? "0" : (0.35 + (shown / 100) * 0.65).toFixed(3));
-    style.setProperty("--flow-time", `${(2.6 - (shown / 100) * 2).toFixed(2)}s`);
 
     // The moon and sun cross the sky. The daily puzzle's moon sits still in a fixed spot.
     const moon = root.querySelector(".moon");
@@ -364,12 +327,10 @@ export function createCity(root) {
       </svg><div class="city-flash${perfect ? " perfect" : ""}" style="--x:${((hitX / W) * 100).toFixed(1)}%"></div>`);
     const flash = root.lastElementChild;
     const bolt = flash.previousElementSibling;
-    // The struck building lights up, even if the battery had already switched it off, and a surge
-    // of current runs down the power line.
+    // The struck building lights up, even if the battery had already switched it off, and a wave of
+    // light runs out through the city from it.
     target.el.classList.add("hit");
-    root.classList.add("surge");
     wave("up", hitX);
-    setTimeout(() => root.classList.remove("surge"), perfect ? 1400 : 900);
     const duration = reducedMotion() ? 600 : perfect ? 1500 : 1000;
     setTimeout(() => {
       bolt?.remove();

@@ -426,15 +426,6 @@ body.entering #gameCard{animation-delay:.06s}
 @keyframes start-out{to{opacity:0;transform:translateY(-14px) scale(.98)}}
 @keyframes game-in{from{opacity:0;transform:translateY(18px)}}
 
-/* Power lines over the rooftops, with pulses of current riding along the wires (city.mjs). */
-.city .poles{fill:var(--row-1,#081014)}
-.city .wire{fill:none;stroke:#5a523d;stroke-width:1.4;opacity:.85}
-.city .wire-flow{fill:none;stroke:#fff3c4;stroke-width:1.6;stroke-linecap:round;stroke-dasharray:7 44;opacity:var(--flow,1);animation:wire-flow var(--flow-time,1s) linear infinite;filter:drop-shadow(0 0 2px var(--halo))}
-.city.out .wire-flow{display:none}
-.city.surge .wire-flow{stroke:#fffef8;stroke-width:2.4;stroke-dasharray:16 12;opacity:1;animation-duration:.2s;filter:drop-shadow(0 0 4px var(--halo)) drop-shadow(0 0 10px var(--halo))}
-body.hard .city .wire-flow{stroke:#f0dcff}body.hard .city .wire{stroke:#4a3866}
-@keyframes wire-flow{to{stroke-dashoffset:-51}}
-
 /* A wave through the windows (city.mjs wave()): each building's delay grows with its distance from
    where the wave starts, and lights switching on or off follow the same delay. */
 .city .bw{transition:opacity .45s var(--wave-delay,0s)}
