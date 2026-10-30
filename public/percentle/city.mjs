@@ -203,7 +203,10 @@ export function createCity(root) {
         }
         lights += `<g class="bw" data-cutoff="${cutoff}">${windows}</g>`;
         placed.push({ x, w: bw, top: by, row: n });
-        x += bw + (lr() < 0.3 ? P * 2 : 0);
+        // Buildings stand shoulder to shoulder: a gap between two would show the glowing sky behind
+        // as a bright slit, like a beam of light. (The draw still runs so the skyline stays the same.)
+        lr();
+        x += bw;
       }
       layout.push(...placed);
       city += `<g class="row row-${n}">${shapes}</g><g class="lights">${lights}</g><g class="beacons">${beacons}</g>`;
