@@ -243,8 +243,11 @@ battery runs out, in a background tab, or with reduced motion):
   supercharges) brings searchlights sweeping the sky on the results screen.
 - A rooftop billboard shows the player's streak (2 days or more), otherwise CHARGLE and the puzzle
   number, or the best endless run. It goes dark with its building.
-- Snow falls and piles up on the roofs round by round in winter (December to February) endless runs.
-  Rain, snow and fog weather is drawn but switched off for now (real weather isn't fetched).
+- Weather: one roll per day, seeded by the date so everyone sees the same sky (`weatherForDay` in
+  `game.mjs`). Odds follow the season: winter about 30% snow and 10% fog, never rain; spring about 30%
+  rain and 10% fog; summer about 20% rain; fall about 22% rain and 15% fog, with a little snow in
+  March and November. Snow settles on the roofs while it's snowing, and in winter endless runs it
+  falls and piles up round by round.
 - Holidays by the Eastern date: Halloween (Oct 27-31: orange windows and moon, bats), December
   (colored lights along rooftops), New Year's (Dec 31-Jan 1) and the Fourth of July (Jul 3-5),
   with fireworks every few seconds.

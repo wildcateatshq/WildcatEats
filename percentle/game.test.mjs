@@ -13,6 +13,7 @@ import {
   reactionFor,
   roundsSurvived,
   endlessClock,
+  weatherForDay,
   dailyTotal,
   guessEntryFrom,
   guessEntryText,
@@ -246,4 +247,23 @@ test("the moon's phase matches the U.S. Naval Observatory's 2026 phase times", a
     const gap = Math.min(Math.abs(phase - expected), 1 - Math.abs(phase - expected));
     assert.ok(gap < 0.035, `${moment}: phase ${phase.toFixed(3)}, expected ${expected}`);
   }
+});
+
+test("the city's weather is one roll per day that suits the season", () => {
+  assert.equal(weatherForDay("2026-10-31"), weatherForDay("2026-10-31"), "the same all day");
+  const counts = { winter: {}, summer: {} };
+  let decemberRain = 0;
+  for (let day = new Date("2026-01-01T12:00:00Z"); day < new Date("2031-01-01T12:00:00Z"); day.setUTCDate(day.getUTCDate() + 1)) {
+    const date = day.toISOString().slice(0, 10);
+    const month = Number(date.slice(5, 7));
+    const kind = weatherForDay(date) ?? "clear";
+    if (month === 12 && kind === "rain") decemberRain++;
+    const season = [12, 1, 2].includes(month) ? "winter" : [6, 7, 8].includes(month) ? "summer" : null;
+    if (season) counts[season][kind] = (counts[season][kind] || 0) + 1;
+  }
+  assert.equal(decemberRain, 0, "never rain in December");
+  assert.equal(counts.summer.snow ?? 0, 0, "never snow in summer");
+  const winterDays = Object.values(counts.winter).reduce((a, b) => a + b, 0);
+  assert.ok(counts.winter.snow / winterDays > 0.2 && counts.winter.snow / winterDays < 0.4, "winter snows about 30% of days");
+  assert.ok((counts.winter.clear ?? 0) / winterDays > 0.5, "most days are clear");
 });

@@ -312,3 +312,26 @@ export function endlessClock(round) {
   const time = `${shown}:${String(minutes).padStart(2, "0")} ${hour < 12 ? "AM" : "PM"}`;
   return { hour, time, label: `${isNight ? "Night" : "Day"} ${count}` };
 }
+
+// Weather on the city (rain, snow or fog): one roll per day, seeded by the date so everyone sees the
+// same sky all day, with odds that suit the season. Never rain in winter, never snow in summer.
+//   [snow, rain, fog] chances by month (January = 1).
+const WEATHER_ODDS = {
+  12: [0.3, 0, 0.1], 1: [0.3, 0, 0.1], 2: [0.3, 0, 0.1],
+  3: [0.05, 0.3, 0.1], 4: [0, 0.3, 0.1], 5: [0, 0.3, 0.1],
+  6: [0, 0.2, 0.03], 7: [0, 0.2, 0.03], 8: [0, 0.2, 0.03],
+  9: [0, 0.22, 0.15], 10: [0, 0.22, 0.15], 11: [0.05, 0.22, 0.15]
+};
+export function weatherForDay(date) {
+  // A steady number from 0 to 1 for the date, so a day's weather never changes.
+  let hash = 2166136261;
+  for (const char of `weather:${date}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
+  // Scramble it (MurmurHash3's finalizer) so neighbouring dates don't get similar rolls.
+  hash ^= hash >>> 16; hash = Math.imul(hash, 0x85ebca6b); hash ^= hash >>> 13; hash = Math.imul(hash, 0xc2b2ae35); hash ^= hash >>> 16;
+  let roll = (hash >>> 0) / 4294967296;
+  const [snow, rain, fog] = WEATHER_ODDS[Number(date.slice(5, 7))];
+  for (const [kind, chance] of [["snow", snow], ["rain", rain], ["fog", fog]]) {
+    if ((roll -= chance) < 0) return kind;
+  }
+  return null;
+}

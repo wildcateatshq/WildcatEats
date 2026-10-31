@@ -1,4 +1,4 @@
-import { achievementsForGame, ACHIEVEMENTS, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, reactionFor, easternDate, endlessClock, finalCharge, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { achievementsForGame, ACHIEVEMENTS, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, reactionFor, easternDate, endlessClock, finalCharge, weatherForDay, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
 import { createCity } from "/percentle/city.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
@@ -216,12 +216,13 @@ function holidayOn(date) {
   return null;
 }
 
-// Weather on the city (rain, snow or fog). Real weather is switched off for now, so the sky stays
-// clear; the drawings are still in city.mjs. Local testing only: ?weather=rain, snow, fog or clear.
+// Weather on the city: one roll per day by season (weatherForDay in game.mjs).
 let weatherNow = null;
 async function loadWeather() {
+  // Local testing only: ?weather=rain, snow, fog or clear.
   const forced = location.hostname === "localhost" ? new URLSearchParams(location.search).get("weather") : null;
-  return forced && forced !== "clear" ? forced : null;
+  if (forced) return forced === "clear" ? null : forced;
+  return weatherForDay(easternDate());
 }
 
 // Snow on the roofs: settled whenever it's snowing; in endless runs from December to February it
