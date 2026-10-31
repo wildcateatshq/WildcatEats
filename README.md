@@ -233,7 +233,7 @@ sky, sun and moon follow it. The moon shows its real phase for the night (`moonP
 Naval Observatory's 2026 phase times). The scene is drawn once per screen width and then only switches
 buildings and colors, and it holds still under reduced motion.
 
-Now and then (a 40% chance with each new question, at a random moment, at least 25 seconds apart)
+Now and then (a 25% chance with each new question, at a random moment, at least 25 seconds apart)
 a small plane with lit cabin windows and blinking lights drifts across the sky between the moon and
 the question's button.
 

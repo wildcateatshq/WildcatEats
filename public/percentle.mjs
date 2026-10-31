@@ -150,7 +150,7 @@ let powerOutTimer;
 let hideGameTimer;
 // Now and then a plane drifts across the sky while a question is up: a chance with each new
 // question, at a random moment, never two close together.
-const PLANE_CHANCE = 0.4;
+const PLANE_CHANCE = 0.25;
 const PLANE_GAP_MS = 25000;
 let lastPlaneAt = -PLANE_GAP_MS;
 let planeTimer;
