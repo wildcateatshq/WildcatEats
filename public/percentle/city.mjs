@@ -519,6 +519,11 @@ export function createCity(root) {
     waveTimer = setTimeout(() => root.classList.remove(`wave-${direction}`), (WAVE_SPREAD + 1) * 1000);
   }
 
+  // Lightning, fireworks and anything passing over the city go on the same layer as the city, so
+  // when the view rises after the battery runs out they move with the city instead of floating
+  // over it.
+  const scene = () => root.querySelector(".city-world") || root;
+
   // A jagged line between two points: the midpoint of every segment is pushed sideways a little,
   // again and again, which gives lightning its natural crooked shape.
   function jagged(x1, y1, x2, y2, roughness) {
@@ -581,14 +586,14 @@ export function createCity(root) {
         sparks += `<rect class="spark" x="${(hitX - P / 2).toFixed(0)}" y="${(hitY - P / 2).toFixed(0)}" width="${P}" height="${P}" style="--dx:${(Math.cos(angle) * distance).toFixed(0)}px;--dy:${(Math.sin(angle) * distance).toFixed(0)}px;animation-delay:${(Math.random() * 0.12).toFixed(2)}s"/>`;
       }
     }
-    root.insertAdjacentHTML("beforeend", `<svg class="city-bolt${perfect ? " perfect" : ""}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">
+    scene().insertAdjacentHTML("beforeend", `<svg class="city-bolt${perfect ? " perfect" : ""}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">
         <defs><radialGradient id="impact"><stop offset="0" stop-color="#fffaf0" stop-opacity=".9"/><stop offset=".4" stop-color="var(--bolt-glow, #ffd56a)" stop-opacity=".45"/><stop offset="1" stop-color="var(--bolt-glow, #ffd56a)" stop-opacity="0"/></radialGradient></defs>
         <circle class="impact" cx="${hitX.toFixed(0)}" cy="${hitY.toFixed(0)}" r="${perfect ? 90 : 50}" fill="url(#impact)"/>
         ${forkLines}
         <path class="bolt-glow" d="${path(main)}" stroke-width="${width.glow}"/><path class="bolt-core" d="${path(main)}" stroke-width="${width.core}"/>
         ${sparks}
       </svg><div class="city-flash${perfect ? " perfect" : ""}" style="--x:${((hitX / W) * 100).toFixed(1)}%"></div>`);
-    const flash = root.lastElementChild;
+    const flash = scene().lastElementChild;
     const bolt = flash.previousElementSibling;
     // The struck building lights up, even if the battery had already switched it off, and a wave of
     // light runs out through the city from it.
@@ -630,11 +635,11 @@ export function createCity(root) {
     const windows = [5, 7, 9, 11, 13].map(x => `<rect x="${x * s}" y="${3 * s}" width="${s}" height="${s}"/>`).join("");
     const leftToRight = Math.random() < 0.5;
     const width = 16 * s;
-    root.insertAdjacentHTML("beforeend", `<div class="city-plane${leftToRight ? "" : " flip"}" style="top:${Math.round(y)}px;--travel:${W + width * 2 + 40}px;animation-duration:${(18 + Math.random() * 7).toFixed(1)}s">
+    scene().insertAdjacentHTML("beforeend", `<div class="city-plane${leftToRight ? "" : " flip"}" style="top:${Math.round(y)}px;--travel:${W + width * 2 + 40}px;animation-duration:${(18 + Math.random() * 7).toFixed(1)}s">
         <svg width="${width}" height="${8 * s}" viewBox="0 0 ${width} ${7 * s}"><g class="plane-body">${body}</g><g class="plane-windows">${windows}</g>
           <rect class="plane-red" x="${5 * s}" y="${6 * s}" width="${s}" height="${s}"/>
           <rect class="plane-strobe" x="${1 * s}" y="0" width="${s}" height="${s}"/></svg></div>`);
-    const el = root.lastElementChild;
+    const el = scene().lastElementChild;
     el.addEventListener("animationend", event => { if (event.target === el) el.remove(); });
   }
 
@@ -654,8 +659,8 @@ export function createCity(root) {
       }
       bursts += `<g class="burst burst-${k % 3}" style="animation-delay:${(k * gap).toFixed(2)}s;animation-iteration-count:${repeat}">${dots}<rect class="burst-core" x="${(cx - P).toFixed(0)}" y="${(cy - P).toFixed(0)}" width="${P * 2}" height="${P * 2}"/></g>`;
     });
-    root.insertAdjacentHTML("beforeend", `<svg class="city-fireworks" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">${bursts}</svg>`);
-    const svg = root.lastElementChild;
+    scene().insertAdjacentHTML("beforeend", `<svg class="city-fireworks" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">${bursts}</svg>`);
+    const svg = scene().lastElementChild;
     setTimeout(() => svg?.remove(), (1.8 * repeat + spots.length * gap) * 1000 + 300);
   }
 
@@ -692,8 +697,8 @@ export function createCity(root) {
   // Something drifting across the screen at height y (screen pixels) and then removed. kind is a
   // class for its look; html is its drawing; seconds is how long the crossing takes.
   function drift(kind, html, y, width, seconds, leftToRight = Math.random() < 0.5) {
-    root.insertAdjacentHTML("beforeend", `<div class="city-drift ${kind}${leftToRight ? "" : " flip"}" style="top:${Math.round(y)}px;--travel:${W + width * 2 + 40}px;animation-duration:${seconds}s">${html}</div>`);
-    const el = root.lastElementChild;
+    scene().insertAdjacentHTML("beforeend", `<div class="city-drift ${kind}${leftToRight ? "" : " flip"}" style="top:${Math.round(y)}px;--travel:${W + width * 2 + 40}px;animation-duration:${seconds}s">${html}</div>`);
+    const el = scene().lastElementChild;
     el.addEventListener("animationend", event => { if (event.target === el) el.remove(); });
     return el;
   }
@@ -703,10 +708,10 @@ export function createCity(root) {
     if (!lively()) return;
     const x = W * (0.1 + Math.random() * 0.6), length = W < 600 ? 110 : 190, angle = (12 + Math.random() * 18) * Math.PI / 180;
     const x2 = x + Math.cos(angle) * length, y2 = y + Math.sin(angle) * length;
-    root.insertAdjacentHTML("beforeend", `<svg class="city-meteor" width="${W}" height="${window.innerHeight}">
+    scene().insertAdjacentHTML("beforeend", `<svg class="city-meteor" width="${W}" height="${window.innerHeight}">
         <defs><linearGradient id="meteorTail" gradientUnits="userSpaceOnUse" x1="${x.toFixed(0)}" y1="${y.toFixed(0)}" x2="${x2.toFixed(0)}" y2="${y2.toFixed(0)}"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".95"/></linearGradient></defs>
         <line x1="${x.toFixed(0)}" y1="${y.toFixed(0)}" x2="${x2.toFixed(0)}" y2="${y2.toFixed(0)}" stroke="url(#meteorTail)" stroke-width="2.5" stroke-linecap="round" pathLength="100"/></svg>`);
-    const svg = root.lastElementChild;
+    const svg = scene().lastElementChild;
     setTimeout(() => svg.remove(), 1400);
   }
 
@@ -743,8 +748,8 @@ export function createCity(root) {
         ${rect(8, 4, 3, 2, "heli-window")}${rect(27, 2, 1, 1, "plane-red")}</svg>
         <svg class="heli-beam" width="${120 * s}" height="${70 * s}" viewBox="0 0 ${120 * s} ${70 * s}"><defs><linearGradient id="heliBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6d8" stop-opacity=".55"/><stop offset="1" stop-color="#fff6d8" stop-opacity="0"/></linearGradient></defs>
         <polygon points="${58 * s},0 ${62 * s},0 ${80 * s},${70 * s} ${40 * s},${70 * s}" fill="url(#heliBeam)"/></svg></div>`;
-    root.insertAdjacentHTML("beforeend", `<div class="heli" style="top:${Math.round(y)}px;left:${Math.round(hoverX - 15 * s)}px;--away:${Math.round(W - hoverX + 60 * s)}px">${html}</div>`);
-    const el = root.lastElementChild;
+    scene().insertAdjacentHTML("beforeend", `<div class="heli" style="top:${Math.round(y)}px;left:${Math.round(hoverX - 15 * s)}px;--away:${Math.round(W - hoverX + 60 * s)}px">${html}</div>`);
+    const el = scene().lastElementChild;
     el.addEventListener("animationend", event => { if (event.target === el) el.remove(); });
   }
 
@@ -764,8 +769,8 @@ export function createCity(root) {
     if (reducedMotion() || !buildings.length || root.querySelector(".city-searchlights")) return;
     const spots = W < 600 ? [0.12, 0.88] : [0.1, 0.2, 0.8, 0.9];
     const beams = spots.map((f, k) => `<div class="searchlight" style="left:${(W * f).toFixed(0)}px;animation-delay:-${(k * 1.3).toFixed(1)}s;--swing:${k % 2 ? -1 : 1}"></div>`).join("");
-    root.insertAdjacentHTML("beforeend", `<div class="city-searchlights">${beams}</div>`);
-    const el = root.lastElementChild;
+    scene().insertAdjacentHTML("beforeend", `<div class="city-searchlights">${beams}</div>`);
+    const el = scene().lastElementChild;
     setTimeout(() => el.classList.add("fading"), 14000);
     setTimeout(() => el.remove(), 15500);
   }
