@@ -461,3 +461,17 @@ body.dead .city:not(.skyward) .city-world{transition:none}
 .city.skyward .shooting-star,body.dead .city .shooting-star{animation:shooting-star 7s ease-in 2.6s infinite}
 @keyframes shooting-star{0%{stroke-dashoffset:60;opacity:0}2%{opacity:1}9%{stroke-dashoffset:-340;opacity:0}100%{stroke-dashoffset:-340;opacity:0}}
 @media(prefers-reduced-motion:reduce){.city-world{transition:none}.city .shooting-star{animation:none!important}}
+
+/* A distant plane drifting across the sky (city.mjs plane()), with blinking wing lights. */
+.city-plane{position:absolute;left:0;transform:translateX(-80px);animation:plane-fly 20s linear forwards;shape-rendering:crispEdges}
+.city-plane.flip{animation-name:plane-fly-back}
+.city-plane.flip svg{transform:scaleX(-1)}
+.city-plane .plane-body{fill:color-mix(in srgb,#1c2430 calc(100% - var(--daylight,0) * 100%),#5b6675)}
+.city-plane .plane-red{fill:#ff4d4d;animation:plane-blink 1.2s steps(1) infinite}
+.city-plane .plane-windows{fill:#ffe09a;opacity:calc(.85 - var(--daylight,0) * .6)}
+.city-plane .plane-strobe{fill:#fff;opacity:0;animation:plane-strobe 1.6s steps(1) infinite}
+body.hard .city-plane .plane-windows{fill:#d9a8ff}
+@keyframes plane-fly{from{transform:translateX(-80px)}to{transform:translateX(calc(var(--travel) - 80px))}}
+@keyframes plane-fly-back{from{transform:translateX(calc(var(--travel) - 80px))}to{transform:translateX(-80px)}}
+@keyframes plane-blink{0%,55%{opacity:1}56%,100%{opacity:.15}}
+@keyframes plane-strobe{0%,90%{opacity:0}91%,96%{opacity:1}97%,100%{opacity:0}}

@@ -537,6 +537,26 @@ export function createCity(root) {
     }, still ? 0 : RISE_DELAY_MS);
   }
 
+  // A small, distant plane drifting across the sky at height y (in screen pixels): a dark side-on
+  // pixel silhouette with a row of lit cabin windows, a blinking red light under the wing and a white
+  // strobe on the tail.
+  function plane(y) {
+    if (rising || reducedMotion() || root.querySelector(".city-plane")) return;
+    const s = W < 600 ? 2.5 : 3; // pixel size
+    const r = ([x, yy, w, h]) => `<rect x="${x * s}" y="${yy * s}" width="${w * s}" height="${h * s}"/>`;
+    // Fuselage, rounded nose, tail fin, and a swept wing below the middle.
+    const body = [[1, 3, 14, 2], [15, 4, 1, 1], [14, 3, 1, 1], [1, 0, 1, 3], [2, 1, 1, 2], [3, 2, 1, 1], [6, 5, 4, 1], [5, 6, 3, 1]].map(r).join("");
+    const windows = [5, 7, 9, 11, 13].map(x => `<rect x="${x * s}" y="${3 * s}" width="${s}" height="${s}"/>`).join("");
+    const leftToRight = Math.random() < 0.5;
+    const width = 16 * s;
+    root.insertAdjacentHTML("beforeend", `<div class="city-plane${leftToRight ? "" : " flip"}" style="top:${Math.round(y)}px;--travel:${W + width * 2 + 40}px;animation-duration:${(18 + Math.random() * 7).toFixed(1)}s">
+        <svg width="${width}" height="${8 * s}" viewBox="0 0 ${width} ${7 * s}"><g class="plane-body">${body}</g><g class="plane-windows">${windows}</g>
+          <rect class="plane-red" x="${5 * s}" y="${6 * s}" width="${s}" height="${s}"/>
+          <rect class="plane-strobe" x="${1 * s}" y="0" width="${s}" height="${s}"/></svg></div>`);
+    const el = root.lastElementChild;
+    el.addEventListener("animationend", event => { if (event.target === el) el.remove(); });
+  }
+
   // Pixel fireworks in the open sky beside the final battery.
   function fireworks() {
     if (reducedMotion() || !buildings.length) return;
@@ -581,6 +601,7 @@ export function createCity(root) {
       refresh();
     },
     wave,
+    plane,
     outOfCharge,
     strike,
     fireworks

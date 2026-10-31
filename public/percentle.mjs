@@ -148,6 +148,26 @@ const POWER_OUT_DELAY_MS = 13000;
 const POWER_OUT_DELAY_REDUCED_MS = 4000;
 let powerOutTimer;
 let hideGameTimer;
+// Now and then a plane drifts across the sky while a question is up: a chance with each new
+// question, at a random moment, never two close together.
+const PLANE_CHANCE = 0.4;
+const PLANE_GAP_MS = 25000;
+let lastPlaneAt = -PLANE_GAP_MS;
+let planeTimer;
+function maybeFlyPlane() {
+  clearTimeout(planeTimer);
+  if (document.body.classList.contains("starting") || Date.now() - lastPlaneAt < PLANE_GAP_MS || Math.random() >= PLANE_CHANCE) return;
+  planeTimer = setTimeout(() => {
+    // Between the bottom of the moon and the top of the Lock in button.
+    const moon = document.querySelector("#city .moon")?.getBoundingClientRect();
+    const button = document.querySelector("#questionAction")?.getBoundingClientRect();
+    if (!moon || !button || document.body.classList.contains("starting")) return;
+    const top = moon.bottom + 16, bottom = button.top - 30;
+    if (bottom <= top) return;
+    lastPlaneAt = Date.now();
+    city.plane(top + Math.random() * (bottom - top));
+  }, 1500 + Math.random() * 6000);
+}
 
 // Answers always have exactly one decimal place, even if a puzzle was stored with more.
 function withRoundedAnswers(questions) {
@@ -419,6 +439,7 @@ function render() {
       <div class="hint-row"><p class="question-hint">0-100%</p>${view.phase === "reveal" ? reactionLine(question, progress.guesses[index]) : ""}</div>
       ${view.phase === "reveal" ? reveal(question, progress.guesses[index], index) : guessForm(guess)}
     </div>`;
+  if (view.phase === "guess") maybeFlyPlane();
   setAction(view.phase === "reveal"
     ? actionButton("next-button", "nextButton", index === currentQuestions.length - 1 ? ["Battery report", "Report"] : ["Next question", "Next"])
     : actionButton("lock-button", "lockButton", ["Lock in my guess", "Lock in"]));
@@ -1324,6 +1345,8 @@ function toggleHardMode() {
 
 function leaveStartScreen() {
   document.body.classList.remove("starting");
+  // The first question was drawn behind the start screen, so its chance of a plane comes now.
+  if (progressFor().guesses.length === viewForProgress(progressFor(), currentQuestions.length).index && !isTodayFinished()) maybeFlyPlane();
 }
 
 // Going into a game, the battery charges up from empty (with "CHARGING" above it) and the city's
