@@ -198,6 +198,18 @@ function maybeFlyPlane() {
 
 // The billboard on a rooftop: the player's streak once it's going, otherwise the game's name and
 // today's puzzle (or the best endless run).
+// The billboard stays clear of the question card, including the room the fun fact takes once the
+// answer is shown, so it doesn't jump when the answer appears.
+function keepBillboardClear() {
+  requestAnimationFrame(() => {
+    const card = document.querySelector("#gameCard")?.getBoundingClientRect();
+    const labels = document.querySelector(".range-labels")?.getBoundingClientRect();
+    if (!card || !labels || !card.height) return; // not measurable behind the start screen
+    city.avoidForBillboard([{ left: card.left, right: card.right, top: card.top, bottom: Math.max(card.bottom, labels.bottom + 100) }]);
+  });
+}
+window.addEventListener("resize", () => { if (document.querySelector("#guessInput")) keepBillboardClear(); });
+
 function updateBillboard() {
   const streak = consecutiveStreak(state.games);
   const top = streak >= 2 ? `${streak} DAY STREAK` : "CHARGLE";
@@ -516,7 +528,10 @@ function render() {
   setAction(view.phase === "reveal"
     ? actionButton("next-button", "nextButton", index === currentQuestions.length - 1 ? ["Battery report", "Report"] : ["Next question", "Next"])
     : actionButton("lock-button", "lockButton", ["Lock in my guess", "Lock in"]));
-  if (view.phase === "guess") bindGuessControls(guess, index);
+  if (view.phase === "guess") {
+    bindGuessControls(guess, index);
+    keepBillboardClear();
+  }
   else {
     playReveal(animate);
     bindNext(index);
@@ -1425,6 +1440,7 @@ function toggleHardMode() {
 
 function leaveStartScreen() {
   document.body.classList.remove("starting");
+  if (document.querySelector("#guessInput")) keepBillboardClear();
   // The first question was drawn behind the start screen, so its chance of a plane comes now.
   if (progressFor().guesses.length === viewForProgress(progressFor(), currentQuestions.length).index && !isTodayFinished()) maybeFlyPlane();
 }

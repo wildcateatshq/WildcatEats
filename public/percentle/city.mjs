@@ -249,21 +249,21 @@ export function createCity(root) {
         <g class="bat-down">${[[-6, 1, 2, 1], [-4, 0, 3, 1], [-1, 0, 2, 2], [1, 0, 3, 1], [4, 1, 2, 1]].map(([x, y, w, h]) => `<rect x="${x * P}" y="${y * P}" width="${w * P}" height="${h * P}"/>`).join("")}</g></g>`;
     city += `<g class="bats">${batSpots.map(([fx, fy], k) => bat(W * fx, H * fy, k)).join("")}</g>`;
 
-    // A billboard on a rooftop on the right, where the game covers it least. Its words come from
-    // setBillboard (the player's streak, or the puzzle number).
-    billboard = null;
-    const boardRoofs = layout.filter(b => b.row === 2 && b.w >= (phone ? 30 : 50) && b.x + b.w / 2 > (phone ? W * 0.6 : (W + 720) / 2 + 10) && b.x + b.w < W - 8);
-    const boardRoof = boardRoofs.sort((a, b) => a.top - b.top)[0];
-    if (boardRoof) {
-      const bw = phone ? 60 : 104, bh = phone ? 24 : 34;
-      const bx = px(boardRoof.x + boardRoof.w / 2 - bw / 2), by = px(boardRoof.top - bh - P * 3);
-      billboard = { x: bx, y: by, w: bw, h: bh };
-      city += `<g class="billboard">
-          <rect class="bb-post" x="${bx + P * 3}" y="${by + bh}" width="${P}" height="${P * 3}"/><rect class="bb-post" x="${bx + bw - P * 4}" y="${by + bh}" width="${P}" height="${P * 3}"/>
-          <rect class="bb-frame" x="${bx}" y="${by}" width="${bw}" height="${bh}"/>
-          <text class="bb-1" x="${bx + bw / 2}" y="${by + bh * 0.46}" font-size="${phone ? 7 : 10}"></text>
-          <text class="bb-2" x="${bx + bw / 2}" y="${by + bh * 0.82}" font-size="${phone ? 6 : 9}"></text></g>`;
+    // A lit billboard on a rooftop on the right (on posts, so it can overhang a narrow roof). It's drawn
+    // once at the origin and moved onto a roof
+    // by placeBillboard: the tallest one on the right that the game doesn't cover. Its words come
+    // from setBillboard (the player's streak, or the puzzle number).
+    const bw = px(phone ? 76 : 136), bh = px(phone ? 30 : 46);
+    billboard = { w: bw, h: bh, roofs: layout.filter(b => b.w >= P * 8 && b.x + b.w / 2 - bw / 2 > (phone ? W * 0.45 : (W + 720) / 2 + 10) && b.x + b.w / 2 + bw / 2 < W - 6).sort((x, y) => x.top - y.top) };
+    let bulbs = "";
+    for (let x = P * 2, k = 0; x < bw - P; x += P * 3, k++) {
+      bulbs += `<rect class="bulb bulb-${k % 2}" x="${x}" y="${P}" width="${P}" height="${P}"/><rect class="bulb bulb-${(k + 1) % 2}" x="${x}" y="${bh - P * 2}" width="${P}" height="${P}"/>`;
     }
+    city += `<g class="billboard">
+        <rect class="bb-post" x="${P * 4}" y="${bh}" width="${P}" height="${P * 3}"/><rect class="bb-post" x="${bw - P * 5}" y="${bh}" width="${P}" height="${P * 3}"/>
+        <rect class="bb-frame" x="0" y="0" width="${bw}" height="${bh}"/>${bulbs}
+        <text class="bb-1" x="${bw / 2}" y="${(bh * 0.5).toFixed(1)}" font-size="${phone ? 9 : 13}"></text>
+        <text class="bb-2" x="${bw / 2}" y="${(bh * 0.76).toFixed(1)}" font-size="${phone ? 7 : 10}"></text></g>`;
 
     // Weather over the city, drawn once and shown by class: rain and snow fall in endless loops
     // (two copies of the same tile, one above the other), and fog drifts low over the skyline.
@@ -368,6 +368,7 @@ export function createCity(root) {
     buildings = [...root.querySelectorAll(".bw")].map((el, i) => ({ el, cutoff: Number(el.dataset.cutoff), ...layout[i] }));
     root.style.setProperty("--pan", `${PAN}px`);
     showBillboard();
+    placeBillboard();
     // Place the moon and sun without gliding in from the corner.
     root.classList.add("placing");
     refresh();
@@ -805,6 +806,23 @@ export function createCity(root) {
   setTimeout(holidayFireworks, 4000);
 
   // The billboard's two lines (empty lines are fine).
+  // Puts the billboard on the tallest roof on the right where nothing in the game covers it (the
+  // rectangles in billboardAvoid, in screen pixels). If every spot is covered, it takes the lowest.
+  let billboardAvoid = [];
+  function placeBillboard() {
+    const el = root.querySelector(".billboard");
+    if (!el || !billboard) return;
+    const spots = billboard.roofs.map(roof => ({ x: Math.round(roof.x + roof.w / 2 - billboard.w / 2), y: Math.round(roof.top - billboard.h - P * 3) }));
+    if (!spots.length) { el.style.display = "none"; return; }
+    const clear = spot => billboardAvoid.every(r => {
+      const top = toScreen(spot.y), bottom = top + billboard.h + P * 3;
+      return spot.x + billboard.w < r.left - 4 || spot.x > r.right + 4 || bottom < r.top - 4 || top > r.bottom + 4;
+    });
+    const spot = spots.find(clear) || spots[spots.length - 1];
+    el.style.display = "";
+    el.setAttribute("transform", `translate(${spot.x} ${spot.y})`);
+  }
+
   function showBillboard() {
     const one = root.querySelector(".bb-1"), two = root.querySelector(".bb-2");
     if (one) one.textContent = billboardText[0] || "";
@@ -852,6 +870,11 @@ export function createCity(root) {
     setBillboard(lines) {
       billboardText = lines;
       showBillboard();
+    },
+    // Parts of the game the billboard should stay clear of (screen rectangles).
+    avoidForBillboard(rects) {
+      billboardAvoid = rects;
+      placeBillboard();
     },
     wave,
     plane,
