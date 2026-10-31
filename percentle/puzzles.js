@@ -74,6 +74,39 @@ function validatePuzzle(questions) {
   return validateQuestions(questions);
 }
 
+// Answer scales. Most answers are percentages (0 to 100). A question can instead have its own
+// `scale`: { min, max, unit, prefix }, like 1 to 36 for an average ACT score, or 20000 to 120000
+// with prefix "$" for a salary. Guesses step by about a thousandth of the range, rounded to a power
+// of ten (0.1 on 0–100, 100 on a 100,000-wide range, 0.01 on 1–10); public/percentle/game.mjs
+// (scaleStep) does the same for players.
+const PERCENT_SCALE = { min: 0, max: 100 };
+const SCALE_ANSWER_MARGIN = 0.1;
+
+function scaleStep({ min, max }) {
+  return 10 ** Math.round(Math.log10((max - min) / 1000));
+}
+
+function roundToStep(value, scale) {
+  const step = scaleStep(scale);
+  return Number((Math.round(value / step) * step).toFixed(Math.max(0, -Math.round(Math.log10(step)))));
+}
+
+function validateScale(scale, label, problems) {
+  if (typeof scale !== "object" || Array.isArray(scale)) {
+    problems.push(`${label} scale must be an object like { "min": 1, "max": 36, "unit": "points" }.`);
+    return null;
+  }
+  const { min, max } = scale;
+  if (!Number.isFinite(min) || !Number.isFinite(max) || min < 0 || max <= min) {
+    problems.push(`${label} scale needs a min of 0 or more and a larger max.`);
+    return null;
+  }
+  const unit = scale.unit ?? "", prefix = scale.prefix ?? "";
+  if (typeof unit !== "string" || unit.trim().length > 16) problems.push(`${label} scale unit must be text of at most 16 characters.`);
+  if (typeof prefix !== "string" || prefix.trim().length > 3) problems.push(`${label} scale prefix must be text of at most 3 characters, like "$".`);
+  return { min, max, ...(String(unit).trim() ? { unit: String(unit).trim() } : {}), ...(String(prefix).trim() ? { prefix: String(prefix).trim() } : {}) };
+}
+
 // Checks a list of questions (a daily puzzle's or a batch for the endless bank) and reports every
 // problem at once. Returns the cleaned questions.
 function validateQuestions(questions) {
@@ -85,19 +118,29 @@ function validateQuestions(questions) {
       problems.push(`${label} must be an object.`);
       return null;
     }
+    const scale = question.scale === undefined || question.scale === null ? null : validateScale(question.scale, label, problems);
     const result = {
       text: text(question.text, `${label} text`, 15, 220, problems),
-      // Answers are always stored rounded to one decimal place (42.46 becomes 42.5).
-      answer: Number.isFinite(question.answer) ? Math.round(question.answer * 10) / 10 : question.answer,
+      // Answers are always stored rounded to their scale's step: one decimal place for a
+      // percentage (42.46 becomes 42.5).
+      answer: Number.isFinite(question.answer) ? roundToStep(question.answer, scale || PERCENT_SCALE) : question.answer,
       category: question.category,
       funFact: text(question.funFact, `${label} funFact`, 10, 180, problems),
       sourceName: text(question.sourceName, `${label} sourceName`, 3, 140, problems),
-      sourceUrl: question.sourceUrl
+      sourceUrl: question.sourceUrl,
+      ...(scale ? { scale } : {})
     };
     if (result.text && !result.text.endsWith("?")) problems.push(`${label} text must be a question ending in "?".`);
-    if (!Number.isFinite(result.answer) || result.answer <= 0 || result.answer >= 100) {
+    if (!scale && (!Number.isFinite(result.answer) || result.answer <= 0 || result.answer >= 100)) {
       problems.push(`${label} answer must be a number strictly between 0 and 100 after rounding to one decimal place.`);
     }
+    if (scale && Number.isFinite(result.answer)) {
+      // Not so near either end that the range gives the answer away.
+      const position = (result.answer - scale.min) / (scale.max - scale.min);
+      if (!(position >= SCALE_ANSWER_MARGIN && position <= 1 - SCALE_ANSWER_MARGIN)) {
+        problems.push(`${label} answer must sit between ${SCALE_ANSWER_MARGIN * 100}% and ${100 - SCALE_ANSWER_MARGIN * 100}% of the way along its scale (${scale.min} to ${scale.max}).`);
+      }
+    } else if (scale) problems.push(`${label} answer must be a number.`);
     if (!CATEGORIES.includes(result.category)) problems.push(`${label} category must be one of: ${CATEGORIES.join(", ")}.`);
     try {
       if (new URL(result.sourceUrl).protocol !== "https:") throw new Error();

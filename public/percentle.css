@@ -78,6 +78,9 @@ main{padding:47px 0 34px}
 .reveal-row.lower{flex-direction:row-reverse}
 .reveal-num{font:700 44px/1.1 var(--mono);letter-spacing:-2px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .reveal-num small{font:400 24px var(--mono);color:var(--muted);margin-left:2px}
+.reveal-num small.prefix{margin:0 2px 0 0}.reveal-num small.word{margin-left:.35em}
+/* Long values on a custom scale ("$120,000") are set smaller so the guess and the answer fit side by side. */
+.reveal-row.long .reveal-num{font-size:32px;letter-spacing:-1.5px}.reveal-row.long .reveal-num small{font-size:18px}
 .reveal-answer,.reveal-answer small{color:var(--ink)}
 .reveal-answer{border-bottom:3px solid currentColor;padding-bottom:3px}
 .reveal-arrow{font:400 30px var(--mono);color:var(--muted)}
@@ -107,7 +110,7 @@ main{padding:47px 0 34px}
 dialog{width:min(440px,calc(100% - 32px));border:1px solid var(--line);border-top:2px solid var(--charge);border-radius:10px;background:var(--card);color:var(--ink);padding:25px 27px 29px;box-shadow:0 24px 80px #0002}dialog::backdrop{background:#000b;backdrop-filter:blur(3px)}.dialog-head{position:absolute;top:18px;right:18px}.close-button{font-size:21px}.dialog-title{font:700 29px var(--display);margin:17px 0 12px}dialog h2{font:700 29px var(--display);margin:4px 48px 12px 0}dialog p,dialog li{font-size:13px;line-height:1.7;color:var(--muted)}dialog p strong{color:var(--ink)}.dialog-actions{display:flex;gap:9px}.dialog-actions button{flex:1}
 .toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,15px);opacity:0;pointer-events:none;border-radius:6px;background:var(--charge);color:var(--charge-ink);font-weight:700;box-shadow:0 0 22px var(--charge-glow);padding:11px 16px;font-size:12px;transition:.2s;z-index:5}.toast.visible{opacity:1;transform:translate(-50%,0)}
 [hidden]{display:none!important}
-@media(max-width:520px){.site-shell{width:min(100% - 28px,720px)}.topbar{height:64px}.return-button{padding:7px 10px;font-size:11px;gap:4px}.return-full{display:none}.return-short{display:inline}main{padding:36px 0 20px}.intro{margin-bottom:25px}.game-card{padding:2px 0 24px;min-height:380px}.question-body{padding-top:12px}.q-num{font-size:64px}.guess-input{font-size:44px}.reveal-num{font-size:36px}.reveal-num small{font-size:20px}.reveal-row{gap:10px}.dialog-actions{flex-direction:column}}
+@media(max-width:520px){.site-shell{width:min(100% - 28px,720px)}.topbar{height:64px}.return-button{padding:7px 10px;font-size:11px;gap:4px}.return-full{display:none}.return-short{display:inline}main{padding:36px 0 20px}.intro{margin-bottom:25px}.game-card{padding:2px 0 24px;min-height:380px}.question-body{padding-top:12px}.q-num{font-size:64px}.guess-input{font-size:44px}.reveal-num{font-size:36px}.reveal-num small{font-size:20px}.reveal-row.long .reveal-num{font-size:23px;letter-spacing:-1px}.reveal-row.long .reveal-num small{font-size:14px}.reveal-row{gap:10px}.dialog-actions{flex-direction:column}}
 /* Start screen: shown on every visit until the player taps into the game. */
 .start-screen{display:none;text-align:center;max-width:440px;margin:0 auto;padding:12px 0 20px;animation:rise .84s cubic-bezier(.2,.8,.2,1) both}
 body.starting .start-screen{display:block}

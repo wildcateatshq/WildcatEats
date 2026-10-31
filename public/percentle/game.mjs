@@ -114,16 +114,71 @@ export function easternDate(date = new Date()) {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
 
-// Typed guesses keep a fixed decimal point: up to two whole digits, then the tenths digit.
-// Typing "4", "2", "5" gives 42.5; "." jumps to the tenths early ("7", ".", "5" gives 7.5).
-// The first digit after focusing or dragging replaces the current value.
-export function guessEntryFrom(value) {
-  const [whole, tenth] = Number(value).toFixed(1).split(".");
-  return { whole, tenth, inTenths: true, fresh: true };
+// ---------- Answer scales ----------
+// Most answers are percentages from 0 to 100. A question can instead have its own `scale`:
+// { min, max, unit, prefix }, such as 1–36 for an average ACT score, or $20,000 to $120,000 for a
+// salary. The game itself works on where a guess sits along the bar, from 0 to 100 (its
+// position), so the drain, supercharges, and scores treat every scale alike: missing by a tenth of
+// the range drains like being 10 points off a percentage.
+export const PERCENT_SCALE = Object.freeze({ min: 0, max: 100, unit: "%", prefix: "" });
+
+export function scaleOf(question) {
+  return question?.scale ? { ...PERCENT_SCALE, unit: "", ...question.scale } : PERCENT_SCALE;
+}
+
+// Guesses move in steps of about a thousandth of the range, rounded to a power of ten: 0.1 on
+// 0–100, 100 on a range 100,000 wide, 0.01 on 1–10.
+export function scaleStep(scale = PERCENT_SCALE) {
+  return 10 ** Math.round(Math.log10((scale.max - scale.min) / 1000));
+}
+
+export function scaleDecimals(scale = PERCENT_SCALE) {
+  return Math.max(0, -Math.round(Math.log10(scaleStep(scale))));
+}
+
+// A value on the scale, rounded to the scale's step.
+export function roundToScale(value, scale = PERCENT_SCALE) {
+  const step = scaleStep(scale);
+  return Number((Math.round(value / step) * step).toFixed(scaleDecimals(scale)));
+}
+
+// Where a value sits along the bar (0 at the scale's min, 100 at its max), and back.
+export function toPosition(value, scale = PERCENT_SCALE) {
+  return ((value - scale.min) / (scale.max - scale.min)) * 100;
+}
+
+export function fromPosition(position, scale = PERCENT_SCALE) {
+  return roundToScale(scale.min + (position / 100) * (scale.max - scale.min), scale);
+}
+
+// A value written for players: "42.5%", "$70,000", "7.25/10", "19.4 points". Big scales get
+// thousands separators. `withUnit: false` leaves off the prefix and unit.
+export function formatValue(value, scale = PERCENT_SCALE, { withUnit = true } = {}) {
+  const decimals = scaleDecimals(scale);
+  const number = scale.max >= 10_000
+    ? value.toLocaleString("en-US", { minimumFractionDigits: decimals, maximumFractionDigits: decimals })
+    : value.toFixed(decimals);
+  if (!withUnit) return number;
+  const unit = scale.unit ? (/^\p{L}/u.test(scale.unit) ? ` ${scale.unit}` : scale.unit) : "";
+  return `${scale.prefix || ""}${number}${unit}`;
+}
+
+// Typed guesses keep a fixed decimal point: up to as many whole digits as the scale needs, then
+// its decimals. On 0–100 that's two whole digits, then the tenths: typing "4", "2", "5" gives 42.5,
+// and "." jumps to the tenths early ("7", ".", "5" gives 7.5). On 1–10 "7", "2", "5" gives 7.25; on a
+// salary scale "7", "0", "0", "0", "0" gives 70000. The first digit after focusing or dragging
+// replaces the current value.
+export function guessEntryFrom(value, scale = PERCENT_SCALE) {
+  const decimals = scaleDecimals(scale);
+  const [whole, tenth = ""] = Number(value).toFixed(decimals).split(".");
+  // The most whole digits a guess below the max can have (99 on 0–100, 9 on 1–10, 35 on 1–36).
+  const wholeDigits = String(Math.max(1, Math.ceil(scale.max) - 1)).length;
+  return { whole, tenth, inTenths: decimals > 0, fresh: true, wholeDigits, decimals };
 }
 
 export function applyGuessKey(entry, key) {
   let { whole, tenth, inTenths } = entry;
+  const wholeDigits = entry.wholeDigits ?? 2, decimals = entry.decimals ?? 1;
   const isDigit = /^\d$/.test(key);
   if (entry.fresh && (isDigit || key === "." || key === ",")) {
     whole = "";
@@ -131,25 +186,26 @@ export function applyGuessKey(entry, key) {
     inTenths = false;
   }
   if (isDigit) {
-    if (inTenths) tenth = key;
-    else {
+    if (inTenths) tenth = tenth.length < decimals ? tenth + key : tenth.slice(0, -1) + key;
+    else if (whole.length < wholeDigits || whole === "0") {
       whole = whole === "0" ? key : whole + key;
-      if (whole.length >= 2) inTenths = true;
+      if (whole.length >= wholeDigits && decimals > 0) inTenths = true;
     }
-  } else if (key === "." || key === ",") {
+  } else if ((key === "." || key === ",") && decimals > 0) {
     inTenths = true;
   } else if (key === "Backspace") {
-    if (inTenths && tenth) tenth = "";
+    if (inTenths && tenth) tenth = tenth.slice(0, -1);
     else {
       inTenths = false;
       whole = whole.slice(0, -1);
     }
   }
-  return { whole, tenth, inTenths, fresh: false };
+  return { ...entry, whole, tenth, inTenths, fresh: false };
 }
 
 export function guessEntryText(entry) {
-  return `${entry.whole || "0"}.${entry.tenth || "0"}`;
+  const decimals = entry.decimals ?? 1;
+  return decimals ? `${entry.whole || "0"}.${(entry.tenth || "").padEnd(decimals, "0")}` : entry.whole || "0";
 }
 
 // Finishing alive on a low battery (this much charge or less) earns a phone-style "Low Battery"

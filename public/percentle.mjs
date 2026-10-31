@@ -1,4 +1,4 @@
-import { achievementsForGame, ACHIEVEMENTS, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, statsCharge, easternDate, endlessClock, finalCharge, weatherForDay, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { achievementsForGame, ACHIEVEMENTS, formatValue, fromPosition, roundToScale, scaleDecimals, scaleOf, scaleStep, toPosition, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, statsCharge, easternDate, endlessClock, finalCharge, weatherForDay, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
 import { createCity } from "/percentle/city.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
@@ -262,8 +262,62 @@ city.setHoliday(forcedHoliday ? (forcedHoliday === "none" ? null : forcedHoliday
 loadWeather().then(kind => { weatherNow = kind; city.setWeather(kind); updateSnow(endlessMode ? progressFor().guesses.length : 0); });
 
 // Answers always have exactly one decimal place, even if a puzzle was stored with more.
+// Answers rounded the way they're shown. A question with its own scale (game.mjs scaleOf) is
+// played by position along its bar: its answer becomes a position from 0 to 100, and the real
+// answer is kept as realAnswer for showing.
 function withRoundedAnswers(questions) {
-  return questions.map(question => ({ ...question, answer: Math.round(question.answer * 10) / 10 }));
+  return questions.map(question => {
+    if (!question.scale) return { ...question, answer: Math.round(question.answer * 10) / 10 };
+    const realAnswer = roundToScale(question.answer, scaleOf(question));
+    return { ...question, realAnswer, answer: toPosition(realAnswer, scaleOf(question)) };
+  });
+}
+
+// A guess (a position along the bar) or a question's answer in the question's own units.
+const guessValue = (question, position) => fromPosition(position, scaleOf(question));
+const answerValue = question => question.realAnswer ?? question.answer;
+
+// A value as big digits with a small unit, for the guess and answer numbers on the reveal.
+function valueHtml(question, value) {
+  const scale = scaleOf(question);
+  const unit = scale.unit || "";
+  const word = /^\p{L}/u.test(unit) ? ' class="word"' : "";
+  return `${scale.prefix ? `<small class="prefix">${escapeHtml(scale.prefix)}</small>` : ""}${formatValue(value, scale, { withUnit: false })}${unit ? `<small${word}>${escapeHtml(unit)}</small>` : ""}`;
+}
+
+// How far a guess was from the answer, in the question's units: "12.4% off", "$12,000 off",
+// "2.5 points off". A unit like "/10" is left off ("1.25 off").
+function distanceText(question, guess) {
+  const scale = scaleOf(question);
+  const distance = roundToScale(Math.abs(guessValue(question, guess) - answerValue(question)), scale);
+  const keepUnit = scale.unit === "%" || /^\p{L}/u.test(scale.unit || "");
+  return formatValue(distance, keepUnit ? scale : { ...scale, unit: "" });
+}
+
+// A scale's number kept short: no trailing zeros ("36", "7.5"), and thousands as K or millions as M
+// on big scales ("$90K").
+function shortNumber(value, scale) {
+  if (scale.max >= 1_000_000) return `${Number((value / 1_000_000).toFixed(2))}M`;
+  if (scale.max >= 10_000) return `${Number((value / 1000).toFixed(1))}K`;
+  return String(Number(value.toFixed(scaleDecimals(scale))));
+}
+
+// The range under the question: "0-100%", "$40,000–$140,000", "1–36 points", "5–10 (out of 10)".
+function scaleHint(question) {
+  if (!question?.scale) return "0-100%";
+  const scale = scaleOf(question);
+  const unit = scale.unit || "";
+  const phrase = unit.startsWith("/") ? ` (out of ${unit.slice(1)})` : /^\p{L}/u.test(unit) ? ` ${unit}` : unit;
+  const number = value => `${scale.prefix || ""}${formatValue(value, scale, { withUnit: false }).replace(/\.0+$/, "")}`;
+  return `${number(scale.min)}–${number(scale.max)}${phrase}`;
+}
+
+// The labels under a question's bar, kept short so they don't run into the markers: its min,
+// middle and max ("0% 50% 100%", "$40K $90K $140K", "1 18.5 36"). The hint above gives the unit.
+function rangeLabels(question) {
+  const scale = scaleOf(question);
+  const label = position => `${scale.prefix || ""}${shortNumber(fromPosition(position, scale), scale)}${scale.unit === "%" ? "%" : ""}`;
+  return `<div class="range-labels">${[0, 50, 100].map(position => `<span>${escapeHtml(label(position))}</span>`).join("")}</div>`;
 }
 
 function readState() {
@@ -539,8 +593,8 @@ function render() {
   stage.innerHTML = `
     <div class="question-body">
       <h2 class="question-text">${escapeHtml(question.text)}</h2>
-      <div class="hint-row"><p class="question-hint">0-100%</p></div>
-      ${view.phase === "reveal" ? reveal(question, progress.guesses[index], index) : guessForm(guess)}
+      <div class="hint-row"><p class="question-hint">${escapeHtml(scaleHint(question))}</p></div>
+      ${view.phase === "reveal" ? reveal(question, progress.guesses[index], index) : guessForm(guess, question)}
     </div>`;
   if (view.phase === "guess") maybeFlyPlane();
   setAction(view.phase === "reveal"
@@ -597,7 +651,7 @@ function renderScoreBox(progress, view, animate) {
   const gain = Math.round((charge - previous) * 10) / 10;
   // Blank while answering; "X% off" (or the recharge) pops in with each reveal.
   note.textContent = view.phase === "reveal"
-    ? lastOff === 0 ? gain > 0 ? `+${gain.toFixed(1)}% CHARGE!` : "NO CHARGE LOST!" : `${lastOff.toFixed(1)}% off`
+    ? lastOff === 0 ? gain > 0 ? `+${gain.toFixed(1)}% CHARGE!` : "NO CHARGE LOST!" : `${distanceText(currentQuestions[locked - 1], progress.guesses[locked - 1])} off`
     : "";
   note.classList.remove("pop");
   if (animate && view.phase === "reveal") {
@@ -699,26 +753,42 @@ function powerOut() {
   render();
 }
 
-function guessForm(guess) {
-  return `<div class="guess-display"><input class="guess-input" id="guessInput" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" value="${Number(guess).toFixed(1)}" aria-label="Your percentage guess, from 0 to 100"><span class="percent-sign">%</span></div>
+// The guess as typed in the box: big scales get thousands separators ("70,000"), and reading it
+// back ignores them.
+const groupedEntry = (text, scale) => (scale.max >= 10_000 ? text.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : text);
+const enteredValue = input => Number(input.value.replace(/,/g, ""));
+
+// `guess` is a position along the bar (0–100); the box shows it in the question's own units.
+function guessForm(guess, question) {
+  const scale = scaleOf(question);
+  const percent = !question?.scale;
+  const shown = formatValue(fromPosition(guess, scale), scale, { withUnit: false });
+  const widest = formatValue(scale.max, scale, { withUnit: false }).length;
+  const width = widest > 4 ? ` style="width:calc(${widest}ch + 34px)"` : "";
+  const label = percent ? "Your percentage guess, from 0 to 100" : `Your guess, from ${formatValue(scale.min, scale)} to ${formatValue(scale.max, scale)}`;
+  const step = (scaleStep(scale) / (scale.max - scale.min)) * 100;
+  const unit = scale.unit || "";
+  return `<div class="guess-display">${scale.prefix ? `<span class="percent-sign">${escapeHtml(scale.prefix)}</span>` : ""}<input class="guess-input" id="guessInput" type="text" inputmode="${scaleDecimals(scale) ? "decimal" : "numeric"}" autocomplete="off" spellcheck="false" value="${shown}"${width} aria-label="${escapeAttr(label)}">${unit ? `<span class="percent-sign">${escapeHtml(unit)}</span>` : ""}</div>
     <div class="range-wrap"><div class="battery bar-battery" id="guessBattery" style="--level:${guess}"><div class="battery-cell"><span class="battery-fill"></span>${ZAP}
-        <input class="battery-range" id="guessRange" type="range" min="0" max="100" step="0.1" value="${guess}" aria-label="Adjust your percentage guess from 0 to 100"></div></div>
-      <div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div></div>`;
+        <input class="battery-range" id="guessRange" type="range" min="0" max="100" step="${Number(step.toFixed(6))}" value="${guess}" aria-label="${escapeAttr(label.replace("Your", "Adjust your"))}"></div></div>
+      ${rangeLabels(question)}</div>`;
 }
 
 function bindGuessControls(initial, index) {
   const input = document.querySelector("#guessInput");
   const range = document.querySelector("#guessRange");
   const battery = document.querySelector("#guessBattery");
-  let entry = guessEntryFrom(initial);
+  const scale = scaleOf(currentQuestions[index]);
+  const position = () => Math.max(0, Math.min(100, toPosition(enteredValue(input), scale)));
+  let entry = guessEntryFrom(fromPosition(initial, scale), scale);
   const persistDraft = () => {
-    battery.style.setProperty("--level", input.value);
-    progressFor().draft = Number(input.value);
+    battery.style.setProperty("--level", position());
+    progressFor().draft = position();
     save();
   };
   const showEntry = () => {
-    input.value = guessEntryText(entry);
-    range.value = input.value;
+    input.value = groupedEntry(guessEntryText(entry), scale);
+    range.value = position();
     input.setSelectionRange(input.value.length, input.value.length);
     persistDraft();
   };
@@ -728,7 +798,7 @@ function bindGuessControls(initial, index) {
     if (event.inputType.startsWith("delete")) entry = applyGuessKey(entry, "Backspace");
     else if (event.inputType === "insertFromPaste" || event.inputType === "insertFromDrop") {
       const pasted = Number.parseFloat(event.data ?? event.dataTransfer?.getData("text") ?? "");
-      if (Number.isFinite(pasted)) entry = { ...guessEntryFrom(Math.max(0, Math.min(100, pasted))), fresh: false };
+      if (Number.isFinite(pasted)) entry = { ...guessEntryFrom(roundToScale(Math.max(scale.min, Math.min(scale.max, pasted)), scale), scale), fresh: false };
     } else for (const key of event.data ?? "") entry = applyGuessKey(entry, key);
     showEntry();
   });
@@ -737,14 +807,14 @@ function bindGuessControls(initial, index) {
     requestAnimationFrame(() => input.setSelectionRange(input.value.length, input.value.length));
   });
   range.addEventListener("input", () => {
-    entry = guessEntryFrom(range.value);
-    input.value = guessEntryText(entry);
+    entry = guessEntryFrom(fromPosition(Number(range.value), scale), scale);
+    input.value = groupedEntry(guessEntryText(entry), scale);
     persistDraft();
   });
   document.querySelector("#lockButton").addEventListener("click", () => {
-    const value = Number(input.value);
-    if (input.value.trim() === "" || !Number.isFinite(value) || value < 0 || value > 100) {
-      input.setCustomValidity("Enter a number from 0 to 100.");
+    const value = enteredValue(input);
+    if (input.value.trim() === "" || !Number.isFinite(value) || value < scale.min || value > scale.max) {
+      input.setCustomValidity(`Enter a number from ${formatValue(scale.min, scale, { withUnit: false })} to ${formatValue(scale.max, scale, { withUnit: false })}.`);
       input.reportValidity();
       input.addEventListener("input", () => input.setCustomValidity(""), { once: true });
       return;
@@ -752,7 +822,8 @@ function bindGuessControls(initial, index) {
     const progress = progressFor();
     if (!progress.guesses.length) progress.hard = hardPreferred;
     if (endlessMode) markEndlessSeen(currentQuestions[index]);
-    progress.guesses[index] = Math.round(value * 10) / 10;
+    // Saved as a position along the bar (for a percentage, the guess itself).
+    progress.guesses[index] = Math.round(toPosition(value, scale) * 1000) / 1000;
     progress.locked.push(true);
     progress.draft = null;
     recordTodayIfComplete(progress);
@@ -763,7 +834,7 @@ function bindGuessControls(initial, index) {
   input.addEventListener("keydown", event => {
     if (event.key === "Enter") document.querySelector("#lockButton").click();
   });
-  input.value = Number(initial).toFixed(1);
+  input.value = groupedEntry(guessEntryText(entry), scale);
 }
 
 // A guess's number glows like it's charged: bright and glowing when close, dimming toward a
@@ -790,10 +861,14 @@ function reveal(question, guess, index) {
   const answerHigher = question.answer >= guess;
   const arrow = guess === question.answer ? "=" : answerHigher ? ICONS.right : ICONS.left;
   const lit = litStyle(off);
-  return `<div class="reveal-row ${answerHigher ? "" : "lower"}${off === 0 ? " struck" : ""}" id="revealRow" aria-label="You guessed ${Number(guess).toFixed(1)} percent. The answer is ${question.answer.toFixed(1)} percent, ${off.toFixed(1)} points off.">
-      <span class="reveal-num reveal-guess" style="--lit-color:${lit.color};--lit-glow:${lit.glow}">${Number(guess).toFixed(1)}<small>%</small></span>
+  const scale = scaleOf(question);
+  const guessShown = formatValue(guessValue(question, guess), scale), answerShown = formatValue(answerValue(question), scale);
+  // Long numbers ("$120,000") get a smaller size so both fit side by side on a phone.
+  const long = Math.max(guessShown.length, answerShown.length) > 7 ? " long" : "";
+  return `<div class="reveal-row ${answerHigher ? "" : "lower"}${off === 0 ? " struck" : ""}${long}" id="revealRow" aria-label="You guessed ${escapeAttr(guessShown)}. The answer is ${escapeAttr(answerShown)}, ${escapeAttr(distanceText(question, guess))} off.">
+      <span class="reveal-num reveal-guess" style="--lit-color:${lit.color};--lit-glow:${lit.glow}">${valueHtml(question, guessValue(question, guess))}</span>
       <span class="reveal-arrow" aria-hidden="true">${arrow}</span>
-      <span class="reveal-num reveal-answer">${question.answer.toFixed(1)}<small>%</small></span>
+      <span class="reveal-num reveal-answer">${valueHtml(question, answerValue(question))}</span>
       ${off === 0 ? `<span class="supercharged" role="status">${NO_DRAIN_WORD}</span>` : ""}
     </div>
     <div class="comparison ${answerHigher ? "too-low" : "too-high"}" data-answer="${answerX}" aria-hidden="true">
@@ -801,7 +876,7 @@ function reveal(question, guess, index) {
         <span class="drained" style="left:${left}%;width:${width}%"></span><span class="battery-fill"></span>
         <span class="marker guess" style="left:${guessX}%;--lit-color:${lit.color};--lit-glow:${lit.glow}"><span class="marker-caption">YOU</span></span>
         <span class="marker answer" style="left:${answerX}%"><span class="marker-caption">ANSWER</span></span></div></div>
-      <div class="range-labels"><span>0%</span><span>50%</span><span>100%</span></div>
+      ${rangeLabels(question)}
     </div>
     <p class="source-note">${escapeHtml(question.funFact)}</p>`;
 }
@@ -849,7 +924,7 @@ function renderRecap(progress) {
     detail.innerHTML = step < progress.guesses.length ? logRow(question, progress.guesses[step], offs[step], step, step === best, charges[step] - (step ? charges[step - 1] : 100), rateOf(progress)) : `<article class="recap-item log-row unreached">
       <div class="log-row-head"><span class="log-q">Q${step + 1}</span><span class="recap-badge">Not reached</span></div>
       <p class="recap-question">${escapeHtml(question.text)}</p>
-      <p class="recap-numbers"><span>Answer: ${question.answer.toFixed(1)}%</span></p>
+      <p class="recap-numbers"><span>Answer: ${escapeHtml(formatValue(answerValue(question), scaleOf(question)))}</span></p>
     </article>`;
   };
   recap.querySelectorAll(".log-step").forEach(button => button.addEventListener("click", () => show(Number(button.dataset.step))));
@@ -898,7 +973,7 @@ function logRow(question, guess, off, i, isBest, change, rate) {
       <p class="recap-question">${escapeHtml(question.text)}</p>
       <div class="mini-bar" aria-hidden="true"><span class="mini-fill" style="width:${low}%"></span><span class="mini-gap" style="left:${low}%;width:${Math.abs(guessX - answerX)}%"></span>
         <span class="mini-tick" style="left:${guessX}%;background:${lit.color};box-shadow:${lit.glow}"></span><span class="mini-tick answer" style="left:${answerX}%"></span></div>
-      <p class="recap-numbers"><span style="color:${lit.color};text-shadow:${lit.glow}">You: ${guess.toFixed(1)}%</span><span>Answer: ${question.answer.toFixed(1)}%</span></p>
+      <p class="recap-numbers"><span style="color:${lit.color};text-shadow:${lit.glow}">You: ${escapeHtml(formatValue(guessValue(question, guess), scaleOf(question)))}</span><span>Answer: ${escapeHtml(formatValue(answerValue(question), scaleOf(question)))}</span></p>
     </article>`;
 }
 
@@ -1109,11 +1184,14 @@ function crowdLine(position) {
 }
 
 function shareResult(charge, progress, out) {
-  // The real distance of the best guess (even one that scored a perfect 0), e.g. "0.2% away".
-  const closest = Math.min(...progress.guesses.map((guess, i) => Math.abs(guess - currentQuestions[i].answer)));
+  // The real distance of the best guess (even one that scored a perfect 0), e.g. "0.2% away", in
+  // that question's units ("$1,200 away"). The closest is measured along the bar, so scales compare.
+  const gaps = progress.guesses.map((guess, i) => Math.abs(guess - currentQuestions[i].answer));
+  const nearest = gaps.indexOf(Math.min(...gaps));
+  const closest = distanceText(currentQuestions[nearest], progress.guesses[nearest]);
   const status = out ? `🪫 Out of charge on Q${progress.guesses.length}` : lowBatteryTier(charge) ? `🪫 Survived on ${formatCharge(charge)}` : `🔋 ${formatCharge(charge)}`;
   const link = `${location.origin}${location.pathname}`;
-  const result = `${GAME_NAME} #${currentNumber}${currentTheme ? ` · ${currentTheme}` : ""}${isHard(progress) ? " · Hard mode 😈" : ""}\n${status}\nClosest guess - ${closest.toFixed(1)}% away\n${link}`;
+  const result = `${GAME_NAME} #${currentNumber}${currentTheme ? ` · ${currentTheme}` : ""}${isHard(progress) ? " · Hard mode 😈" : ""}\n${status}\nClosest guess - ${closest} away\n${link}`;
   if (navigator.share) {
     navigator.share({ text: result }).catch(error => {
       if (error.name !== "AbortError") copyResult(result);

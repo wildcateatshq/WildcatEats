@@ -211,7 +211,13 @@ subjects and kinds.
 
 Each question has `text` (ending in "?"), `answer` (strictly between 0 and 100, at most one
 decimal), `category`, `funFact` (shown after the answer), `sourceName`, and an `https://`
-`sourceUrl` (kept for checking, not shown). Categories are `U.S. life`, `Sports`, `Music`,
+`sourceUrl` (kept for checking, not shown). A question can instead have a **custom scale**,
+`scale: { min, max, unit, prefix }` (for example `{ "min": 20000, "max": 120000, "prefix": "$" }` for a
+salary, or `{ "min": 1, "max": 36, "unit": "points" }` for an ACT score): its answer must sit 10–90% of
+the way along the scale and is rounded to the scale's step, about a thousandth of the range as a
+power of ten (100 on a 100,000-wide range, 0.01 on 1–10). The game plays every question by where a
+guess sits along its bar (0–100), so drain, supercharges and scores treat all scales alike, and it
+shows guesses and answers in the scale's units. Categories are `U.S. life`, `Sports`, `Music`,
 `Movies`, and `World`, in any mix: a day can have several questions from one category and
 none from another. A puzzle can also carry an optional `theme` (3–40 characters, e.g. "World
 Series Special"), which makes it a special: the game shows the title on the start screen and

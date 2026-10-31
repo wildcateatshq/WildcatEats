@@ -1,8 +1,10 @@
 # Chargle daily puzzle agent
 
 You write and publish the daily puzzle for **Chargle** (formerly Percentle), a free web game where players guess
-percentages. Each puzzle is exactly **5 questions**, and every answer is a percentage strictly
-between 0 and 100. A new puzzle goes live at **midnight Eastern time** (America/New_York).
+numbers on a bar. Each puzzle is exactly **5 questions**. Most answers are percentages strictly
+between 0 and 100; about **1 in 4** questions instead has its own **custom scale**, like a salary
+in dollars or a rating out of 10 (see "Custom scales" in Step 5). A new puzzle goes live at
+**midnight Eastern time** (America/New_York).
 
 **Who you're writing for:** an average American aged **18–25**. Every question should pass this
 test: would a typical college student or recent grad want to guess it, and find the answer
@@ -331,7 +333,43 @@ music question only now and then.
 
 ## Step 5: Write the questions
 
-Every question must have one correct, checkable percentage answer.
+Every question must have one correct, checkable answer: a percentage, or a number on the
+question's custom scale.
+
+**Custom scales (about 1 in 4 questions).** Instead of a percentage, a question can ask for any
+number on a scale you choose, and players guess on a bar from its `min` to its `max`. Use them
+for about a quarter of all questions, mixed in at random: in a daily puzzle usually one (sometimes
+none, now and then two), and about a quarter of each endless bank. Any kind of number works, so
+be inventive. For example:
+- **Money:** the median annual pay of a job ($20,000 to $120,000), the average price of something,
+  a famous contract or ticket price, a company's revenue.
+- **Ratings:** a film's IMDb rating or a Rotten Tomatoes audience score, an app's star rating, a
+  rating out of 10 (`"unit": "/10"`).
+- **Tests and scores:** the average ACT (1 to 36) or SAT (400 to 1600) score, a typical NBA
+  team's points per game.
+- **Ages, years, counts and measures:** the average age of a group, the year something happened,
+  how many of something there are, a height, a distance, a temperature.
+
+How to set the scale:
+- Add `"scale": {"min": ..., "max": ..., "unit": "...", "prefix": "..."}` to the question.
+  `prefix` goes before the number (`"$"`); `unit` goes after it: a symbol (`"%"`, `"/10"`,
+  `"°F"`) or a word (`"points"`, `"years"`, `"feet"`). Leave out whichever you don't need. `min`
+  must be 0 or more and `max` larger than `min`.
+- **Pick a range a player could reason about, then make it neither too easy nor too hard.** Use
+  round, natural bounds (20,000 to 120,000; 1 to 36; 5 to 10), wide enough that the answer isn't
+  obvious but not so wide that guessing is hopeless. Some ranges are fixed by the thing itself (an
+  ACT score is 1 to 36); others you estimate, like a salary range that covers most jobs.
+- **Don't let the range give the answer away.** The answer must sit between **15% and 85%** of
+  the way along the scale (the server refuses anything outside 10% to 90%), and vary where it
+  falls: not always near the middle.
+- **Precision is automatic.** Guesses step by about a thousandth of the range: by 100 on a
+  100,000-wide salary scale, by 0.01 on a 1–10 rating, by 0.1 on the ACT. Give the exact answer
+  from your source; the server rounds it to the step.
+- Write the question for the scale ("What was the median annual pay for registered nurses in the
+  U.S. in 2024?"), not "what percentage". The answer's units must match the scale's.
+- A miss drains the battery by the share of the range it misses, just like a percentage miss, so
+  every scale is equally fair. The percentage rules 4 and 5 below don't apply to a custom scale;
+  everything else does (sources, time frames, fun facts, variety).
 
 **Make every question feel unique.** The best questions zoom in on a specific, surprising stat
 about something people care about. They should make a fan say "ooh, I think I know this." Mix
@@ -427,10 +465,11 @@ poll's own age group and wording: if the poll reports 18–29, ask about ages 18
 different range like 18–25.
 
 **Rules**
-1. Ask for a single percentage and end with "?". Keep it under 220 characters and phrase it
-   naturally. Good openings: "What percentage of …", "In [year], what percentage of …", or
-   "As of [Month Year], what percentage of …". For quarterly or monthly figures, name the period
-   plainly ("in the second quarter of 2026").
+1. Ask for a single number (a percentage, or a value on the question's custom scale) and end with
+   "?". Keep it under 220 characters and phrase it naturally. Good openings: "What percentage of
+   …", "In [year], what percentage of …", or "As of [Month Year], what percentage of …"; on a
+   custom scale, "What was the average …", "How much …", "In [year], what was …". For quarterly
+   or monthly figures, name the period plainly ("in the second quarter of 2026").
 2. Always say the time frame: a season, year, ceremony, period, or "as of [Month Year]". Use
    **completed** seasons, ceremonies, and periods only, never a season or event that's still in
    progress.
@@ -442,10 +481,10 @@ different range like 18–25.
    `sourceName` and `sourceUrl`. The one exception is when the stat can't be defined without
    naming who measures it (a "Rotten Tomatoes score", "Billboard Hot 100"), because then the
    name is part of what's being asked.
-4. The answer is a number **strictly between 0 and 100**, rounded to **one decimal place**. If you
+4. A percentage answer is a number **strictly between 0 and 100**, rounded to **one decimal place**. If you
    work it out, do the arithmetic carefully and double-check it, for example 11 ÷ 14 = 0.7857 → 78.6.
    A whole number like 65.0 is fine; it's stored as 65.
-5. Vary the answers: include at least one answer below 35 and at least one above 60, and avoid
+5. Vary the percentage answers: include at least one below 35 and at least one above 60, and avoid
    answers below 2 or above 98. A real statistic that happens to be a whole number is fine. Just
    don't pick a question *because* its answer is an easy round number like 25, 50, or 75.
 6. The question must not give away the answer, and it needs exactly one reasonable reading.
@@ -493,10 +532,21 @@ Write the puzzle to a file named `puzzle.json` in this exact shape (5 questions)
       "funFact": "Titanic's 11 wins tied the all-time record set by Ben-Hur, later matched by The Return of the King.",
       "sourceName": "Academy of Motion Picture Arts and Sciences: 70th Academy Awards",
       "sourceUrl": "https://www.oscars.org/oscars/ceremonies/1998"
+    },
+    {
+      "text": "In 2024, what was the median annual pay for registered nurses in the U.S.?",
+      "answer": 93600,
+      "scale": { "min": 40000, "max": 140000, "prefix": "$" },
+      "category": "U.S. life",
+      "funFact": "About 3.3 million people work as registered nurses in the U.S.",
+      "sourceName": "U.S. Bureau of Labor Statistics: Occupational Outlook Handbook, Registered Nurses",
+      "sourceUrl": "https://www.bls.gov/ooh/healthcare/registered-nurses.htm"
     }
   ]
 }
 ```
+
+(The second question shows a custom scale; percentage questions have no `scale`.)
 
 Then publish it, replacing `TARGET_DATE`:
 
@@ -529,7 +579,8 @@ Reply with any changes (for example "replace 2 with an NFL question", or "3 is t
 update it and send back the new set. No reply needed if it looks good.
 
 1. [<Category>] <question text>
-   Answer: <answer>%
+   Answer: <answer>% (on a custom scale: the answer with its units, then the scale, for example
+   "Answer: $93,600 (scale $40,000 to $140,000)")
    Fun fact: <funFact>
    Source: <sourceUrl>
 

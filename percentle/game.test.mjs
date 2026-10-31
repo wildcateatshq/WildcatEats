@@ -7,6 +7,12 @@ import {
   chargeTrack,
   chargeLeft,
   statsCharge,
+  formatValue,
+  fromPosition,
+  roundToScale,
+  scaleOf,
+  scaleStep,
+  toPosition,
   crowdRank,
   DRAIN_RATE,
   drainRateFor,
@@ -54,6 +60,36 @@ test("daily total sums the five absolute differences", () => {
   // 1 + 2 + 0 (30.5 is within 0.5 of 30) + 2 + 5
   assert.equal(dailyTotal([11, 18, 30.5, 42, 45], questions), 10);
   assert.throws(() => dailyTotal([10], questions), RangeError);
+});
+
+test("custom scales step by about a thousandth of the range and play by position along the bar", () => {
+  const salary = { min: 20000, max: 120000, prefix: "$" };
+  const rating = { min: 1, max: 10, unit: "/10" };
+  const act = { min: 1, max: 36, unit: "points" };
+  assert.equal(scaleStep(scaleOf({})), 0.1, "percentages keep tenths");
+  assert.equal(scaleStep(salary), 100);
+  assert.equal(scaleStep(rating), 0.01);
+  assert.equal(scaleStep(act), 0.1);
+  assert.equal(scaleStep({ min: 400, max: 1600 }), 1);
+  assert.equal(toPosition(70000, salary), 50);
+  assert.equal(fromPosition(50, salary), 70000);
+  assert.equal(fromPosition(33.3333, rating), 4);
+  assert.equal(roundToScale(19.43, act), 19.4);
+  assert.equal(formatValue(70000, salary), "$70,000");
+  assert.equal(formatValue(7.25, rating), "7.25/10");
+  assert.equal(formatValue(19.4, act), "19.4 points");
+  assert.equal(formatValue(42.5, scaleOf({})), "42.5%", "percentages look the same as ever");
+  // Missing by a tenth of the range drains like 10 points off a percentage.
+  assert.equal(pointsOff(toPosition(80000, salary), toPosition(70000, salary)), 10);
+  assert.equal(pointsOff(toPosition(70400, salary), toPosition(70000, salary)), 0, "within 0.5% of the range is a supercharge");
+});
+
+test("typing a guess follows the scale's digits and decimals", () => {
+  const type = (start, scale, keys) => guessEntryText([...keys].reduce((entry, key) => applyGuessKey(entry, key), guessEntryFrom(start, scale)));
+  assert.equal(type(5.5, { min: 1, max: 10 }, "725"), "7.25");
+  assert.equal(type(18.5, { min: 1, max: 36 }, "194"), "19.4");
+  assert.equal(type(70000, { min: 20000, max: 120000 }, "65000"), "65000");
+  assert.equal(type(70000, { min: 20000, max: 120000 }, "6.5"), "65", "no decimals on a scale that steps by 100");
 });
 
 test("a hard game counts in stats as the charge the same guesses would leave in regular mode", () => {

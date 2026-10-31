@@ -56,6 +56,24 @@ test("puzzle validation reports every problem at once", () => {
   assert.throws(() => validatePuzzle(puzzle), /Question 1 answer[\s\S]*Question 2 sourceUrl[\s\S]*Question 3 category[\s\S]*Question 4 text/);
 });
 
+test("a question can have its own scale, with its answer rounded to the scale's step and kept off the ends", () => {
+  const puzzle = validPuzzle();
+  puzzle[0] = { ...puzzle[0], answer: 63795.4, scale: { min: 20000, max: 120000, prefix: " $ ", unit: "" } };
+  puzzle[1] = { ...puzzle[1], answer: 19.43, scale: { min: 1, max: 36, unit: "points" } };
+  const cleaned = validatePuzzle(puzzle);
+  assert.equal(cleaned[0].answer, 63800, "a salary scale steps by 100");
+  assert.deepEqual(cleaned[0].scale, { min: 20000, max: 120000, prefix: "$" });
+  assert.equal(cleaned[1].answer, 19.4);
+  assert.equal("scale" in cleaned[2], false, "percentages have no scale");
+
+  const tooClose = validPuzzle();
+  tooClose[0] = { ...tooClose[0], answer: 118000, scale: { min: 20000, max: 120000 } };
+  assert.throws(() => validatePuzzle(tooClose), /Question 1 answer must sit between 10% and 90%/);
+  const backwards = validPuzzle();
+  backwards[0] = { ...backwards[0], answer: 50, scale: { min: 100, max: 10 } };
+  assert.throws(() => validatePuzzle(backwards), /Question 1 scale needs a min of 0 or more and a larger max/);
+});
+
 test("any category mix is allowed, but each puzzle has exactly five questions", () => {
   const allSports = validPuzzle().map((item, index) => ({ ...item, category: "Sports", text: `What percentage of sports thing ${index} happened?` }));
   assert.equal(validatePuzzle(allSports).length, 5);
