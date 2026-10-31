@@ -400,6 +400,20 @@ body.hard .city-glow{background:radial-gradient(ellipse 60% 70% at 50% 100%,rgba
 body.hard .city-bolt{--bolt-glow:#b46bff}body.hard .bolt-core{stroke:#f0dcff}body.hard .spark,body.hard .city .bw.hit rect{fill:#f0dcff}
 body.hard .city-flash{background:radial-gradient(ellipse 80% 60% at var(--x,50%) 10%,rgba(225,190,255,.32),transparent 70%)}
 body.hard .burst{fill:#c45cff}body.hard .burst-1{fill:#ff8ad8}body.hard .burst-2{fill:#e9d6ff}
+/* The storm's power-out strike (strike({outage})): a huge blue-white bolt, the whole screen flashing
+   white twice, a shockwave ring from the roof it hits, and the city jolting. */
+.city-bolt.outage,body.hard .city-bolt.outage{--bolt-glow:#9cc4ff;filter:drop-shadow(0 0 6px var(--bolt-glow)) drop-shadow(0 0 26px var(--bolt-glow)) drop-shadow(0 0 60px rgba(156,196,255,.6));animation:city-bolt-in .08s linear both,city-bolt-outage 1.8s ease-out .08s forwards}
+body.hard .city-bolt.outage .bolt-core{stroke:#ffffff}
+.city-bolt.outage .impact{animation-duration:1.6s}
+.city-bolt.outage .shockwave{fill:none;stroke:#e6f0ff;stroke-width:3;transform-box:fill-box;transform-origin:center;animation:city-shockwave 1s cubic-bezier(.1,.7,.3,1) both}
+.city-bolt.outage .spark{fill:#eef5ff}
+.city-flash.outage,body.hard .city-flash.outage{background:radial-gradient(ellipse 140% 110% at var(--x,50%) 30%,rgba(240,246,255,.95),rgba(200,220,255,.55) 60%,rgba(200,220,255,.3));animation:city-flash-outage 1.6s ease-out forwards}
+.city.quake .city-world{animation:city-quake .6s linear}
+@keyframes city-bolt-outage{0%,5%{opacity:1}8%{opacity:.1}11%,20%{opacity:1}23%{opacity:.3}27%,60%{opacity:1}100%{opacity:0}}
+@keyframes city-flash-outage{0%{opacity:0}4%{opacity:1}9%{opacity:.15}14%{opacity:.95}20%{opacity:.3}26%{opacity:.6}100%{opacity:0}}
+@keyframes city-shockwave{from{transform:scale(.2);opacity:1;stroke-width:6}to{transform:scale(7);opacity:0;stroke-width:1}}
+@keyframes city-quake{0%,100%{translate:0 0}12%{translate:-9px 5px}25%{translate:8px -6px}38%{translate:-7px 4px}50%{translate:6px -3px}65%{translate:-4px 2px}80%{translate:2px -1px}}
+@media(prefers-reduced-motion:reduce){.city.quake .city-world{animation:none}}
 @keyframes city-bolt-in{from{clip-path:inset(0 0 100% 0)}to{clip-path:inset(0)}}
 @keyframes city-bolt{0%,8%{opacity:1}12%{opacity:.2}16%,40%{opacity:1}100%{opacity:0}}
 @keyframes city-bolt-perfect{0%,6%{opacity:1}9%{opacity:.15}12%,22%{opacity:1}25%{opacity:.25}29%,55%{opacity:1}100%{opacity:0}}

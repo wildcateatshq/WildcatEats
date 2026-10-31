@@ -375,11 +375,11 @@ export function createCity(root) {
       }
       return out;
     };
-    const stormFront = `<svg class="storm-front" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">${cloudBank(W, -H * 0.05, H * 0.2, phone ? 12 : 22, 91)}</svg>`;
+    const stormFront = `<svg class="storm-front" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">${cloudBank(W, -H * 0.04, H * 0.2, phone ? 24 : 32, 91)}</svg>`;
     const flickers = [[0.2, 0.3, 0], [0.72, 0.55, -2.3], [0.45, 0.78, -4.1], [0.85, 0.18, -5.6]]
       .map(([fx, fy, delay]) => `<div class="storm-flicker" style="left:${(fx * 100).toFixed(0)}%;top:${(fy * 100).toFixed(0)}%;animation-delay:${delay}s"></div>`).join("");
     const stormSky = `<div class="city-stormsky" style="height:${PAN}px;top:-${PAN}px">${flickers}
-        <svg viewBox="0 0 ${W} ${PAN}" preserveAspectRatio="none">${cloudBank(W, -PAN * 0.05, PAN * 1.05, phone ? 26 : 46, 97)}</svg></div>`;
+        <svg viewBox="0 0 ${W} ${PAN}" preserveAspectRatio="none">${cloudBank(W, -PAN * 0.05, PAN * 1.02, phone ? 50 : 92, 97)}</svg></div>`;
     // Rain over the whole screen in the storm: one tile of streaks, repeated and slid down endlessly.
     const rr = random(101);
     let streaks = "";
@@ -634,31 +634,36 @@ export function createCity(root) {
     const target = candidates[Math.floor(Math.random() * candidates.length)] || buildings[0];
     const hitX = target.x + target.w / 2;
     const hitY = target.top;
-    const startX = Math.min(W * 0.95, Math.max(W * 0.05, hitX + (Math.random() - 0.5) * W * (perfect ? 0.5 : 0.35)));
+    // The strike that knocks the power out in a storm is the biggest of all: a thick bolt with many
+    // branches, a white flash over the whole screen, a shockwave from the roof and a jolt.
+    const big = perfect || outage;
+    const startX = Math.min(W * 0.95, Math.max(W * 0.05, hitX + (Math.random() - 0.5) * W * (big ? 0.5 : 0.35)));
     const main = jagged(startX, -10, hitX, hitY, 0.22);
-    const reach = H * (perfect ? 0.32 : 0.16) * (phone ? 1 : 0.8);
-    const forks = branches(main, perfect ? 7 : 3, reach, perfect ? 1 : 2, []);
+    const reach = H * (outage ? 0.4 : perfect ? 0.32 : 0.16) * (phone ? 1 : 0.8);
+    const forks = branches(main, outage ? 10 : perfect ? 7 : 3, reach, big ? 1 : 2, []);
     const path = points => points.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join("");
-    const width = { core: perfect ? 3.5 : 2.5, glow: perfect ? 18 : 11 };
+    const width = outage ? { core: 6, glow: 34 } : { core: perfect ? 3.5 : 2.5, glow: perfect ? 18 : 11 };
     const forkLines = forks.map(({ points, depth }) => {
       const scale = depth === 1 ? 0.55 : 0.35;
       return `<path class="bolt-glow" d="${path(points)}" stroke-width="${(width.glow * scale).toFixed(1)}"/><path class="bolt-core" d="${path(points)}" stroke-width="${(width.core * scale).toFixed(1)}" opacity="${depth === 1 ? 0.85 : 0.6}"/>`;
     }).join("");
     let sparks = "";
-    if (perfect) {
-      for (let i = 0; i < 18; i++) {
+    if (big) {
+      for (let i = 0; i < (outage ? 34 : 18); i++) {
         const angle = Math.PI + Math.random() * Math.PI; // up and out from the roof
-        const distance = 30 + Math.random() * (phone ? 60 : 110);
+        const distance = 30 + Math.random() * (phone ? 60 : 110) * (outage ? 1.6 : 1);
         sparks += `<rect class="spark" x="${(hitX - P / 2).toFixed(0)}" y="${(hitY - P / 2).toFixed(0)}" width="${P}" height="${P}" style="--dx:${(Math.cos(angle) * distance).toFixed(0)}px;--dy:${(Math.sin(angle) * distance).toFixed(0)}px;animation-delay:${(Math.random() * 0.12).toFixed(2)}s"/>`;
       }
     }
-    scene().insertAdjacentHTML("beforeend", `<svg class="city-bolt${perfect ? " perfect" : ""}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">
+    const kind = outage ? " outage" : perfect ? " perfect" : "";
+    scene().insertAdjacentHTML("beforeend", `<svg class="city-bolt${kind}" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">
         <defs><radialGradient id="impact"><stop offset="0" stop-color="#fffaf0" stop-opacity=".9"/><stop offset=".4" stop-color="var(--bolt-glow, #ffd56a)" stop-opacity=".45"/><stop offset="1" stop-color="var(--bolt-glow, #ffd56a)" stop-opacity="0"/></radialGradient></defs>
-        <circle class="impact" cx="${hitX.toFixed(0)}" cy="${hitY.toFixed(0)}" r="${perfect ? 90 : 50}" fill="url(#impact)"/>
+        <circle class="impact" cx="${hitX.toFixed(0)}" cy="${hitY.toFixed(0)}" r="${outage ? 160 : perfect ? 90 : 50}" fill="url(#impact)"/>
+        ${outage ? `<circle class="shockwave" cx="${hitX.toFixed(0)}" cy="${hitY.toFixed(0)}" r="${phone ? 40 : 60}"/>` : ""}
         ${forkLines}
         <path class="bolt-glow" d="${path(main)}" stroke-width="${width.glow}"/><path class="bolt-core" d="${path(main)}" stroke-width="${width.core}"/>
         ${sparks}
-      </svg><div class="city-flash${perfect ? " perfect" : ""}" style="--x:${((hitX / W) * 100).toFixed(1)}%"></div>`);
+      </svg><div class="city-flash${kind}" style="--x:${((hitX / W) * 100).toFixed(1)}%"></div>`);
     const flash = scene().lastElementChild;
     const bolt = flash.previousElementSibling;
     // The struck building lights up, even if the battery had already switched it off, and a wave of
@@ -668,7 +673,13 @@ export function createCity(root) {
       target.el.classList.add("hit");
       wave("up", hitX);
     }
-    const duration = reducedMotion() ? 600 : perfect ? 1500 : 1000;
+    if (outage && !reducedMotion()) {
+      root.classList.remove("quake");
+      void root.offsetWidth;
+      root.classList.add("quake");
+      setTimeout(() => root.classList.remove("quake"), 700);
+    }
+    const duration = reducedMotion() ? 600 : outage ? 1900 : perfect ? 1500 : 1000;
     setTimeout(() => {
       bolt?.remove();
       flash?.remove();
