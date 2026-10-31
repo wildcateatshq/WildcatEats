@@ -198,14 +198,19 @@ function maybeFlyPlane() {
 
 // The billboard on a rooftop: the player's streak once it's going, otherwise the game's name and
 // today's puzzle (or the best endless run).
-// The billboard stays clear of the question card, including the room the fun fact takes once the
-// answer is shown, so it doesn't jump when the answer appears.
+// The billboard stays clear of the question card. While answering, it also leaves room for a short
+// fun fact under the bar; once the answer is shown it only moves if the real fun fact covers it.
+let billboardClearOf = null;
 function keepBillboardClear() {
   requestAnimationFrame(() => {
     const card = document.querySelector("#gameCard")?.getBoundingClientRect();
     const labels = document.querySelector(".range-labels")?.getBoundingClientRect();
     if (!card || !labels || !card.height) return; // not measurable behind the start screen
-    city.avoidForBillboard([{ left: card.left, right: card.right, top: card.top, bottom: Math.max(card.bottom, labels.bottom + 100) }]);
+    const fact = document.querySelector(".source-note")?.getBoundingClientRect();
+    const bottom = fact ? fact.bottom : Math.max(card.bottom, labels.bottom + 60);
+    if (fact && billboardClearOf && fact.bottom <= billboardClearOf) return; // the room left was enough
+    billboardClearOf = bottom;
+    city.avoidForBillboard([{ left: card.left, right: card.right, top: card.top, bottom }]);
   });
 }
 window.addEventListener("resize", () => { if (document.querySelector("#guessInput")) keepBillboardClear(); });
@@ -530,11 +535,12 @@ function render() {
     : actionButton("lock-button", "lockButton", ["Lock in my guess", "Lock in"]));
   if (view.phase === "guess") {
     bindGuessControls(guess, index);
+    billboardClearOf = null;
     keepBillboardClear();
-  }
-  else {
+  } else {
     playReveal(animate);
     bindNext(index);
+    setTimeout(keepBillboardClear, 1500); // once the fun fact has faded in
   }
 }
 

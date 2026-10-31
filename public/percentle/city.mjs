@@ -249,21 +249,24 @@ export function createCity(root) {
         <g class="bat-down">${[[-6, 1, 2, 1], [-4, 0, 3, 1], [-1, 0, 2, 2], [1, 0, 3, 1], [4, 1, 2, 1]].map(([x, y, w, h]) => `<rect x="${x * P}" y="${y * P}" width="${w * P}" height="${h * P}"/>`).join("")}</g></g>`;
     city += `<g class="bats">${batSpots.map(([fx, fy], k) => bat(W * fx, H * fy, k)).join("")}</g>`;
 
-    // A lit billboard on a rooftop on the right (on posts, so it can overhang a narrow roof). It's drawn
+    // A lit billboard on a rooftop on the right, on two posts standing on the roof. It's drawn
     // once at the origin and moved onto a roof
     // by placeBillboard: the tallest one on the right that the game doesn't cover. Its words come
     // from setBillboard (the player's streak, or the puzzle number).
-    const bw = px(phone ? 76 : 136), bh = px(phone ? 30 : 46);
-    billboard = { w: bw, h: bh, roofs: layout.filter(b => b.w >= P * 8 && b.x + b.w / 2 - bw / 2 > (phone ? W * 0.45 : (W + 720) / 2 + 10) && b.x + b.w / 2 + bw / 2 < W - 6).sort((x, y) => x.top - y.top) };
+    const bw = px(phone ? 60 : 104), bh = px(phone ? 24 : 34);
+    // Roofs wide enough to hold it (at least 60% of its width), with the sign fully on screen.
+    const fits = b => b.w >= bw * 0.6 && b.x + b.w / 2 - bw / 2 > 4 && b.x + b.w / 2 + bw / 2 < W - 4;
+    billboard = { w: bw, h: bh, roofs: layout.filter(fits).sort((x, y) => x.top - y.top), walls: layout.filter(b => b.w >= bw + P * 2 && b.x >= 0 && b.x + b.w <= W).sort((x, y) => y.row - x.row) };
     let bulbs = "";
     for (let x = P * 2, k = 0; x < bw - P; x += P * 3, k++) {
       bulbs += `<rect class="bulb bulb-${k % 2}" x="${x}" y="${P}" width="${P}" height="${P}"/><rect class="bulb bulb-${(k + 1) % 2}" x="${x}" y="${bh - P * 2}" width="${P}" height="${P}"/>`;
     }
     city += `<g class="billboard">
-        <rect class="bb-post" x="${P * 4}" y="${bh}" width="${P}" height="${P * 3}"/><rect class="bb-post" x="${bw - P * 5}" y="${bh}" width="${P}" height="${P * 3}"/>
+        <g class="bb-legs"><rect class="bb-post bb-post-l" y="${bh}" width="${P}" height="${P * 3}"/><rect class="bb-post bb-post-r" y="${bh}" width="${P}" height="${P * 3}"/>
+        <rect class="bb-brace" y="${bh + P}" height="${P}"/><rect class="bb-spill" y="${bh + P * 3 - 1}" height="2"/></g>
         <rect class="bb-frame" x="0" y="0" width="${bw}" height="${bh}"/>${bulbs}
-        <text class="bb-1" x="${bw / 2}" y="${(bh * 0.5).toFixed(1)}" font-size="${phone ? 9 : 13}"></text>
-        <text class="bb-2" x="${bw / 2}" y="${(bh * 0.76).toFixed(1)}" font-size="${phone ? 7 : 10}"></text></g>`;
+        <text class="bb-1" x="${bw / 2}" y="${(bh * 0.47).toFixed(1)}" font-size="${phone ? 7 : 10}"></text>
+        <text class="bb-2" x="${bw / 2}" y="${(bh * 0.72).toFixed(1)}" font-size="${phone ? 6 : 9}"></text></g>`;
 
     // Weather over the city, drawn once and shown by class: rain and snow fall in endless loops
     // (two copies of the same tile, one above the other), and fog drifts low over the skyline.
@@ -806,21 +809,42 @@ export function createCity(root) {
   setTimeout(holidayFireworks, 4000);
 
   // The billboard's two lines (empty lines are fine).
-  // Puts the billboard on the tallest roof on the right where nothing in the game covers it (the
-  // rectangles in billboardAvoid, in screen pixels). If every spot is covered, it takes the lowest.
+  // Puts the billboard on the tallest roof where nothing in the game covers it (the rectangles in
+  // billboardAvoid, in screen pixels), preferring the right half. If every roof is covered, it hides.
   let billboardAvoid = [];
   function placeBillboard() {
     const el = root.querySelector(".billboard");
     if (!el || !billboard) return;
-    const spots = billboard.roofs.map(roof => ({ x: Math.round(roof.x + roof.w / 2 - billboard.w / 2), y: Math.round(roof.top - billboard.h - P * 3) }));
-    if (!spots.length) { el.style.display = "none"; return; }
+    const spots = billboard.roofs.map(roof => ({ roof, x: Math.round(roof.x + roof.w / 2 - billboard.w / 2), y: Math.round(roof.top - billboard.h - P * 3) }));
     const clear = spot => billboardAvoid.every(r => {
       const top = toScreen(spot.y), bottom = top + billboard.h + P * 3;
       return spot.x + billboard.w < r.left - 4 || spot.x > r.right + 4 || bottom < r.top - 4 || top > r.bottom + 4;
     });
-    const spot = spots.find(clear) || spots[spots.length - 1];
+    // The tallest clear roof on the right half first, then anywhere.
+    let spot = spots.find(s => s.x + billboard.w / 2 > W * 0.45 && clear(s)) || spots.find(clear);
+    // Small screens may have no clear roof (the sky above the roofs is under the game). Then it hangs
+    // flat on the front of a building instead, just below the game, preferring the right half.
+    let onWall = false;
+    if (!spot) {
+      const below = Math.max(0, ...billboardAvoid.map(r => r.bottom)) - (window.innerHeight - H) + P;
+      const walls = billboard.walls.map(roof => ({ roof, x: Math.round(roof.x + roof.w / 2 - billboard.w / 2), y: Math.round(Math.max(below, roof.top + P * 2)) }))
+        .filter(w => w.y + billboard.h <= H - P && clear(w));
+      spot = walls.find(w => w.x + billboard.w / 2 > W * 0.45) || walls[0];
+      onWall = Boolean(spot);
+    }
+    if (!spot) { el.style.display = "none"; return; }
     el.style.display = "";
     el.setAttribute("transform", `translate(${spot.x} ${spot.y})`);
+    // On a roof it stands on two braced posts under the board, both on the roof, with its light
+    // spilling onto the roof; on a wall it needs none.
+    el.querySelector(".bb-legs").style.display = onWall ? "none" : "";
+    const left = Math.max(P * 3, spot.roof.x - spot.x + P), right = Math.min(billboard.w - P * 4, spot.roof.x + spot.roof.w - spot.x - P * 2);
+    el.querySelector(".bb-post-l").setAttribute("x", left);
+    el.querySelector(".bb-post-r").setAttribute("x", right);
+    el.querySelector(".bb-brace").setAttribute("x", left);
+    el.querySelector(".bb-brace").setAttribute("width", right - left + P);
+    el.querySelector(".bb-spill").setAttribute("x", Math.max(0, spot.roof.x - spot.x));
+    el.querySelector(".bb-spill").setAttribute("width", Math.min(billboard.w, spot.roof.x + spot.roof.w - spot.x) - Math.max(0, spot.roof.x - spot.x));
   }
 
   function showBillboard() {

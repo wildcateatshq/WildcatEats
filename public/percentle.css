@@ -522,7 +522,12 @@ body.hard .city-plane .plane-windows{fill:#d9a8ff}
 body.hard .searchlight{background:linear-gradient(0deg,rgba(225,190,255,.34),rgba(225,190,255,0) 85%)}
 
 /* Billboard on a rooftop, lit while its building has power. */
-.city .billboard .bb-post,.city .billboard .bb-frame{fill:#0b0f14}
+.city .billboard .bb-frame{fill:#0b0f14}
+.city .billboard .bb-post,.city .billboard .bb-brace{fill:#4a5361}
+.city .billboard .bb-spill{fill:transparent;transition:fill .5s}
+.city .billboard.on .bb-post,.city .billboard.on .bb-brace{fill:#6b6150}
+.city .billboard.on .bb-spill{fill:rgba(255,216,107,.55)}
+body.hard .city .billboard.on .bb-spill{fill:rgba(201,139,255,.55)}
 .city .billboard .bb-frame{stroke:#2a323d;stroke-width:1.5}
 .city .billboard.on .bb-frame{stroke:#5a4a1e}
 .city .billboard .bulb{fill:#3a3f46}
