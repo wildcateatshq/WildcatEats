@@ -136,12 +136,14 @@ const ANSWER_SHOWN_MS = 1450;
 // ...and the Next button fades in this long after that.
 const NEXT_BUTTON_DELAY_MS = 1000;
 let nextButtonTimer;
-// Running out of charge: the battery drains to empty and the city blacks out (city.outOfCharge).
-// After a beat (HIDE_GAME_MS) the whole game fades away, leaving just the city, and the view drifts
-// slowly up into the night sky. Once it's at the top, the out-of-charge screen pops up over the
+// Running out of charge: as soon as the losing guess is revealed the view starts drifting slowly up
+// into the night sky (city.outOfCharge), while the battery drains to empty and the city blacks
+// out. A beat after the battery is empty (HIDE_GAME_MS from the reveal) the whole game fades away,
+// leaving just the sky. Once it's at the top, the out-of-charge screen pops up over the
 // sky. POWER_OUT_DELAY_MS after the guess was locked is only a safety net, in case the blackout
 // never started (say, the battery's drain was cut short).
-const HIDE_GAME_MS = 1000;
+const DRAIN_MS = 1400;
+const HIDE_GAME_MS = 2600;
 const POWER_OUT_DELAY_MS = 13000;
 const POWER_OUT_DELAY_REDUCED_MS = 4000;
 let powerOutTimer;
@@ -486,11 +488,12 @@ function renderScoreBox(progress, view, animate) {
   // Only the reveal of a guess that runs the battery out starts the blackout, once it has drained to empty.
   const alarm = animate && view.phase === "reveal" && charge < 0;
   if (animate && view.phase === "reveal" && lastOff > 0) city.wave("down");
-  animateBattery(battery, from, shown, 1400).then(finished => { if (finished && alarm) soundAlarm(); });
+  if (alarm) soundAlarm();
+  animateBattery(battery, from, shown, DRAIN_MS);
 }
 
 function soundAlarm() {
-  city.outOfCharge(powerOut);
+  city.outOfCharge(powerOut, DRAIN_MS);
   hideGameTimer = setTimeout(() => document.body.classList.add("ascending"), HIDE_GAME_MS);
 }
 

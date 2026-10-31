@@ -521,14 +521,15 @@ export function createCity(root) {
     }, duration);
   }
 
-  // The battery has run out: every building goes black against the sky, and after a beat the view
-  // rises slowly up into the night above the city. onTop runs once the view has reached the top.
-  const RISE_DELAY_MS = 1100;
+  // The guess that runs the battery out has just been revealed. The view starts rising slowly up
+  // into the night above the city while the battery is still draining; once it has drained
+  // (blackoutAfter) every building goes black against the sky. onTop runs once the view is at the top.
+  const RISE_DELAY_MS = 300;
   const RISE_MS = 6000; // keep in step with .city-world's transition in percentle.css
-  function outOfCharge(onTop) {
+  function outOfCharge(onTop, blackoutAfter = 0) {
     rising = true;
-    root.classList.add("blackout");
     const still = reducedMotion();
+    setTimeout(() => { if (rising) root.classList.add("blackout"); }, still ? 0 : blackoutAfter);
     setTimeout(() => {
       if (!rising) return;
       root.classList.add("skyward");
