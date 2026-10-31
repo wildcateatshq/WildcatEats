@@ -159,8 +159,8 @@ line (`mode` on crowd submissions) and their games are marked in stats and shari
 locked only while today's puzzle is under way: before it starts it sets the mode for the daily and
 for endless runs, and once it's finished it sets the mode for endless runs only.
 Dropping below 0% ends the game early: the city blacks out into silhouettes, the game fades away,
-the view drifts slowly up into the night sky (Milky Way, nebulae, a ringed planet, and a UFO that zips across the top), and at the top
-the player sees an "Out of charge" screen. Exactly 0.0% survives.
+the view drifts slowly up into the night sky (Milky Way, nebulae, a ringed planet), and at the top
+the player sees an "Out of charge" screen, with a UFO gliding across the sky under the top bar. Exactly 0.0% survives.
 
 ### Daily puzzles come from an AI agent
 

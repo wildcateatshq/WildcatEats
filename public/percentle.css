@@ -338,37 +338,47 @@ body:not(.starting):has(.question-body) .source-note{padding:9px 12px;line-heigh
 .lock-button,.next-button:not(.secondary-button),.share-button,.brand-mark,.start-mark{background:linear-gradient(180deg,#fffef8 0%,var(--charge) 55%,color-mix(in srgb,var(--charge) 75%,var(--halo)) 100%);box-shadow:0 0 0 1px color-mix(in srgb,var(--halo) 55%,transparent),0 0 24px color-mix(in srgb,var(--halo) 60%,transparent),0 8px 36px color-mix(in srgb,var(--halo) 35%,transparent)}
 .q-num{-webkit-text-stroke:1.5px color-mix(in srgb,var(--halo) 80%,#fff);filter:drop-shadow(0 0 6px color-mix(in srgb,var(--halo) 45%,transparent))}
 
-/* The night city behind the game (public/percentle/city.mjs). */
-.city{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;background:linear-gradient(180deg,var(--sky-top,#03060b) 0%,color-mix(in srgb,var(--sky-top,#03060b) 50%,var(--sky-bottom,#0b1c26)) 55%,var(--sky-bottom,#0b1c26) 100%);transition:--sky-top 2.5s ease,--sky-bottom 2.5s ease,--row-0 2.5s ease,--row-1 2.5s ease,--row-2 2.5s ease,--daylight 2.5s ease,--windows 2.5s ease,--stars 1.5s ease,--glow 1s ease}
+/* The night city behind the game (public/percentle/city.mjs). Its colors and brightness come from
+   variables set on .city, which change at once; each part eases to its new look on its own (the sky,
+   the rows' fill, the windows' opacity...), so a transition never restyles the thousands of pixels
+   in the whole city every frame. */
+.city{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.city-sky{position:absolute;inset:0;background:linear-gradient(180deg,var(--sky-top,#03060b) 0%,color-mix(in srgb,var(--sky-top,#03060b) 50%,var(--sky-bottom,#0b1c26)) 55%,var(--sky-bottom,#0b1c26) 100%);transition:--sky-top 2.5s ease,--sky-bottom 2.5s ease}
 .city-scene,.city-bolt,.city-fireworks{position:absolute;inset:0;width:100%;height:100%}
 .city-scene{shape-rendering:crispEdges}
-.city .stars{fill:#cfe3ff;opacity:var(--stars,.3);transition:opacity 1s}
+.city .stars{fill:#cfe3ff;opacity:.3;transition:opacity 1.5s ease}
 .city .moon{fill:#fff6d8;opacity:calc(1 - var(--daylight,0) * 1.6)}
 /* The moon and sun glide to each new spot as the endless clock moves on. */
-.city .moon,.city .sun{transition:transform 1.6s cubic-bezier(.45,0,.25,1)}
+.city .moon,.city .sun{transition:transform 1.6s cubic-bezier(.45,0,.25,1),opacity 2.5s ease}
+.city .clouds,.city .row,.city .pylon{transition:fill 2.5s ease,opacity 2.5s ease}
+.city .lights{opacity:var(--windows,1);transition:opacity 2.5s ease}
 /* When the city is first drawn (or redrawn for a new screen width) it starts at its real colors and
    brightness at once, instead of blending in from the defaults. */
-.city.placing,.city.placing .moon,.city.placing .sun,.city.placing .city-glow,.city.placing .stars,.city.placing .bw{transition:none}
-.city .moon .moon-dark{opacity:.1}
-.city .moon .moon-sea{opacity:.69}
+.city.placing .city-sky,.city.placing .moon,.city.placing .sun,.city.placing .clouds,.city.placing .row,.city.placing .pylon,.city.placing .lights,.city.placing .city-glow,.city.placing .stars,.city.placing .bw{transition:none}
+.city .moon .moon-dark{fill-opacity:.1}
+.city .moon .moon-sea{fill-opacity:.69}
 .city .moon .moon-crater{fill:#ffffff}
 .city .sun{fill:#ffe9a0;opacity:var(--daylight,0)}
 .city .sun-glow{fill:url(#sunGlow)}
-.city .clouds{fill:#e8eefc;opacity:calc(var(--daylight,0) * .3);animation:city-drift 90s ease-in-out infinite alternate}
+.city .clouds{fill:#e8eefc;opacity:calc(var(--daylight,0) * .3)}
+/* Effects only animate while they show: a running animation, even on something hidden, keeps the
+   browser redrawing the city every frame. */
+.city.day .clouds{animation:city-drift 90s ease-in-out infinite alternate}
 .city .storm{display:none}
 .city .storm-clouds{fill:#1d0e31;opacity:.28}
-.city .rain{fill:#b78cff;opacity:.18;animation:city-rain .9s linear infinite}
+.city .rain{fill:#b78cff;opacity:.18}
+body.hard .city .rain{animation:city-rain .9s linear infinite}
 .city .row-0,.city .pylon{fill:var(--row-0,#0b151b)}
 .city .row-1{fill:var(--row-1,#081014)}
 .city .row-2{fill:var(--row-2,#05090c)}
 .city .bw{opacity:0;transition:opacity .45s}
-.city .bw.on{opacity:var(--windows,1)}
+.city .bw.on{opacity:1}
 .city .w0{fill:#ffe09a}.city .w1{fill:#ffd27a}.city .w2{fill:#fff2c9}.city .wn{fill:#fff3c4}
 .city .beacons{fill:#d9473a;opacity:.55;animation:city-beacon 3.2s ease-in-out infinite}
 .city.out .beacons{display:none}
 .city.low .bw.on:nth-child(3n){animation:city-flicker 2.2s steps(1) infinite}
-.city-glow{position:absolute;left:-10%;right:-10%;bottom:0;height:46%;background:radial-gradient(ellipse 60% 70% at 50% 100%,rgba(255,200,110,.38),transparent 70%);opacity:var(--glow,1);transition:opacity 1s}
-.city-scan{position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 3px);mix-blend-mode:screen}
+.city-glow{position:absolute;left:-10%;right:-10%;bottom:0;height:46%;background:radial-gradient(ellipse 60% 70% at 50% 100%,rgba(255,200,110,.38),transparent 70%);opacity:1;transition:opacity 1s}
+.city-scan{position:absolute;inset:0;background:repeating-linear-gradient(0deg,rgba(255,255,255,.022) 0 1px,transparent 1px 3px)}
 .city-bolt{--bolt-glow:#ffd56a;filter:drop-shadow(0 0 4px var(--bolt-glow)) drop-shadow(0 0 14px color-mix(in srgb,var(--bolt-glow) 70%,transparent))}
 .bolt-glow{fill:none;stroke:var(--bolt-glow);opacity:.16;stroke-linejoin:round;stroke-linecap:round}
 .bolt-core{fill:none;stroke:#fffaf0;stroke-linejoin:round;stroke-linecap:round}
@@ -401,7 +411,7 @@ body.hard .burst{fill:#c45cff}body.hard .burst-1{fill:#ff8ad8}body.hard .burst-2
 @keyframes city-rain{to{transform:translate(-4px,24px)}}
 @keyframes city-drift{from{transform:translateX(-30px)}to{transform:translateX(30px)}}
 @keyframes city-beacon{0%,100%{opacity:.55}50%{opacity:.08}}
-@keyframes city-flicker{0%,100%{opacity:var(--windows,1)}40%{opacity:.15}46%{opacity:var(--windows,1)}70%{opacity:.3}74%{opacity:var(--windows,1)}}
+@keyframes city-flicker{0%,100%{opacity:1}40%{opacity:.15}46%{opacity:1}70%{opacity:.3}74%{opacity:1}}
 @media(prefers-reduced-motion:reduce){.city *{animation:none!important;transition:none!important}}
 
 
@@ -422,7 +432,7 @@ body.entering #gameCard{animation-delay:.06s}
 .city .bw{transition:opacity .45s var(--wave-delay,0s)}
 .city.wave-down .bw.on{animation:wave-dip .9s ease-in-out var(--wave-delay,0s) both}
 .city.wave-up .bw.on{animation:wave-flare .9s ease-out var(--wave-delay,0s) both}
-@keyframes wave-dip{0%,100%{opacity:var(--windows,1)}40%{opacity:calc(var(--windows,1) * .2)}}
+@keyframes wave-dip{0%,100%{opacity:1}40%{opacity:.2}}
 @keyframes wave-flare{0%,100%{filter:none}35%{filter:brightness(1.9)}}
 
 /* The city's colors are registered so they can blend: the sky slides from night to dawn to day
@@ -434,8 +444,6 @@ body.entering #gameCard{animation-delay:.06s}
 @property --row-2{syntax:"<color>";inherits:true;initial-value:#05090c}
 @property --daylight{syntax:"<number>";inherits:true;initial-value:0}
 @property --windows{syntax:"<number>";inherits:true;initial-value:1}
-@property --stars{syntax:"<number>";inherits:true;initial-value:.3}
-@property --glow{syntax:"<number>";inherits:true;initial-value:1}
 
 
 /* Out of charge (city.mjs outOfCharge): every building turns a pure black silhouette with a cold
@@ -457,16 +465,18 @@ body.dead .city:not(.skyward) .city-world{transition:none}
 .city .shooting-star{fill:none;stroke:#fffef8;stroke-width:2;stroke-linecap:round;stroke-dasharray:60 400;stroke-dashoffset:60;opacity:0}
 .city.skyward .shooting-star,body.dead .city .shooting-star{animation:shooting-star 7s ease-in 2.6s infinite}
 @keyframes shooting-star{0%{stroke-dashoffset:60;opacity:0}2%{opacity:1}9%{stroke-dashoffset:-340;opacity:0}100%{stroke-dashoffset:-340;opacity:0}}
-/* A flying saucer zips across the top once, just before the out-of-charge screen pops up. */
-.city .ufo{transform:translateX(-60px);opacity:0}
-.city.skyward .ufo,body.dead .city .ufo{animation:ufo-zip 1.3s cubic-bezier(.5,0,.5,1) 4.4s forwards}
-@keyframes ufo-zip{0%{transform:translate(-60px,0);opacity:1}30%{transform:translate(calc(var(--travel) * .3),5px)}60%{transform:translate(calc(var(--travel) * .6),-3px)}99%{opacity:1}100%{transform:translate(var(--travel),2px);opacity:0}}
-.city .ufo-hull{fill:#8a94a3}
-.city .ufo-dome{fill:#a8f0dc;opacity:.85}
-.city .ufo-glow{fill:#6dffa8;opacity:.35}
-.city .ufo-light-0{fill:#7dffb0;animation:plane-blink .3s steps(1) infinite}
-.city .ufo-light-1{fill:#ffe9a6;animation:plane-blink .3s steps(1) -.15s infinite}
-@media(prefers-reduced-motion:reduce){.city-world{transition:none}.city .shooting-star,.city .ufo{animation:none!important}}
+/* A flying saucer gliding across the top of the out-of-charge screen (city.mjs ufo()): its own
+   layer, moved only by transform at a steady speed, with a gentle bob. */
+.city-ufo{position:absolute;left:0;transform:translateX(-60px);will-change:transform;animation:ufo-zip 2.4s linear forwards;shape-rendering:crispEdges}
+.city-ufo .ufo-bob{animation:ufo-bob .8s ease-in-out infinite alternate}
+@keyframes ufo-zip{to{transform:translateX(var(--travel))}}
+@keyframes ufo-bob{from{transform:translateY(-3px)}to{transform:translateY(3px)}}
+.city-ufo .ufo-hull{fill:#8a94a3}
+.city-ufo .ufo-dome{fill:#a8f0dc;opacity:.85}
+.city-ufo .ufo-glow{fill:#6dffa8;opacity:.35}
+.city-ufo .ufo-light-0{fill:#7dffb0;animation:plane-blink .3s steps(1) infinite}
+.city-ufo .ufo-light-1{fill:#ffe9a6;animation:plane-blink .3s steps(1) -.15s infinite}
+@media(prefers-reduced-motion:reduce){.city-world{transition:none}.city .shooting-star{animation:none!important}}
 
 /* A distant plane drifting across the sky (city.mjs plane()), with blinking wing lights. */
 .city-plane{position:absolute;left:0;transform:translateX(-80px);animation:plane-fly 20s linear forwards;shape-rendering:crispEdges}
@@ -553,11 +563,11 @@ body.hard .city .billboard.on .bulb{fill:#e9d6ff}
 .city.weather-rain .wx-rain,.city.weather-snow .wx-snow,.city.weather-fog .wx-fog{display:inline}
 .city .wx-rain line{stroke:#a9c3df;stroke-width:1.2}
 .city .wx-snow rect{fill:#fff}
-.city .wx-rain .wx-fall{animation:wx-fall .9s linear infinite}
-.city .wx-snow .wx-fall{animation:wx-fall 16s linear infinite}
-.city .fog{animation:fog-drift 26s ease-in-out infinite alternate}
-.city .fog-1{animation-duration:34s;animation-delay:-9s}
-.city .fog-2{animation-duration:30s;animation-delay:-17s}
+.city.weather-rain .wx-rain .wx-fall{animation:wx-fall .9s linear infinite}
+.city.weather-snow .wx-snow .wx-fall{animation:wx-fall 16s linear infinite}
+.city.weather-fog .fog{animation:fog-drift 26s ease-in-out infinite alternate}
+.city.weather-fog .fog-1{animation-duration:34s;animation-delay:-9s}
+.city.weather-fog .fog-2{animation-duration:30s;animation-delay:-17s}
 @keyframes wx-fall{from{transform:translateY(0)}to{transform:translateY(var(--tile))}}
 @keyframes fog-drift{from{transform:translateX(-50px)}to{transform:translateX(50px)}}
 
@@ -570,15 +580,17 @@ body.hard .city .billboard.on .bulb{fill:#e9d6ff}
 .city.halloween .w0,.city.halloween .w1,.city.halloween .w2,.city.halloween .wn{fill:#ff8a2a}
 .city.halloween .moon .moon-lit,.city.halloween .moon .moon-sea,.city.halloween .moon .moon-crater{fill:#ffcf8a}
 .city.halloween .city-glow{background:radial-gradient(ellipse 60% 70% at 50% 100%,rgba(255,138,42,.4),transparent 70%)}
-.city .bat{fill:#4a3558;transform:translate(var(--bx),var(--by));animation:bat-wander 9s ease-in-out infinite}
+.city .bat{fill:#4a3558;transform:translate(var(--bx),var(--by))}
+.city.halloween .bat{animation:bat-wander 9s ease-in-out infinite}
 .city .bat .bat-down{opacity:0}
-.city .bat .bat-up{animation:bird-up .35s steps(1) infinite}
-.city .bat .bat-down{animation:bird-down .35s steps(1) infinite}
+.city.halloween .bat .bat-up{animation:bird-up .35s steps(1) infinite}
+.city.halloween .bat .bat-down{animation:bird-down .35s steps(1) infinite}
 @keyframes bat-wander{0%,100%{transform:translate(var(--bx),var(--by))}25%{transform:translate(calc(var(--bx) + 26px),calc(var(--by) - 12px))}50%{transform:translate(calc(var(--bx) + 8px),calc(var(--by) + 14px))}75%{transform:translate(calc(var(--bx) - 22px),calc(var(--by) - 6px))}}
 /* December: strings of colored lights along rooftops, twinkling. */
 .city.december .holiday-lights{display:inline}
 .city .hl-0{fill:#ff4d4d}.city .hl-1{fill:#4dff88}.city .hl-2{fill:#ffd86b}.city .hl-3{fill:#6fb8ff}
-.city .hl{animation:twinkle 1.6s steps(1) infinite;filter:drop-shadow(0 0 2px currentColor)}
-.city .hl-1{animation-delay:-.4s}.city .hl-2{animation-delay:-.8s}.city .hl-3{animation-delay:-1.2s}
+.city.december .holiday-lights{filter:drop-shadow(0 0 2px rgba(255,236,190,.7))}
+.city.december .hl{animation:twinkle 1.6s steps(1) infinite}
+.city.december .hl-1{animation-delay:-.4s}.city.december .hl-2{animation-delay:-.8s}.city.december .hl-3{animation-delay:-1.2s}
 .city.out .holiday-lights{display:none}
 @keyframes twinkle{50%{opacity:.35}}

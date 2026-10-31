@@ -514,7 +514,14 @@ function render() {
     save();
     return render();
   }
+  const wasDead = document.body.classList.contains("dead");
   document.body.classList.toggle("dead", view.phase === "results" && out);
+  // Once the out-of-charge screen is up, a UFO glides across the open sky just under the top bar.
+  if (!wasDead && document.body.classList.contains("dead")) {
+    setTimeout(() => {
+      if (document.body.classList.contains("dead")) city.ufo((document.querySelector(".topbar")?.getBoundingClientRect().bottom ?? 60) + 14);
+    }, 1200);
+  }
   renderScoreBox(progress, view, animate);
   if (view.phase === "results") {
     renderResults();

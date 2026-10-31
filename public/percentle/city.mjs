@@ -117,7 +117,7 @@ export function createCity(root) {
     let stars = "";
     for (let i = 0; i < (phone ? 70 : 150); i++) {
       const size = r() < 0.15 ? P : P / 1.5;
-      stars += `<rect x="${px(r() * W)}" y="${px(r() * H * 0.62)}" width="${size}" height="${size}" opacity="${(0.25 + r() * 0.75).toFixed(2)}"/>`;
+      stars += `<rect x="${px(r() * W)}" y="${px(r() * H * 0.62)}" width="${size}" height="${size}" fill-opacity="${(0.25 + r() * 0.75).toFixed(2)}"/>`;
     }
     // The moon as it really is tonight, and a pixel sun, drawn around (0, 0) and moved into place
     // later. Each pixel of the moon is lit or in shadow by the phase: a waxing moon is lit on the
@@ -213,7 +213,7 @@ export function createCity(root) {
           for (let c = 0; c < cols; c++) {
             if (lr() >= 0.8) continue;
             const kind = lr() < 0.02 ? "wn" : `w${Math.floor(lr() * 3)}`;
-            windows += `<rect class="${kind}${wr() < 0.06 ? " dark" : ""}" x="${x + P + c * P * 3}" y="${wy}" width="${P}" height="${P * 1.5}" opacity="${(layer.win * dim * (0.55 + lr() * 0.45)).toFixed(2)}"/>`;
+            windows += `<rect class="${kind}${wr() < 0.06 ? " dark" : ""}" x="${x + P + c * P * 3}" y="${wy}" width="${P}" height="${P * 1.5}" fill-opacity="${(layer.win * dim * (0.55 + lr() * 0.45)).toFixed(2)}"/>`;
           }
         }
         lights += `<g class="bw" data-cutoff="${cutoff}">${windows}</g>`;
@@ -274,10 +274,10 @@ export function createCity(root) {
     let rainTile = "", snowTile = "";
     for (let i = 0; i < (phone ? 80 : 180); i++) {
       const x = wx() * (W + 40) - 20, y = wx() * H;
-      rainTile += `<line x1="${x.toFixed(0)}" y1="${y.toFixed(0)}" x2="${(x - 4).toFixed(0)}" y2="${(y + 14).toFixed(0)}" opacity="${(0.25 + wx() * 0.4).toFixed(2)}"/>`;
+      rainTile += `<line x1="${x.toFixed(0)}" y1="${y.toFixed(0)}" x2="${(x - 4).toFixed(0)}" y2="${(y + 14).toFixed(0)}" stroke-opacity="${(0.25 + wx() * 0.4).toFixed(2)}"/>`;
     }
     for (let i = 0; i < (phone ? 90 : 210); i++) {
-      snowTile += `<rect x="${px(wx() * W)}" y="${px(wx() * H)}" width="${P}" height="${P}" opacity="${(0.45 + wx() * 0.5).toFixed(2)}"/>`;
+      snowTile += `<rect x="${px(wx() * W)}" y="${px(wx() * H)}" width="${P}" height="${P}" fill-opacity="${(0.45 + wx() * 0.5).toFixed(2)}"/>`;
     }
     const skylineTop = Math.min(...layout.filter(b => b.row === 0).map(b => b.top));
     const fog = [0.2, 0.55, 0.85].map((f, i) => `<ellipse class="fog fog-${i}" cx="${(W * f).toFixed(0)}" cy="${(skylineTop + H * 0.06).toFixed(0)}" rx="${(W * 0.42).toFixed(0)}" ry="${(H * 0.07).toFixed(0)}" fill="url(#fogPuff)"/>`).join("");
@@ -294,7 +294,7 @@ export function createCity(root) {
     let deepStars = "";
     for (let i = 0; i < (phone ? 110 : 260); i++) {
       const size = sky() < 0.12 ? P : P / 1.5;
-      deepStars += `<rect x="${px(sky() * W)}" y="${px(sky() * PAN)}" width="${size}" height="${size}" opacity="${(0.3 + sky() * 0.7).toFixed(2)}"/>`;
+      deepStars += `<rect x="${px(sky() * W)}" y="${px(sky() * PAN)}" width="${size}" height="${size}" fill-opacity="${(0.3 + sky() * 0.7).toFixed(2)}"/>`;
     }
     // The Milky Way: a soft diagonal band of faint stars and glow.
     let galaxy = "";
@@ -302,7 +302,7 @@ export function createCity(root) {
       const t = sky();
       const spread = (sky() + sky() + sky() - 1.5) * PAN * 0.16;
       const gx = t * W, gy = PAN * 0.92 - t * PAN * 0.8 + spread;
-      galaxy += `<rect x="${px(gx)}" y="${px(gy)}" width="${P / 1.5}" height="${P / 1.5}" opacity="${(0.15 + sky() * 0.5).toFixed(2)}"/>`;
+      galaxy += `<rect x="${px(gx)}" y="${px(gy)}" width="${P / 1.5}" height="${P / 1.5}" fill-opacity="${(0.15 + sky() * 0.5).toFixed(2)}"/>`;
     }
     // A ringed planet in open sky (beside the game on a wide screen), lit from the left, with a moon.
     const R = phone ? 30 : 56;
@@ -318,7 +318,7 @@ export function createCity(root) {
           const rx = Math.cos(ang) * R * k, ry = Math.sin(ang) * R * k * 0.28;
           const x = rx * 0.97 - ry * 0.26, y = rx * 0.26 + ry * 0.97; // tilted
           if ((ry < 0) !== back) continue;
-          out += `<rect x="${px(x)}" y="${px(y)}" width="${P}" height="${P}" opacity="${k === 1.75 ? 0.9 : 0.55}"/>`;
+          out += `<rect x="${px(x)}" y="${px(y)}" width="${P}" height="${P}" fill-opacity="${k === 1.75 ? 0.9 : 0.55}"/>`;
         }
       }
       return out;
@@ -328,20 +328,10 @@ export function createCity(root) {
       if (x * x + y * y > R * R) continue;
       const band = bands[Math.floor(((y / R + 1) / 2) * bands.length * 1.5) % bands.length];
       const light = 0.45 + 0.55 * Math.max(0, (-x / R) * 0.7 + 0.5 - Math.hypot(x, y) / R * 0.25);
-      planet += `<rect x="${x}" y="${y}" width="${P}" height="${P}" fill="${band}" opacity="${Math.min(1, light).toFixed(2)}"/>`;
+      planet += `<rect x="${x}" y="${y}" width="${P}" height="${P}" fill="${band}" fill-opacity="${Math.min(1, light).toFixed(2)}"/>`;
     }
     const mr = Math.round(R * 0.2);
     const moonlet = `<g transform="translate(${(-R * 2.4).toFixed(0)} ${(-R * 1.2).toFixed(0)})"><circle r="${mr}"/><circle r="${mr}" cx="${(mr * 0.45).toFixed(1)}" fill="#02050c" opacity=".55"/></g>`;
-    // A pixel flying saucer that zips across the very top once the view is up: a glass dome, a gray
-    // hull with blinking rim lights, and a green glow underneath.
-    const u = phone ? 2 : 3;
-    const ur = ([x, y, w, h]) => `<rect x="${x * u}" y="${y * u}" width="${w * u}" height="${h * u}"/>`;
-    const ufo = `<g transform="translate(0 ${phone ? 26 : 34})"><g class="ufo" style="--travel:${W + 16 * u + 40}px">
-          <g class="ufo-glow">${[[5, 6, 6, 1], [6, 7, 4, 1]].map(ur).join("")}</g>
-          <g class="ufo-dome">${[[6, 0, 4, 1], [5, 1, 6, 2]].map(ur).join("")}</g>
-          <g class="ufo-hull">${[[2, 3, 12, 1], [0, 4, 16, 1], [2, 5, 12, 1]].map(ur).join("")}</g>
-          ${[2, 6, 10, 14].map((x, k) => `<rect class="ufo-light ufo-light-${k % 2}" x="${x * u}" y="${4 * u}" width="${u}" height="${u}"/>`).join("")}
-        </g></g>`;
     const space = `<svg class="city-space" viewBox="0 0 ${W} ${PAN}" preserveAspectRatio="none" style="height:${PAN}px;top:-${PAN}px">
         <defs>
           <linearGradient id="spaceFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#010208"/><stop offset=".7" stop-color="#02050c" stop-opacity=".6"/><stop offset="1" stop-color="#02050c" stop-opacity="0"/></linearGradient>
@@ -361,11 +351,10 @@ export function createCity(root) {
           <g class="planet-ring">${ringPixel(false)}</g>
           <g class="planet-moon">${moonlet}</g>
         </g>
-        ${ufo}
         <path class="shooting-star" d="M${(W * 0.15).toFixed(0)},${(PAN * 0.18).toFixed(0)} l${(W * 0.12).toFixed(0)},${(PAN * 0.06).toFixed(0)}"/>
       </svg>`;
 
-    root.innerHTML = `<div class="city-world"><div class="city-glow"></div>
+    root.innerHTML = `<div class="city-sky"></div><div class="city-world"><div class="city-glow"></div>
       <svg class="city-scene" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">
         <defs><radialGradient id="sunGlow"><stop offset="0" stop-color="#ffd86b" stop-opacity=".35"/><stop offset="1" stop-color="#ffd86b" stop-opacity="0"/></radialGradient></defs>
         <g class="stars">${stars}</g>
@@ -404,6 +393,7 @@ export function createCity(root) {
 
     const sky = skyAt(hour ?? 0);
     const night = 1 - sky.day;
+    root.classList.toggle("day", sky.day > 0.01);
     let top = sky.top, bottom = sky.bottom;
     if (hard) {
       top = mix(top, "#0d0418", 0.6);
@@ -426,14 +416,18 @@ export function createCity(root) {
     root.style.setProperty("--snow", String(snowLevel));
     root.querySelector(".billboard")?.classList.toggle("on", shown > BILLBOARD_CUTOFF);
     const rows = hard ? BUILDINGS_HARD : BUILDINGS_NIGHT;
-    const style = root.style;
-    style.setProperty("--sky-top", top);
-    style.setProperty("--sky-bottom", bottom);
-    rows.forEach((color, i) => style.setProperty(`--row-${i}`, mix(color, BUILDINGS_DAY[i], hard ? sky.day * 0.5 : sky.day)));
-    style.setProperty("--stars", (night * (0.25 + (1 - shown / 100) * 0.75) * (overcast ? 0.15 : 1)).toFixed(3));
-    style.setProperty("--windows", (1 - sky.day * 0.7).toFixed(3));
-    style.setProperty("--glow", out ? "0" : (night * (0.25 + (shown / 100) * 0.75)).toFixed(3));
-    style.setProperty("--daylight", sky.day.toFixed(3));
+    // These run while the battery animates (every frame), so a variable on the whole city is only
+    // touched when its value really changes: a change restyles every pixel in the city. The stars
+    // and glow follow the charge itself, so they're set straight on their own elements.
+    const set = (name, value) => { if (root.style.getPropertyValue(name) !== value) root.style.setProperty(name, value); };
+    set("--sky-top", top);
+    set("--sky-bottom", bottom);
+    rows.forEach((color, i) => set(`--row-${i}`, mix(color, BUILDINGS_DAY[i], hard ? sky.day * 0.5 : sky.day)));
+    set("--windows", (1 - sky.day * 0.7).toFixed(3));
+    set("--daylight", sky.day.toFixed(3));
+    const stars = root.querySelector(".stars"), glow = root.querySelector(".city-glow");
+    if (stars) stars.style.opacity = (night * (0.25 + (1 - shown / 100) * 0.75) * (overcast ? 0.15 : 1)).toFixed(2);
+    if (glow) glow.style.opacity = out ? "0" : (night * (0.25 + (shown / 100) * 0.75)).toFixed(2);
 
     // The moon and sun cross the sky, gliding from spot to spot (see .moon/.sun in percentle.css).
     const moon = root.querySelector(".moon");
@@ -458,6 +452,8 @@ export function createCity(root) {
   const lastSpot = new WeakMap();
   function place(el, to) {
     const from = lastSpot.get(el);
+    // Already there (refresh runs every frame while the battery animates): nothing to do.
+    if (from && from.x === to.x && from.y === to.y && !root.classList.contains("placing")) return;
     lastSpot.set(el, to);
     const at = p => `translate(${p.x.toFixed(1)}px, ${p.y.toFixed(1)}px)`;
     // Once it has set off the right edge, it comes back round out of sight: an instant jump from
@@ -638,6 +634,24 @@ export function createCity(root) {
     }, still ? 0 : RISE_DELAY_MS);
   }
 
+  // A pixel flying saucer that zips across the top of the screen at height y (screen pixels), once
+  // the out-of-charge screen is up: a glass dome, a gray hull with blinking rim lights and a green
+  // glow underneath. It's its own layer sliding at a steady speed, so it glides smoothly.
+  function ufo(y) {
+    if (reducedMotion() || root.querySelector(".city-ufo")) return;
+    const u = W < 600 ? 2 : 3;
+    const r = ([x, yy, w, h]) => `<rect x="${x * u}" y="${yy * u}" width="${w * u}" height="${h * u}"/>`;
+    root.insertAdjacentHTML("beforeend", `<div class="city-ufo" style="top:${Math.round(y)}px;--travel:${W + 16 * u + 40}px"><div class="ufo-bob">
+        <svg width="${16 * u}" height="${8 * u}" viewBox="0 0 ${16 * u} ${8 * u}">
+          <g class="ufo-glow">${[[5, 6, 6, 1], [6, 7, 4, 1]].map(r).join("")}</g>
+          <g class="ufo-dome">${[[6, 0, 4, 1], [5, 1, 6, 2]].map(r).join("")}</g>
+          <g class="ufo-hull">${[[2, 3, 12, 1], [0, 4, 16, 1], [2, 5, 12, 1]].map(r).join("")}</g>
+          ${[2, 6, 10, 14].map((x, k) => `<rect class="ufo-light ufo-light-${k % 2}" x="${x * u}" y="${4 * u}" width="${u}" height="${u}"/>`).join("")}
+        </svg></div></div>`);
+    const el = root.lastElementChild;
+    el.addEventListener("animationend", event => { if (event.target === el) el.remove(); });
+  }
+
   // A small, distant plane drifting across the sky at height y (in screen pixels): a dark side-on
   // pixel silhouette with a row of lit cabin windows, a blinking red light under the wing and a white
   // strobe on the tail.
@@ -669,7 +683,7 @@ export function createCity(root) {
       for (let a = 0; a < 16; a++) {
         const angle = (a / 16) * Math.PI * 2;
         for (let s = 1; s <= 5; s++) {
-          dots += `<rect x="${(cx + Math.cos(angle) * s * step).toFixed(0)}" y="${(cy + Math.sin(angle) * s * step).toFixed(0)}" width="${P}" height="${P}" opacity="${(1 - s * 0.16).toFixed(2)}"/>`;
+          dots += `<rect x="${(cx + Math.cos(angle) * s * step).toFixed(0)}" y="${(cy + Math.sin(angle) * s * step).toFixed(0)}" width="${P}" height="${P}" fill-opacity="${(1 - s * 0.16).toFixed(2)}"/>`;
         }
       }
       bursts += `<g class="burst burst-${k % 3}" style="animation-delay:${(k * gap).toFixed(2)}s;animation-iteration-count:${repeat}">${dots}<rect class="burst-core" x="${(cx - P).toFixed(0)}" y="${(cy - P).toFixed(0)}" width="${P * 2}" height="${P * 2}"/></g>`;
@@ -918,6 +932,7 @@ export function createCity(root) {
     helicopter,
     birds,
     outOfCharge,
+    ufo,
     strike,
     fireworks,
     firework,
