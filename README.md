@@ -243,9 +243,8 @@ battery runs out, in a background tab, or with reduced motion):
   supercharges) brings searchlights sweeping the sky on the results screen.
 - A rooftop billboard shows the player's streak (2 days or more), otherwise CHARGLE and the puzzle
   number, or the best endless run. It goes dark with its building.
-- Real weather over Villanova from Open-Meteo, checked at most hourly: rain, snow or fog, with an
-  overcast sky. Snow settles on the roofs while it's snowing, and in winter endless runs it falls
-  and piles up round by round.
+- Snow falls and piles up on the roofs round by round in winter (December to February) endless runs.
+  Rain, snow and fog weather is drawn but switched off for now (real weather isn't fetched).
 - Holidays by the Eastern date: Halloween (Oct 27-31: orange windows and moon, bats), December
   (colored lights along rooftops), New Year's (Dec 31-Jan 1) and the Fourth of July (Jul 3-5),
   with fireworks every few seconds.

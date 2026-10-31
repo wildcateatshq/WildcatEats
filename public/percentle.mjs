@@ -216,32 +216,12 @@ function holidayOn(date) {
   return null;
 }
 
-// Real weather over Villanova (rain, snow or fog), from Open-Meteo's free forecast, checked at
-// most once an hour. Weather codes: 45/48 fog; 51-67, 80-82, 95-99 rain; 71-77, 85-86 snow.
-const WEATHER_URL = "https://api.open-meteo.com/v1/forecast?latitude=40.037&longitude=-75.342&current=weather_code";
-function weatherFromCode(code) {
-  if (code === 45 || code === 48) return "fog";
-  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "snow";
-  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95) return "rain";
-  return null;
-}
+// Weather on the city (rain, snow or fog). Real weather is switched off for now, so the sky stays
+// clear; the drawings are still in city.mjs. Local testing only: ?weather=rain, snow, fog or clear.
 let weatherNow = null;
 async function loadWeather() {
-  // Local testing only: ?weather=rain, snow, fog or clear.
   const forced = location.hostname === "localhost" ? new URLSearchParams(location.search).get("weather") : null;
-  if (forced) return forced === "clear" ? null : forced;
-  try {
-    const saved = JSON.parse(readPreference("percentle.weather") || "null");
-    if (saved && Date.now() - saved.at < 3600000) return saved.kind;
-  } catch {}
-  try {
-    const body = await (await fetch(WEATHER_URL)).json();
-    const kind = weatherFromCode(body.current?.weather_code);
-    try { localStorage.setItem("percentle.weather", JSON.stringify({ at: Date.now(), kind })); } catch {}
-    return kind;
-  } catch {
-    return null; // no weather is fine
-  }
+  return forced && forced !== "clear" ? forced : null;
 }
 
 // Snow on the roofs: settled whenever it's snowing; in endless runs from December to February it
