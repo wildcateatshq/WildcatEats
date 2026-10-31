@@ -97,6 +97,7 @@ export function createCity(root) {
   let P = 3;
   let waveTimer = 0;
   let rising = false; // from the battery running out until the out-of-charge screen is up
+  let heldLevel = null; // while the battery runs out, the lights stay at this level until they go out
   let PAN = 0; // how far the view rises
   let weatherKind = null; // "rain", "snow", "fog" or null
   let holiday = null; // "halloween", "december", "newyear", "july4" or null
@@ -383,13 +384,16 @@ export function createCity(root) {
     const hard = body.classList.contains("hard");
     // On the start screen the city is dark: nothing powers it until the battery charges up on Play.
     // In the game it shows the real charge.
-    const shown = body.classList.contains("starting") ? 0 : Math.max(0, Math.min(100, level));
+    const shown = body.classList.contains("starting") ? 0 : Math.max(0, Math.min(100, heldLevel ?? level));
     const out = shown <= 0;
     for (const building of buildings) building.el.classList.toggle("on", building.cutoff < shown);
     root.classList.toggle("out", out);
     root.classList.toggle("low", shown > 0 && shown < 20);
     if (body.classList.contains("dead")) rising = false;
-    else if (!rising) root.classList.remove("blackout", "skyward");
+    else if (!rising) {
+      heldLevel = null;
+      root.classList.remove("blackout", "skyward");
+    }
 
     const sky = skyAt(hour ?? 0);
     const night = 1 - sky.day;
@@ -516,13 +520,18 @@ export function createCity(root) {
   // "down" dims every lit window as it passes, and the buildings losing power go dark in the same
   // rippling order; "up" makes them flare brighter as it passes.
   const WAVE_SPREAD = 0.7; // seconds for the wave to reach the far edge
-  function wave(direction, originX = W / 2) {
-    if (reducedMotion() || !buildings.length) return;
+  // Each building's delay grows with its distance from originX, so lights switching on or off (and
+  // the wave animations) ripple outward from there.
+  function rippleFrom(originX) {
     const reach = Math.max(originX, W - originX) || 1;
     for (const building of buildings) {
       const distance = Math.abs(building.x + building.w / 2 - originX) / reach;
       building.el.style.setProperty("--wave-delay", `${(distance * WAVE_SPREAD).toFixed(3)}s`);
     }
+  }
+  function wave(direction, originX = W / 2) {
+    if (reducedMotion() || !buildings.length) return;
+    rippleFrom(originX);
     root.classList.remove("wave-down", "wave-up");
     void root.offsetWidth; // restart the animation if a wave is already running
     root.classList.add(`wave-${direction}`);
@@ -618,20 +627,28 @@ export function createCity(root) {
     }, duration);
   }
 
-  // The guess that runs the battery out has just been revealed. The view starts rising slowly up
-  // into the night above the city while the battery is still draining; once it has drained
-  // (blackoutAfter) every building goes black against the sky. onTop runs once the view is at the top.
-  const RISE_DELAY_MS = 300;
+  // The guess that runs the battery out has just been revealed. The city keeps its lights on while
+  // the battery drains and the game fades away; then (lightsOutAfter) the lights go out in a ripple
+  // from the middle, the buildings turn black against the sky, and once the dark city has been
+  // seen the view rises slowly up into the night above it. onTop runs once the view is at the top.
+  const SILHOUETTE_MS = 800; // after the lights go out
+  const RISE_AFTER_MS = 1600; // after the lights go out
   const RISE_MS = 6000; // keep in step with .city-world's transition in percentle.css
-  function outOfCharge(onTop, blackoutAfter = 0) {
+  function outOfCharge(onTop, lightsOutAfter = 0) {
     rising = true;
     const still = reducedMotion();
-    setTimeout(() => { if (rising) root.classList.add("blackout"); }, still ? 0 : blackoutAfter);
-    setTimeout(() => {
-      if (!rising) return;
+    heldLevel = still ? null : level > 0 ? level : heldLevel ?? 1;
+    const later = (ms, step) => setTimeout(() => { if (rising) step(); }, still ? 0 : ms);
+    later(lightsOutAfter, () => {
+      rippleFrom(W / 2);
+      heldLevel = null;
+      refresh();
+    });
+    later(lightsOutAfter + SILHOUETTE_MS, () => root.classList.add("blackout"));
+    later(lightsOutAfter + RISE_AFTER_MS, () => {
       root.classList.add("skyward");
       setTimeout(() => { if (rising) onTop?.(); }, still ? 600 : RISE_MS + 150);
-    }, still ? 0 : RISE_DELAY_MS);
+    });
   }
 
   // A pixel flying saucer that zips across the top of the screen at height y (screen pixels), once

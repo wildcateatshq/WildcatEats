@@ -141,14 +141,15 @@ const ANSWER_SHOWN_MS = 1450;
 // ...and the Next button fades in this long after that.
 const NEXT_BUTTON_DELAY_MS = 1000;
 let nextButtonTimer;
-// Running out of charge: as soon as the losing guess is revealed the view starts drifting slowly up
-// into the night sky (city.outOfCharge), while the battery drains to empty and the city blacks
-// out. A beat after the battery is empty (HIDE_GAME_MS from the reveal) the whole game fades away,
-// leaving just the sky. Once it's at the top, the out-of-charge screen pops up over the
-// sky. POWER_OUT_DELAY_MS after the guess was locked is only a safety net, in case the blackout
-// never started (say, the battery's drain was cut short).
+// Running out of charge: the losing guess is revealed and the battery drains to empty, then the
+// whole game fades away (HIDE_GAME_MS from the reveal) so the city is in plain view when its lights
+// go out (LIGHTS_OUT_MS) and it blacks out. Then the view drifts slowly up into the night sky
+// (city.outOfCharge), and once it's at the top the out-of-charge screen pops up over the sky.
+// POWER_OUT_DELAY_MS after the guess was locked is only a safety net, in case the blackout never
+// started (say, the battery's drain was cut short).
 const DRAIN_MS = 1400;
-const HIDE_GAME_MS = 2600;
+const HIDE_GAME_MS = 1500;
+const LIGHTS_OUT_MS = 2400; // the game takes 1s to fade
 const POWER_OUT_DELAY_MS = 13000;
 const POWER_OUT_DELAY_REDUCED_MS = 4000;
 let powerOutTimer;
@@ -615,7 +616,7 @@ function renderScoreBox(progress, view, animate) {
 }
 
 function soundAlarm() {
-  city.outOfCharge(powerOut, DRAIN_MS);
+  city.outOfCharge(powerOut, LIGHTS_OUT_MS);
   hideGameTimer = setTimeout(() => document.body.classList.add("ascending"), HIDE_GAME_MS);
 }
 
