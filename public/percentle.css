@@ -465,6 +465,23 @@ body.dead .city:not(.skyward) .city-world{transition:none}
 .city .shooting-star{fill:none;stroke:#fffef8;stroke-width:2;stroke-linecap:round;stroke-dasharray:60 400;stroke-dashoffset:60;opacity:0}
 .city.skyward .shooting-star,body.dead .city .shooting-star{animation:shooting-star 7s ease-in 2.6s infinite}
 @keyframes shooting-star{0%{stroke-dashoffset:60;opacity:0}2%{opacity:1}9%{stroke-dashoffset:-340;opacity:0}100%{stroke-dashoffset:-340;opacity:0}}
+/* An endless run that runs out in daylight ends in a storm (city.mjs outOfCharge): a front of heavy
+   clouds rolls in over the city, the sky turns slate, rain sweeps the whole screen, and the view
+   rises into storm clouds with lightning flickering inside them instead of into space. */
+.city .storm-front{position:absolute;inset:0;width:100%;height:100%;shape-rendering:crispEdges;opacity:0;transform:translateY(-70px);transition:opacity 1.4s ease,transform 1.8s cubic-bezier(.2,.7,.3,1);pointer-events:none}
+.city.storm-out .storm-front{opacity:1;transform:none}
+.city-stormsky{display:none;position:absolute;left:0;width:100%;overflow:hidden;background:linear-gradient(180deg,#14171c,#22262d 85%,rgba(34,38,45,0))}
+.city.storm-out .city-stormsky{display:block}
+.city.storm-out .city-space{display:none}
+.city-stormsky svg{position:absolute;inset:0;width:100%;height:100%;shape-rendering:crispEdges}
+.storm-flicker{position:absolute;width:50vmax;height:30vmax;transform:translate(-50%,-50%);background:radial-gradient(closest-side,rgba(214,226,255,.55),rgba(214,226,255,0));opacity:0;animation:storm-flicker 7s steps(1) infinite;pointer-events:none}
+@keyframes storm-flicker{0%,88%{opacity:0}89%{opacity:.9}90%{opacity:.15}91%{opacity:.75}93%,100%{opacity:0}}
+.city-storm-rain{position:absolute;left:0;right:0;top:-160px;bottom:0;opacity:0;transition:opacity 1.2s ease;pointer-events:none}
+.city.storm-out .city-storm-rain{opacity:1;animation:storm-rain .45s linear infinite}
+@keyframes storm-rain{to{transform:translateY(160px)}}
+.city.storm-out .sun,.city.storm-out .clouds{opacity:0;transition:opacity 1.4s ease}
+@media(prefers-reduced-motion:reduce){.city.storm-out .city-storm-rain,.storm-flicker{animation:none}}
+
 /* A flying saucer gliding across the top of the out-of-charge screen (city.mjs ufo()): its own
    layer, moved only by transform at a steady speed, with a gentle bob. */
 .city-ufo{position:absolute;left:0;transform:translateX(-60px);will-change:transform;animation:ufo-zip 2.4s linear forwards;shape-rendering:crispEdges}

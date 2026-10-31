@@ -150,7 +150,7 @@ let nextButtonTimer;
 const DRAIN_MS = 1400;
 const HIDE_GAME_MS = 1500;
 const LIGHTS_OUT_MS = 2400; // the game takes 1s to fade
-const POWER_OUT_DELAY_MS = 13000;
+const POWER_OUT_DELAY_MS = 16000;
 const POWER_OUT_DELAY_REDUCED_MS = 4000;
 let powerOutTimer;
 let hideGameTimer;
@@ -166,6 +166,9 @@ const VISITORS = [
   { name: "birds", chance: 0.45, fits: sky => sky.hour !== null && [5, 6, 7, 17, 18, 19].includes(Math.floor(((sky.hour % 24) + 24) % 24)) }
 ];
 const VISITOR_GAP_MS = 25000;
+// Local testing only: http://localhost:3010/?clock=13 starts endless runs that many hours later
+// (13 = 10 AM), to see the daytime city without playing through the night.
+const CLOCK_SHIFT = location.hostname === "localhost" ? Number(new URLSearchParams(location.search).get("clock")) || 0 : 0;
 // Local testing only: http://localhost:3010/?visitor=blimp sends that visitor with every question.
 const FORCED_VISITOR = location.hostname === "localhost" ? new URLSearchParams(location.search).get("visitor") : null;
 let lastVisitorAt = -VISITOR_GAP_MS;
@@ -500,11 +503,13 @@ function render() {
   document.querySelector("#returnButton").hidden = !practiceMode;
   if (practiceMode || endlessMode) leaveStartScreen();
   document.querySelector("#puzzleNumber").innerHTML = endlessMode ? INFINITY_ICON : `NO. ${currentNumber}`;
-  // Endless runs keep a clock: 9 PM at the start, an hour on with each round.
-  const clock = endlessMode ? endlessClock(view.index) : null;
+  // Endless runs keep a clock: 9 PM at the start, an hour on with each round. The results stay at
+  // the time of the round the run ended on.
+  const round = view.phase === "results" ? Math.max(0, progress.guesses.length - 1) : view.index;
+  const clock = endlessMode ? endlessClock(round + CLOCK_SHIFT) : null;
   city.setTime(clock ? clock.hour : null);
   updateBillboard();
-  updateSnow(endlessMode ? view.index : 0);
+  updateSnow(endlessMode ? round : 0);
   document.querySelector("#puzzleDate").textContent = endlessMode ? `${endlessHard ? "HARD · " : ""}${clock.label} · ${clock.time}`.toUpperCase() : currentDate === today ? (currentTheme || "Today's edition").toUpperCase() : `${currentDate} · PRACTICE`;
   setAction("");
   const animate = justLocked;

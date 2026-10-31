@@ -98,6 +98,8 @@ export function createCity(root) {
   let waveTimer = 0;
   let rising = false; // from the battery running out until the out-of-charge screen is up
   let heldLevel = null; // while the battery runs out, the lights stay at this level until they go out
+  let storming = false; // an endless run ran out of charge in daylight: it ends in a storm
+  const STORM_DAYLIGHT = 0.4; // how light the sky must be for that (about 6:15 AM to 6:15 PM)
   let PAN = 0; // how far the view rises
   let weatherKind = null; // "rain", "snow", "fog" or null
   let holiday = null; // "halloween", "december", "newyear", "july4" or null
@@ -355,6 +357,38 @@ export function createCity(root) {
         <path class="shooting-star" d="M${(W * 0.15).toFixed(0)},${(PAN * 0.18).toFixed(0)} l${(W * 0.12).toFixed(0)},${(PAN * 0.06).toFixed(0)}"/>
       </svg>`;
 
+    // An endless run that runs out of charge in daylight ends in a storm instead of in space
+    // (storm-out): a front of heavy pixel clouds rolls in over the top of the city, and above it, where
+    // the view rises to, a sky full of storm clouds with lightning flickering inside them.
+    const cloudBank = (width, top, height, count, seed) => {
+      const cr = random(seed);
+      const shades = ["#2a2f37", "#343a44", "#3f4651", "#4b535f"];
+      let out = "";
+      for (let i = 0; i < count; i++) {
+        const cx = cr() * width, cy = top + cr() * height, cw = width * (phone ? 0.35 : 0.18) * (0.8 + cr() * 0.9);
+        const rows = 3 + Math.floor(cr() * 4), rh = px(8 + cr() * 10);
+        for (let k = 0; k < rows; k++) {
+          const t = k / (rows - 1); // 0 at the top of the cloud, 1 at its base
+          const ww = cw * (0.45 + 0.55 * Math.sin(Math.PI * (0.2 + t * 0.6)));
+          out += `<rect x="${px(cx - ww / 2 + (cr() - 0.5) * P * 6)}" y="${px(cy + k * rh)}" width="${px(ww)}" height="${rh}" fill="${shades[Math.min(3, Math.floor((1 - t) * 3.5))]}"/>`;
+        }
+      }
+      return out;
+    };
+    const stormFront = `<svg class="storm-front" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">${cloudBank(W, -H * 0.05, H * 0.2, phone ? 12 : 22, 91)}</svg>`;
+    const flickers = [[0.2, 0.3, 0], [0.72, 0.55, -2.3], [0.45, 0.78, -4.1], [0.85, 0.18, -5.6]]
+      .map(([fx, fy, delay]) => `<div class="storm-flicker" style="left:${(fx * 100).toFixed(0)}%;top:${(fy * 100).toFixed(0)}%;animation-delay:${delay}s"></div>`).join("");
+    const stormSky = `<div class="city-stormsky" style="height:${PAN}px;top:-${PAN}px">${flickers}
+        <svg viewBox="0 0 ${W} ${PAN}" preserveAspectRatio="none">${cloudBank(W, -PAN * 0.05, PAN * 1.05, phone ? 26 : 46, 97)}</svg></div>`;
+    // Rain over the whole screen in the storm: one tile of streaks, repeated and slid down endlessly.
+    const rr = random(101);
+    let streaks = "";
+    for (let i = 0; i < 14; i++) {
+      const x = rr() * 160, y = rr() * 160;
+      streaks += `<line x1='${x.toFixed(0)}' y1='${y.toFixed(0)}' x2='${(x - 4).toFixed(0)}' y2='${(y + 16).toFixed(0)}'/>`;
+    }
+    const rainTileUrl = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' stroke='#b4c2d4' stroke-opacity='.55' stroke-width='1.3'>${streaks}</svg>`).replace(/'/g, "%27")}")`;
+
     root.innerHTML = `<div class="city-sky"></div><div class="city-world"><div class="city-glow"></div>
       <svg class="city-scene" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">
         <defs><radialGradient id="sunGlow"><stop offset="0" stop-color="#ffd86b" stop-opacity=".35"/><stop offset="1" stop-color="#ffd86b" stop-opacity="0"/></radialGradient></defs>
@@ -367,7 +401,10 @@ export function createCity(root) {
         ${city}
       </svg>
       ${weather}
-      ${space}</div>
+      ${stormFront}
+      ${space}
+      ${stormSky}</div>
+      <div class="city-storm-rain" style='background-image:${rainTileUrl}'></div>
       <div class="city-scan"></div>`;
     buildings = [...root.querySelectorAll(".bw")].map((el, i) => ({ el, cutoff: Number(el.dataset.cutoff), ...layout[i] }));
     root.style.setProperty("--pan", `${PAN}px`);
@@ -389,13 +426,18 @@ export function createCity(root) {
     for (const building of buildings) building.el.classList.toggle("on", building.cutoff < shown);
     root.classList.toggle("out", out);
     root.classList.toggle("low", shown > 0 && shown < 20);
-    if (body.classList.contains("dead")) rising = false;
-    else if (!rising) {
+    const sky = skyAt(hour ?? 0);
+    if (body.classList.contains("dead")) {
+      rising = false;
+      // Reloading an endless run that ran out in daylight shows its storm again.
+      if (hour !== null && sky.day >= STORM_DAYLIGHT) storming = true;
+    } else if (!rising) {
       heldLevel = null;
+      storming = false;
       root.classList.remove("blackout", "skyward");
     }
+    root.classList.toggle("storm-out", storming);
 
-    const sky = skyAt(hour ?? 0);
     const night = 1 - sky.day;
     root.classList.toggle("day", sky.day > 0.01);
     let top = sky.top, bottom = sky.bottom;
@@ -409,11 +451,15 @@ export function createCity(root) {
       top = mix(top, "#1b232d", 0.45);
       bottom = mix(bottom, "#2b3440", 0.35);
     }
+    if (storming) {
+      top = mix(top, "#1c2027", 0.85);
+      bottom = mix(bottom, "#3a414c", 0.8);
+    }
     if (out) {
       top = mix(top, "#000000", 0.4 * night);
       bottom = mix(bottom, "#000000", 0.5 * night);
     }
-    root.classList.toggle("weather-rain", weatherKind === "rain");
+    root.classList.toggle("weather-rain", weatherKind === "rain" && !storming);
     root.classList.toggle("weather-snow", weatherKind === "snow" || snowFalling);
     root.classList.toggle("weather-fog", weatherKind === "fog");
     for (const name of ["halloween", "december", "newyear", "july4"]) root.classList.toggle(name, holiday === name);
@@ -579,8 +625,8 @@ export function createCity(root) {
   // Lightning striking the city: a bolt from the sky down onto a rooftop, a flash across the sky,
   // a burst of light where it lands, and the struck building lit up for a moment. A perfect answer
   // (exact to the tenth) gets a bigger, wider, more branched bolt, a double flicker and sparks.
-  function strike({ perfect = false } = {}) {
-    if (!buildings.length) return;
+  function strike({ perfect = false, outage = false } = {}) {
+    if (!buildings.length) return null;
     const phone = W < 600;
     // Lightning finds tall things: pick among the taller front buildings, away from the screen edges.
     const candidates = buildings.filter(b => b.row > 0 && b.x + b.w / 2 > W * 0.12 && b.x + b.w / 2 < W * 0.88)
@@ -616,31 +662,45 @@ export function createCity(root) {
     const flash = scene().lastElementChild;
     const bolt = flash.previousElementSibling;
     // The struck building lights up, even if the battery had already switched it off, and a wave of
-    // light runs out through the city from it.
-    target.el.classList.add("hit");
-    wave("up", hitX);
+    // light runs out through the city from it. A strike that knocks the power out (outage) does
+    // neither: the lights go out from it instead (see outOfCharge).
+    if (!outage) {
+      target.el.classList.add("hit");
+      wave("up", hitX);
+    }
     const duration = reducedMotion() ? 600 : perfect ? 1500 : 1000;
     setTimeout(() => {
       bolt?.remove();
       flash?.remove();
       target.el.classList.remove("hit");
     }, duration);
+    return hitX;
   }
 
   // The guess that runs the battery out has just been revealed. The city keeps its lights on while
   // the battery drains and the game fades away; then (lightsOutAfter) the lights go out in a ripple
   // from the middle, the buildings turn black against the sky, and once the dark city has been
   // seen the view rises slowly up into the night above it. onTop runs once the view is at the top.
+  // An endless run that runs out in daylight gets a storm instead: the storm rolls in over the city,
+  // lightning strikes a building and the lights go out from there, and the view rises into the
+  // storm clouds.
   const SILHOUETTE_MS = 800; // after the lights go out
   const RISE_AFTER_MS = 1600; // after the lights go out
+  const STORM_STRIKE_MS = 1800; // from the storm rolling in to the lightning
   const RISE_MS = 6000; // keep in step with .city-world's transition in percentle.css
   function outOfCharge(onTop, lightsOutAfter = 0) {
     rising = true;
     const still = reducedMotion();
     heldLevel = still ? null : level > 0 ? level : heldLevel ?? 1;
     const later = (ms, step) => setTimeout(() => { if (rising) step(); }, still ? 0 : ms);
+    const stormy = hour !== null && skyAt(hour).day >= STORM_DAYLIGHT;
+    if (stormy) {
+      later(lightsOutAfter, () => { storming = true; refresh(); });
+      lightsOutAfter += still ? 0 : STORM_STRIKE_MS;
+    }
     later(lightsOutAfter, () => {
-      rippleFrom(W / 2);
+      const hitX = stormy && !still ? strike({ outage: true }) : null;
+      rippleFrom(hitX ?? W / 2);
       heldLevel = null;
       refresh();
     });
@@ -655,7 +715,7 @@ export function createCity(root) {
   // the out-of-charge screen is up: a glass dome, a gray hull with blinking rim lights and a green
   // glow underneath. It's its own layer sliding at a steady speed, so it glides smoothly.
   function ufo(y) {
-    if (reducedMotion() || root.querySelector(".city-ufo")) return;
+    if (reducedMotion() || storming || root.querySelector(".city-ufo")) return;
     const u = W < 600 ? 2 : 3;
     const r = ([x, yy, w, h]) => `<rect x="${x * u}" y="${yy * u}" width="${w * u}" height="${h * u}"/>`;
     root.insertAdjacentHTML("beforeend", `<div class="city-ufo" style="top:${Math.round(y)}px;--travel:${W + 16 * u + 40}px"><div class="ufo-bob">

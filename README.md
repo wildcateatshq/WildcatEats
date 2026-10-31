@@ -160,7 +160,9 @@ locked only while today's puzzle is under way: before it starts it sets the mode
 for endless runs, and once it's finished it sets the mode for endless runs only.
 Dropping below 0% ends the game early: the city blacks out into silhouettes, the game fades away,
 the view drifts slowly up into the night sky (Milky Way, nebulae, a ringed planet), and at the top
-the player sees an "Out of charge" screen, with a UFO gliding across the sky under the top bar. Exactly 0.0% survives.
+the player sees an "Out of charge" screen, with a UFO gliding across the sky under the top bar. An
+endless run that runs out in daylight ends in a storm instead: clouds roll in, lightning knocks the
+power out, and the view rises into the storm clouds. Exactly 0.0% survives.
 
 ### Daily puzzles come from an AI agent
 
