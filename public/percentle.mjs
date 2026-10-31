@@ -1,4 +1,4 @@
-import { achievementsForGame, ACHIEVEMENTS, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, easternDate, endlessClock, finalCharge, weatherForDay, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { achievementsForGame, ACHIEVEMENTS, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, statsCharge, easternDate, endlessClock, finalCharge, weatherForDay, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
 import { createCity } from "/percentle/city.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
@@ -1179,8 +1179,9 @@ function bindLastTenGames() {
 
 function showStats() {
   const games = state.games;
-  // A game that ran out of charge counts as 0% left.
-  const charges = games.map(game => Math.max(0, gameCharge(game)));
+  // A game that ran out of charge counts as 0% left; a hard game counts as its regular-mode
+  // equivalent, so playing hard doesn't pull the average down.
+  const charges = games.map(game => Math.max(0, statsCharge(gameCharge(game), game.hard)));
   const average = charges.length ? charges.reduce((a, b) => a + b, 0) / charges.length : null;
   const best = charges.length ? Math.max(...charges) : null;
   openDialog("Your stats", `<div class="stat-cards">
@@ -1190,7 +1191,8 @@ function showStats() {
     <div class="stat-card"><span>CURRENT STREAK</span><strong>${consecutiveStreak(games)} day${consecutiveStreak(games) === 1 ? "" : "s"}</strong></div>
     <div class="stat-card"><span>ENDLESS BEST</span><strong>${state.endless.allTime} round${state.endless.allTime === 1 ? "" : "s"}</strong></div>
     <div class="stat-card"><span>ENDLESS RUNS</span><strong>${state.endless.runs}</strong></div>${state.endless.hardAllTime ? `
-    <div class="stat-card"><span>ENDLESS BEST · HARD</span><strong>${state.endless.hardAllTime} round${state.endless.hardAllTime === 1 ? "" : "s"}</strong></div>` : ""}</div>
+    <div class="stat-card"><span>ENDLESS BEST · HARD</span><strong>${state.endless.hardAllTime} round${state.endless.hardAllTime === 1 ? "" : "s"}</strong></div>` : ""}</div>${games.some(game => game.hard) ? `
+    <p class="stat-note">Hard games count as the charge the same guesses would leave in regular mode (40% hard counts as 70%).</p>` : ""}
     <h3 class="dialog-subtitle">Recent games</h3>${lastTenGames(games)}
     <h3 class="dialog-title">Past puzzles</h3><p>${isTodayFinished() ? "Replay any of the last 30 daily puzzles." : "Finish today's puzzle to unlock the archive."}</p>
     <div class="archive-list" id="archiveList">${isTodayFinished() ? "<span class='hist-empty'>Loading past puzzles…</span>" : "<span class='hist-empty'>The archive unlocks after today's five questions.</span>"}</div>`);

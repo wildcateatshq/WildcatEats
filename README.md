@@ -155,7 +155,9 @@ A SUPERCHARGED answer (within 0.5) recharges the battery by 5% (`SUPERCHARGE_BON
 100%; because of that cap, charge is worked out question by question (`chargeTrack`), and each
 saved game keeps its final charge (older games are re-scored from their total points off). **Hard mode** (a switch on the start screen) drains twice as fast (`HARD_DRAIN_RATE`), turns the
 golds purple, and locks in once a puzzle's first guess is made; hard players get their own crowd
-line (`mode` on crowd submissions) and their games are marked in stats and sharing. The switch is
+line (`mode` on crowd submissions) and their games are marked in stats and sharing. In the average
+and best charge (and the spreadsheet's average charge left), a hard game counts as the charge the
+same guesses would leave in regular mode, `(100 + hard charge) / 2` (`statsCharge`). The switch is
 locked only while today's puzzle is under way: before it starts it sets the mode for the daily and
 for endless runs, and once it's finished it sets the mode for endless runs only.
 Dropping below 0% ends the game early: the city blacks out into silhouettes, the game fades away,
@@ -305,7 +307,8 @@ counted against the same ID. Rows live in `percentle_visits` (or `data/percentle
 
 `GET /api/percentle/stats/daily.csv?key=...` returns one row per day, oldest first, from the first
 day with data through today: players who opened the game, new and returning players, finishes,
-hard-mode finishes, outs, average charge left, endless runs, shares, and sources. Visit columns
+hard-mode finishes, outs, average charge left (hard games at their regular-mode equivalent),
+endless runs, shares, and sources. Visit columns
 are blank for days before tracking began. It needs `PERCENTLE_STATS_KEY` (unset turns it off),
 and is meant for Excel's Data > From Web, set to refresh when the workbook opens.
 

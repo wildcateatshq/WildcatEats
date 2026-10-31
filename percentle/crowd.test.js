@@ -116,6 +116,11 @@ test("hard-mode scores form their own crowd line and survive a restart", async (
     await reopened.init();
     assert.equal((await reopened.getSummary(date, "hard")).players, 1);
     assert.equal((await reopened.getSummary(date)).players, 6);
+
+    // In the stats spreadsheet a hard game counts as its regular-mode equivalent: using 70 of its
+    // charge (30% left) in hard counts as 65% left, so the day sums 90+80+70+60+50+40 plus 65.
+    const [day] = await reopened.dailyFinishes();
+    assert.deepEqual(day, { date, finished: 7, hard: 1, out: 0, chargeSum: 455 });
   } finally {
     await fs.rm(folder, { recursive: true, force: true });
   }

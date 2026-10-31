@@ -33,6 +33,14 @@ export function chargeLeft(totalOff, rate = DRAIN_RATE) {
   return Math.round((100 - totalOff * rate) * 10) / 10;
 }
 
+// What a game's final charge counts as in stats. Hard mode drains twice as fast, so a hard game
+// counts as the charge the same guesses would leave in regular mode: (100 + hard charge) / 2, for
+// example 40% in hard counts as 70%. A game that ran out of charge stays below zero.
+export function statsCharge(charge, hard = false) {
+  if (!hard || charge < 0) return charge;
+  return Math.min(100, Math.round(((100 + charge) / 2) * 10) / 10);
+}
+
 // A SUPERCHARGED answer (within the perfect margin) recharges the battery by this much, never
 // above 100%.
 export const SUPERCHARGE_BONUS = 5;

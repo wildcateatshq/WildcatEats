@@ -182,14 +182,15 @@ function createCrowdStore(options = {}) {
   }
 
   // Per day, for the stats spreadsheet: finishes (both modes), hard-mode finishes, players who ran
-  // out of charge, and the summed charge left of those who didn't (scores are 100 - charge).
+  // out of charge, and the summed charge left of those who didn't (scores are 100 - charge). A hard
+  // game counts as its regular-mode equivalent, (100 + charge) / 2, which is 100 - score / 2.
   async function dailyFinishes() {
     if (pool) {
       const { rows } = await pool.query(
         `select to_char(puzzle_date, 'YYYY-MM-DD') as date, count(*)::int as finished,
                 coalesce(sum(case when mode = 'hard' then 1 else 0 end), 0)::int as hard,
                 coalesce(sum(case when score >= $1 then 1 else 0 end), 0)::int as out,
-                coalesce(sum(case when score < $1 then score else 0 end), 0)::float as "pointsOff"
+                coalesce(sum(case when score >= $1 then 0 when mode = 'hard' then score / 2.0 else score end), 0)::float as "pointsOff"
          from percentle_daily_scores group by puzzle_date`,
         [OUT_OF_CHARGE_RANK]
       );
@@ -203,7 +204,7 @@ function createCrowdStore(options = {}) {
         day.finished++;
         if (key.startsWith("hard:")) day.hard++;
         if (score >= OUT_OF_CHARGE_RANK) day.out++;
-        else day.chargeSum += 100 - score;
+        else day.chargeSum += 100 - (key.startsWith("hard:") ? score / 2 : score);
       }
       days.set(date, day);
     }

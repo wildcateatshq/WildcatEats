@@ -6,6 +6,7 @@ import {
   bestGuessIndex,
   chargeTrack,
   chargeLeft,
+  statsCharge,
   crowdRank,
   DRAIN_RATE,
   drainRateFor,
@@ -53,6 +54,15 @@ test("daily total sums the five absolute differences", () => {
   // 1 + 2 + 0 (30.5 is within 0.5 of 30) + 2 + 5
   assert.equal(dailyTotal([11, 18, 30.5, 42, 45], questions), 10);
   assert.throws(() => dailyTotal([10], questions), RangeError);
+});
+
+test("a hard game counts in stats as the charge the same guesses would leave in regular mode", () => {
+  assert.equal(statsCharge(40, true), 70, "40% hard is 70% regular");
+  assert.equal(statsCharge(0, true), 50, "an empty hard battery that survived is half full in regular");
+  assert.equal(statsCharge(100, true), 100);
+  assert.equal(statsCharge(33.3, true), 66.7, "rounded to one decimal place");
+  assert.equal(statsCharge(-4, true), -4, "running out of charge still counts as running out");
+  assert.equal(statsCharge(40), 40, "regular games are unchanged");
 });
 
 test("charge left drains from 100 at the drain rate and can go negative", () => {
