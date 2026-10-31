@@ -34,7 +34,10 @@ const toast = document.querySelector("#toast");
 // Local testing only: http://localhost:3000/percentle.html?reset clears saved progress and stats.
 if (location.hostname === "localhost" && new URLSearchParams(location.search).has("reset")) {
   try { localStorage.removeItem(STORAGE_KEY); } catch {}
-  history.replaceState(null, "", location.pathname);
+  // Only "reset" goes; other local testing options (?visitor=, ?weather=, ?holiday=) stay.
+  const params = new URLSearchParams(location.search);
+  params.delete("reset");
+  history.replaceState(null, "", `${location.pathname}${params.size ? `?${params}` : ""}`);
 }
 document.title = GAME_NAME.toUpperCase();
 document.querySelectorAll("[data-game-name]").forEach(element => {
@@ -87,6 +90,8 @@ recordVisit(easternDate());
 const city = createCity(document.querySelector("#city"));
 // A finish with at least this much charge left sets off fireworks over the city.
 const FIREWORKS_AT = 60;
+// A guess this close (but not a supercharge) sets off a single small firework.
+const CLOSE_FIREWORK_WITHIN = 3;
 
 let todayPuzzle;
 try {
@@ -148,26 +153,111 @@ const POWER_OUT_DELAY_MS = 13000;
 const POWER_OUT_DELAY_REDUCED_MS = 4000;
 let powerOutTimer;
 let hideGameTimer;
-// Now and then a plane drifts across the sky while a question is up: a chance with each new
-// question, at a random moment, never two close together.
-const PLANE_CHANCE = 0.25;
-const PLANE_GAP_MS = 25000;
-let lastPlaneAt = -PLANE_GAP_MS;
-let planeTimer;
+// Now and then something passes over the city while a question is up: one roll with each new
+// question, at a random moment, never two close together. Each visitor has its own chance and only
+// comes when it fits the sky (shooting stars at night, birds at dawn and dusk in endless, the
+// helicopter late at night).
+const VISITORS = [
+  { name: "plane", chance: 0.25, fits: () => true },
+  { name: "shootingStar", chance: 0.15, fits: sky => sky.daylight < 0.3 },
+  { name: "blimp", chance: 0.07, fits: () => true },
+  { name: "helicopter", chance: 0.08, fits: sky => sky.hour === null || (((sky.hour % 24) + 24) % 24 < 4) },
+  { name: "birds", chance: 0.45, fits: sky => sky.hour !== null && [5, 6, 7, 17, 18, 19].includes(Math.floor(((sky.hour % 24) + 24) % 24)) }
+];
+const VISITOR_GAP_MS = 25000;
+// Local testing only: http://localhost:3010/?visitor=blimp sends that visitor with every question.
+const FORCED_VISITOR = location.hostname === "localhost" ? new URLSearchParams(location.search).get("visitor") : null;
+let lastVisitorAt = -VISITOR_GAP_MS;
+let visitorTimer;
 function maybeFlyPlane() {
-  clearTimeout(planeTimer);
-  if (document.body.classList.contains("starting") || Date.now() - lastPlaneAt < PLANE_GAP_MS || Math.random() >= PLANE_CHANCE) return;
-  planeTimer = setTimeout(() => {
-    // Between the bottom of the moon and the top of the Lock in button.
+  clearTimeout(visitorTimer);
+  if (document.body.classList.contains("starting")) return;
+  const sky = city.state();
+  let visitor = FORCED_VISITOR;
+  if (!visitor) {
+    if (Date.now() - lastVisitorAt < VISITOR_GAP_MS) return;
+    let roll = Math.random();
+    visitor = VISITORS.filter(v => v.fits(sky)).find(v => (roll -= v.chance) < 0)?.name;
+    if (!visitor) return;
+  }
+  visitorTimer = setTimeout(() => {
+    // Planes, birds and shooting stars cross between the bottom of the moon and the top of the
+    // question's button; the blimp and helicopter stay low over the rooftops.
     const moon = document.querySelector("#city .moon")?.getBoundingClientRect();
     const button = document.querySelector("#questionAction")?.getBoundingClientRect();
     if (!moon || !button || document.body.classList.contains("starting")) return;
-    const top = moon.bottom + 16, bottom = button.top - 30;
-    if (bottom <= top) return;
-    lastPlaneAt = Date.now();
-    city.plane(top + Math.random() * (bottom - top));
-  }, 1500 + Math.random() * 6000);
+    const top = Math.max(16, moon.bottom + 16), bottom = button.top - 30;
+    const y = bottom > top ? top + Math.random() * (bottom - top) : top;
+    lastVisitorAt = Date.now();
+    if (visitor === "plane") city.plane(y);
+    else if (visitor === "shootingStar") city.shootingStar(Math.max(20, y - 60));
+    else if (visitor === "birds") city.birds(y);
+    else city[visitor]?.();
+  }, FORCED_VISITOR ? 1200 : 1500 + Math.random() * 6000);
 }
+
+// The billboard on a rooftop: the player's streak once it's going, otherwise the game's name and
+// today's puzzle (or the best endless run).
+function updateBillboard() {
+  const streak = consecutiveStreak(state.games);
+  const top = streak >= 2 ? `${streak} DAY STREAK` : "CHARGLE";
+  const bottom = endlessMode ? `BEST ${Math.max(state.endless.allTime, state.endless.hardAllTime || 0)}` : `NO. ${currentNumber}`;
+  city.setBillboard([top, bottom]);
+}
+
+// Holidays on the city: Halloween (Oct 27-31), lights all December, fireworks on New Year's
+// (Dec 31-Jan 1) and the Fourth of July (Jul 3-5). By the Eastern date, like the puzzles.
+function holidayOn(date) {
+  const md = date.slice(5);
+  if (md >= "10-27" && md <= "10-31") return "halloween";
+  if (md === "12-31" || md === "01-01") return "newyear";
+  if (md >= "12-01" && md <= "12-30") return "december";
+  if (md >= "07-03" && md <= "07-05") return "july4";
+  return null;
+}
+
+// Real weather over Villanova (rain, snow or fog), from Open-Meteo's free forecast, checked at
+// most once an hour. Weather codes: 45/48 fog; 51-67, 80-82, 95-99 rain; 71-77, 85-86 snow.
+const WEATHER_URL = "https://api.open-meteo.com/v1/forecast?latitude=40.037&longitude=-75.342&current=weather_code";
+function weatherFromCode(code) {
+  if (code === 45 || code === 48) return "fog";
+  if ((code >= 71 && code <= 77) || code === 85 || code === 86) return "snow";
+  if ((code >= 51 && code <= 67) || (code >= 80 && code <= 82) || code >= 95) return "rain";
+  return null;
+}
+let weatherNow = null;
+async function loadWeather() {
+  // Local testing only: ?weather=rain, snow, fog or clear.
+  const forced = location.hostname === "localhost" ? new URLSearchParams(location.search).get("weather") : null;
+  if (forced) return forced === "clear" ? null : forced;
+  try {
+    const saved = JSON.parse(readPreference("percentle.weather") || "null");
+    if (saved && Date.now() - saved.at < 3600000) return saved.kind;
+  } catch {}
+  try {
+    const body = await (await fetch(WEATHER_URL)).json();
+    const kind = weatherFromCode(body.current?.weather_code);
+    try { localStorage.setItem("percentle.weather", JSON.stringify({ at: Date.now(), kind })); } catch {}
+    return kind;
+  } catch {
+    return null; // no weather is fine
+  }
+}
+
+// Snow on the roofs: settled whenever it's snowing; in endless runs from December to February it
+// also falls and piles up round by round.
+function updateSnow(round = 0) {
+  const month = Number(easternDate().slice(5, 7));
+  const winter = month === 12 || month <= 2;
+  if (weatherNow === "snow") city.setSnow(1, true);
+  else if (endlessMode && winter) city.setSnow(Math.min(1, round / 12), true);
+  else city.setSnow(0, false);
+}
+
+// Local testing only: ?holiday=december (or halloween, newyear, july4, none).
+const forcedHoliday = location.hostname === "localhost" ? new URLSearchParams(location.search).get("holiday") : null;
+city.setHoliday(forcedHoliday ? (forcedHoliday === "none" ? null : forcedHoliday) : holidayOn(easternDate()));
+loadWeather().then(kind => { weatherNow = kind; city.setWeather(kind); updateSnow(endlessMode ? progressFor().guesses.length : 0); });
 
 // Answers always have exactly one decimal place, even if a puzzle was stored with more.
 function withRoundedAnswers(questions) {
@@ -414,6 +504,8 @@ function render() {
   // Endless runs keep a clock: 9 PM at the start, an hour on with each round.
   const clock = endlessMode ? endlessClock(view.index) : null;
   city.setTime(clock ? clock.hour : null);
+  updateBillboard();
+  updateSnow(endlessMode ? view.index : 0);
   document.querySelector("#puzzleDate").textContent = endlessMode ? `${endlessHard ? "HARD · " : ""}${clock.label} · ${clock.time}`.toUpperCase() : currentDate === today ? (currentTheme || "Today's edition").toUpperCase() : `${currentDate} · PRACTICE`;
   setAction("");
   const animate = justLocked;
@@ -566,6 +658,11 @@ function playReveal(animate) {
     const last = progress.guesses.length - 1;
     const perfect = progress.guesses[last] === currentQuestions[last].answer;
     setTimeout(() => city.strike({ perfect }), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1300);
+  } else if (animate) {
+    // A very close guess sets off one small firework.
+    const progress = progressFor();
+    const last = progress.guesses.length - 1;
+    if (pointsOff(progress.guesses[last], currentQuestions[last].answer) <= CLOSE_FIREWORK_WITHIN) setTimeout(city.firework, 1300);
   }
 }
 
@@ -835,6 +932,8 @@ function renderResults() {
   else playResultDrain(charge, animate).then(finished => {
     if (!finished) return;
     if (animate && charge >= FIREWORKS_AT) city.fireworks();
+    // A perfect game (every answer supercharged) gets searchlights sweeping the sky.
+    if (animate && progress.guesses.every((guess, i) => pointsOff(guess, currentQuestions[i].answer) === 0)) city.searchlights();
     if (animate && lowBatteryTier(charge)) showLowBatteryAlert(charge, announceAchievements);
     else announceAchievements();
   });

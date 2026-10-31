@@ -98,6 +98,13 @@ export function createCity(root) {
   let waveTimer = 0;
   let rising = false; // from the battery running out until the out-of-charge screen is up
   let PAN = 0; // how far the view rises
+  let weatherKind = null; // "rain", "snow", "fog" or null
+  let holiday = null; // "halloween", "december", "newyear", "july4" or null
+  let snowLevel = 0; // 0 to 1: how much snow sits on the roofs
+  let snowFalling = false;
+  let billboard = null; // { x, y, w, h } once drawn
+  let billboardText = ["CHARGLE", ""];
+  const BILLBOARD_CUTOFF = 25; // the billboard's building loses power below this charge
 
   function build() {
     W = window.innerWidth;
@@ -178,6 +185,8 @@ export function createCity(root) {
     const dim = phone ? 0.62 : 0.85;
     let city = "";
     const layout = []; // each building's place, in the same order as its windows group
+    // A few windows start dark, so there are some to switch on (see the window flicker below).
+    const wr = random(77);
     layers.forEach((layer, n) => {
       const lr = random(layer.seed);
       const base = H - (H - H * (layer.top + 0.12)) * scale;
@@ -204,7 +213,7 @@ export function createCity(root) {
           for (let c = 0; c < cols; c++) {
             if (lr() >= 0.8) continue;
             const kind = lr() < 0.02 ? "wn" : `w${Math.floor(lr() * 3)}`;
-            windows += `<rect class="${kind}" x="${x + P + c * P * 3}" y="${wy}" width="${P}" height="${P * 1.5}" opacity="${(layer.win * dim * (0.55 + lr() * 0.45)).toFixed(2)}"/>`;
+            windows += `<rect class="${kind}${wr() < 0.06 ? " dark" : ""}" x="${x + P + c * P * 3}" y="${wy}" width="${P}" height="${P * 1.5}" opacity="${(layer.win * dim * (0.55 + lr() * 0.45)).toFixed(2)}"/>`;
           }
         }
         lights += `<g class="bw" data-cutoff="${cutoff}">${windows}</g>`;
@@ -217,6 +226,64 @@ export function createCity(root) {
       layout.push(...placed);
       city += `<g class="row row-${n}">${shapes}</g><g class="lights">${lights}</g><g class="beacons">${beacons}</g>`;
     });
+
+    // Snow caps on every roof, grown by --snow (0 to 1) when it snows or a winter endless run goes on.
+    city += `<g class="snow-caps">${layout.map(b => `<rect x="${b.x}" y="${b.top - P * 2}" width="${b.w}" height="${P * 2}"/>`).join("")}</g>`;
+
+    // December: strings of colored lights along some rooftops (shown with .december).
+    const hl = random(61);
+    let strings = "";
+    for (const roof of layout.filter(b => b.row > 0 && b.w > P * 8)) {
+      if (hl() > 0.55) continue;
+      for (let x = roof.x + P; x < roof.x + roof.w - P; x += P * 2) {
+        const sag = Math.sin(((x - roof.x) / roof.w) * Math.PI) * P * 1.5;
+        strings += `<rect class="hl hl-${Math.floor(hl() * 4)}" x="${x}" y="${(roof.top + P + sag).toFixed(0)}" width="${P}" height="${P}"/>`;
+      }
+    }
+    city += `<g class="holiday-lights">${strings}</g>`;
+
+    // Halloween: a few bats fluttering in open sky (shown with .halloween).
+    const batSpots = phone ? [[0.22, 0.19], [0.86, 0.2], [0.62, 0.15]] : [[0.12, 0.22], [0.2, 0.34], [0.86, 0.3], [0.08, 0.42]];
+    const bat = (bx, by, k) => `<g class="bat" style="--bx:${bx.toFixed(0)}px;--by:${by.toFixed(0)}px;animation-delay:-${(k * 1.7).toFixed(1)}s">
+        <g class="bat-up">${[[-6, 0, 4, 1], [-4, -1, 2, 1], [-1, 0, 2, 2], [2, 0, 4, 1], [2, -1, 2, 1]].map(([x, y, w, h]) => `<rect x="${x * P}" y="${y * P}" width="${w * P}" height="${h * P}"/>`).join("")}</g>
+        <g class="bat-down">${[[-6, 1, 2, 1], [-4, 0, 3, 1], [-1, 0, 2, 2], [1, 0, 3, 1], [4, 1, 2, 1]].map(([x, y, w, h]) => `<rect x="${x * P}" y="${y * P}" width="${w * P}" height="${h * P}"/>`).join("")}</g></g>`;
+    city += `<g class="bats">${batSpots.map(([fx, fy], k) => bat(W * fx, H * fy, k)).join("")}</g>`;
+
+    // A billboard on a rooftop on the right, where the game covers it least. Its words come from
+    // setBillboard (the player's streak, or the puzzle number).
+    billboard = null;
+    const boardRoofs = layout.filter(b => b.row === 2 && b.w >= (phone ? 30 : 50) && b.x + b.w / 2 > (phone ? W * 0.6 : (W + 720) / 2 + 10) && b.x + b.w < W - 8);
+    const boardRoof = boardRoofs.sort((a, b) => a.top - b.top)[0];
+    if (boardRoof) {
+      const bw = phone ? 60 : 104, bh = phone ? 24 : 34;
+      const bx = px(boardRoof.x + boardRoof.w / 2 - bw / 2), by = px(boardRoof.top - bh - P * 3);
+      billboard = { x: bx, y: by, w: bw, h: bh };
+      city += `<g class="billboard">
+          <rect class="bb-post" x="${bx + P * 3}" y="${by + bh}" width="${P}" height="${P * 3}"/><rect class="bb-post" x="${bx + bw - P * 4}" y="${by + bh}" width="${P}" height="${P * 3}"/>
+          <rect class="bb-frame" x="${bx}" y="${by}" width="${bw}" height="${bh}"/>
+          <text class="bb-1" x="${bx + bw / 2}" y="${by + bh * 0.46}" font-size="${phone ? 7 : 10}"></text>
+          <text class="bb-2" x="${bx + bw / 2}" y="${by + bh * 0.82}" font-size="${phone ? 6 : 9}"></text></g>`;
+    }
+
+    // Weather over the city, drawn once and shown by class: rain and snow fall in endless loops
+    // (two copies of the same tile, one above the other), and fog drifts low over the skyline.
+    const wx = random(83);
+    let rainTile = "", snowTile = "";
+    for (let i = 0; i < (phone ? 80 : 180); i++) {
+      const x = wx() * (W + 40) - 20, y = wx() * H;
+      rainTile += `<line x1="${x.toFixed(0)}" y1="${y.toFixed(0)}" x2="${(x - 4).toFixed(0)}" y2="${(y + 14).toFixed(0)}" opacity="${(0.25 + wx() * 0.4).toFixed(2)}"/>`;
+    }
+    for (let i = 0; i < (phone ? 90 : 210); i++) {
+      snowTile += `<rect x="${px(wx() * W)}" y="${px(wx() * H)}" width="${P}" height="${P}" opacity="${(0.45 + wx() * 0.5).toFixed(2)}"/>`;
+    }
+    const skylineTop = Math.min(...layout.filter(b => b.row === 0).map(b => b.top));
+    const fog = [0.2, 0.55, 0.85].map((f, i) => `<ellipse class="fog fog-${i}" cx="${(W * f).toFixed(0)}" cy="${(skylineTop + H * 0.06).toFixed(0)}" rx="${(W * 0.42).toFixed(0)}" ry="${(H * 0.07).toFixed(0)}" fill="url(#fogPuff)"/>`).join("");
+    const weather = `<svg class="city-weather" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">
+        <defs><radialGradient id="fogPuff"><stop offset="0" stop-color="#cdd6e0" stop-opacity=".2"/><stop offset="1" stop-color="#cdd6e0" stop-opacity="0"/></radialGradient></defs>
+        <g class="wx-rain"><g class="wx-fall" style="--tile:${H}px">${rainTile}<g transform="translate(0 ${-H})">${rainTile}</g></g></g>
+        <g class="wx-snow"><g class="wx-fall" style="--tile:${H}px">${snowTile}<g transform="translate(0 ${-H})">${snowTile}</g></g></g>
+        <g class="wx-fog">${fog}</g>
+      </svg>`;
 
     // The sky above the view, seen when it rises after the battery runs out.
     PAN = Math.round(H * 0.8);
@@ -295,10 +362,12 @@ export function createCity(root) {
         <g class="pylon">${pylon}</g>
         ${city}
       </svg>
+      ${weather}
       ${space}</div>
       <div class="city-scan"></div>`;
     buildings = [...root.querySelectorAll(".bw")].map((el, i) => ({ el, cutoff: Number(el.dataset.cutoff), ...layout[i] }));
     root.style.setProperty("--pan", `${PAN}px`);
+    showBillboard();
     // Place the moon and sun without gliding in from the corner.
     root.classList.add("placing");
     refresh();
@@ -325,16 +394,28 @@ export function createCity(root) {
       top = mix(top, "#0d0418", 0.6);
       bottom = mix(bottom, "#3a1a5c", 0.55);
     }
+    // Rain, snow and fog hang grey cloud over the sky and hide most of the stars.
+    const overcast = Boolean(weatherKind);
+    if (overcast) {
+      top = mix(top, "#1b232d", 0.45);
+      bottom = mix(bottom, "#2b3440", 0.35);
+    }
     if (out) {
       top = mix(top, "#000000", 0.4 * night);
       bottom = mix(bottom, "#000000", 0.5 * night);
     }
+    root.classList.toggle("weather-rain", weatherKind === "rain");
+    root.classList.toggle("weather-snow", weatherKind === "snow" || snowFalling);
+    root.classList.toggle("weather-fog", weatherKind === "fog");
+    for (const name of ["halloween", "december", "newyear", "july4"]) root.classList.toggle(name, holiday === name);
+    root.style.setProperty("--snow", String(snowLevel));
+    root.querySelector(".billboard")?.classList.toggle("on", shown > BILLBOARD_CUTOFF);
     const rows = hard ? BUILDINGS_HARD : BUILDINGS_NIGHT;
     const style = root.style;
     style.setProperty("--sky-top", top);
     style.setProperty("--sky-bottom", bottom);
     rows.forEach((color, i) => style.setProperty(`--row-${i}`, mix(color, BUILDINGS_DAY[i], hard ? sky.day * 0.5 : sky.day)));
-    style.setProperty("--stars", (night * (0.25 + (1 - shown / 100) * 0.75)).toFixed(3));
+    style.setProperty("--stars", (night * (0.25 + (1 - shown / 100) * 0.75) * (overcast ? 0.15 : 1)).toFixed(3));
     style.setProperty("--windows", (1 - sky.day * 0.7).toFixed(3));
     style.setProperty("--glow", out ? "0" : (night * (0.25 + (shown / 100) * 0.75)).toFixed(3));
     style.setProperty("--daylight", sky.day.toFixed(3));
@@ -557,12 +638,10 @@ export function createCity(root) {
     el.addEventListener("animationend", event => { if (event.target === el) el.remove(); });
   }
 
-  // Pixel fireworks in the open sky beside the final battery.
-  function fireworks() {
+  // Pixel fireworks: bursts at spots given as fractions of the screen, each a little after the last.
+  function launch(spots, { repeat = 2, gap = 0.55 } = {}) {
     if (reducedMotion() || !buildings.length) return;
-    const phone = W < 600;
-    const spots = phone ? [[0.1, 0.37], [0.9, 0.31], [0.88, 0.47]] : [[0.18, 0.22], [0.82, 0.16], [0.86, 0.4]];
-    const step = phone ? 5.5 : 11;
+    const step = W < 600 ? 5.5 : 11;
     let bursts = "";
     spots.forEach(([fx, fy], k) => {
       const cx = W * fx, cy = H * fy;
@@ -573,11 +652,158 @@ export function createCity(root) {
           dots += `<rect x="${(cx + Math.cos(angle) * s * step).toFixed(0)}" y="${(cy + Math.sin(angle) * s * step).toFixed(0)}" width="${P}" height="${P}" opacity="${(1 - s * 0.16).toFixed(2)}"/>`;
         }
       }
-      bursts += `<g class="burst burst-${k}" style="animation-delay:${k * 0.55}s">${dots}<rect class="burst-core" x="${(cx - P).toFixed(0)}" y="${(cy - P).toFixed(0)}" width="${P * 2}" height="${P * 2}"/></g>`;
+      bursts += `<g class="burst burst-${k % 3}" style="animation-delay:${(k * gap).toFixed(2)}s;animation-iteration-count:${repeat}">${dots}<rect class="burst-core" x="${(cx - P).toFixed(0)}" y="${(cy - P).toFixed(0)}" width="${P * 2}" height="${P * 2}"/></g>`;
     });
     root.insertAdjacentHTML("beforeend", `<svg class="city-fireworks" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">${bursts}</svg>`);
     const svg = root.lastElementChild;
-    setTimeout(() => svg?.remove(), 5200);
+    setTimeout(() => svg?.remove(), (1.8 * repeat + spots.length * gap) * 1000 + 300);
+  }
+
+  // Three fireworks in the open sky beside the final battery, for a strong finish.
+  function fireworks() {
+    launch(W < 600 ? [[0.1, 0.37], [0.9, 0.31], [0.88, 0.47]] : [[0.18, 0.22], [0.82, 0.16], [0.86, 0.4]]);
+  }
+
+  // One small firework in open sky to one side, for a very close guess.
+  function firework() {
+    const left = Math.random() < 0.5;
+    const phone = W < 600;
+    const fx = phone ? (left ? 0.1 : 0.9) : left ? 0.08 + Math.random() * 0.1 : 0.82 + Math.random() * 0.1;
+    launch([[fx, phone ? 0.3 + Math.random() * 0.12 : 0.18 + Math.random() * 0.2]], { repeat: 1 });
+  }
+
+  // Whether a passing animation can play now: not on the start screen, not while the battery has
+  // run out, not in a background tab, and never for anyone who prefers less motion.
+  function lively() {
+    const body = document.body;
+    return !rising && !reducedMotion() && !document.hidden && buildings.length > 0 &&
+      !body.classList.contains("starting") && !body.classList.contains("dead") && !root.classList.contains("out");
+  }
+
+  // Screen position (from the top of the window) of a height in the scene, which is pinned to the
+  // bottom of the screen.
+  const toScreen = y => y + (window.innerHeight - H);
+  // The top of the skyline: a typical tall roof (the 15th percentile), so a single spire doesn't count.
+  const skylineScreenTop = () => {
+    const tops = buildings.map(b => b.top).sort((x, y) => x - y);
+    return toScreen(tops[Math.floor(tops.length * 0.15)] ?? H * 0.75);
+  };
+
+  // Something drifting across the screen at height y (screen pixels) and then removed. kind is a
+  // class for its look; html is its drawing; seconds is how long the crossing takes.
+  function drift(kind, html, y, width, seconds, leftToRight = Math.random() < 0.5) {
+    root.insertAdjacentHTML("beforeend", `<div class="city-drift ${kind}${leftToRight ? "" : " flip"}" style="top:${Math.round(y)}px;--travel:${W + width * 2 + 40}px;animation-duration:${seconds}s">${html}</div>`);
+    const el = root.lastElementChild;
+    el.addEventListener("animationend", event => { if (event.target === el) el.remove(); });
+    return el;
+  }
+
+  // A shooting star: a quick streak of light with a fading tail, high in the sky.
+  function shootingStar(y) {
+    if (!lively()) return;
+    const x = W * (0.1 + Math.random() * 0.6), length = W < 600 ? 110 : 190, angle = (12 + Math.random() * 18) * Math.PI / 180;
+    const x2 = x + Math.cos(angle) * length, y2 = y + Math.sin(angle) * length;
+    root.insertAdjacentHTML("beforeend", `<svg class="city-meteor" width="${W}" height="${window.innerHeight}">
+        <defs><linearGradient id="meteorTail" gradientUnits="userSpaceOnUse" x1="${x.toFixed(0)}" y1="${y.toFixed(0)}" x2="${x2.toFixed(0)}" y2="${y2.toFixed(0)}"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".95"/></linearGradient></defs>
+        <line x1="${x.toFixed(0)}" y1="${y.toFixed(0)}" x2="${x2.toFixed(0)}" y2="${y2.toFixed(0)}" stroke="url(#meteorTail)" stroke-width="2.5" stroke-linecap="round" pathLength="100"/></svg>`);
+    const svg = root.lastElementChild;
+    setTimeout(() => svg.remove(), 1400);
+  }
+
+  // A blimp drifting slowly just above the rooftops, with a lit banner along its side.
+  function blimp() {
+    if (!lively() || root.querySelector(".blimp")) return;
+    const s = W < 600 ? 2 : 3;
+    let body = "";
+    for (let row = -5; row <= 5; row++) {
+      const half = Math.round(Math.sqrt(1 - (row / 6) ** 2) * 26);
+      body += `<rect x="${(30 - half) * s}" y="${(row + 7) * s}" width="${half * 2 * s}" height="${s}"/>`;
+    }
+    body += `<rect x="${54 * s}" y="${1 * s}" width="${4 * s}" height="${4 * s}"/><rect x="${54 * s}" y="${9 * s}" width="${4 * s}" height="${4 * s}"/><rect x="${24 * s}" y="${13 * s}" width="${12 * s}" height="${3 * s}"/>`;
+    const html = `<svg width="${60 * s}" height="${17 * s}" viewBox="0 0 ${60 * s} ${17 * s}"><g class="blimp-body">${body}</g>
+        <rect class="blimp-banner" x="${12 * s}" y="${5 * s}" width="${36 * s}" height="${5 * s}"/>
+        <text class="blimp-text" x="${30 * s}" y="${8.8 * s}" font-size="${3.4 * s}">CHARGLE.IO</text>
+        <rect class="plane-red" x="${29 * s}" y="${16 * s}" width="${s}" height="${s}"/></svg>`;
+    drift("blimp", html, skylineScreenTop() - (W < 600 ? 0 : 17 * s + 24), 60 * s, 48 + Math.random() * 10);
+  }
+
+  // A helicopter that flies in, hovers above the rooftops sweeping a searchlight over them, and
+  // flies off. Mostly late at night.
+  function helicopter() {
+    if (!lively() || root.querySelector(".heli")) return;
+    const s = W < 600 ? 2 : 3;
+    const gutter = (W - 720) / 2;
+    const hoverX = W < 600 ? W * 0.8 : gutter > 160 ? W - gutter / 2 : W * 0.88;
+    // On a phone the guess bar covers the sky just above the roofs, so it flies lower, over them.
+    const y = skylineScreenTop() - (W < 600 ? -8 : 110);
+    const rect = (x, yy, w, h, cls = "") => `<rect${cls ? ` class="${cls}"` : ""} x="${x * s}" y="${yy * s}" width="${w * s}" height="${h * s}"/>`;
+    const html = `<div class="heli-body"><svg width="${30 * s}" height="${12 * s}" viewBox="0 0 ${30 * s} ${12 * s}">
+        <g class="heli-rotor">${rect(2, 0, 22, 1)}</g>
+        <g class="heli-shape">${rect(12, 1, 1, 2)}${rect(7, 3, 11, 5)}${rect(18, 4, 9, 2)}${rect(26, 2, 2, 4)}${rect(8, 9, 10, 1)}${rect(10, 8, 1, 1)}${rect(15, 8, 1, 1)}</g>
+        ${rect(8, 4, 3, 2, "heli-window")}${rect(27, 2, 1, 1, "plane-red")}</svg>
+        <svg class="heli-beam" width="${120 * s}" height="${70 * s}" viewBox="0 0 ${120 * s} ${70 * s}"><defs><linearGradient id="heliBeam" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff6d8" stop-opacity=".55"/><stop offset="1" stop-color="#fff6d8" stop-opacity="0"/></linearGradient></defs>
+        <polygon points="${58 * s},0 ${62 * s},0 ${80 * s},${70 * s} ${40 * s},${70 * s}" fill="url(#heliBeam)"/></svg></div>`;
+    root.insertAdjacentHTML("beforeend", `<div class="heli" style="top:${Math.round(y)}px;left:${Math.round(hoverX - 15 * s)}px;--away:${Math.round(W - hoverX + 60 * s)}px">${html}</div>`);
+    const el = root.lastElementChild;
+    el.addEventListener("animationend", event => { if (event.target === el) el.remove(); });
+  }
+
+  // A small V of birds crossing the sky, wings flapping (dawn and dusk in endless).
+  function birds(y) {
+    if (!lively() || root.querySelector(".birds")) return;
+    const s = W < 600 ? 2 : 3;
+    const flock = [[12, 0], [8, 3], [16, 3], [4, 6], [20, 6], [0, 9]];
+    const one = ([x, yy], k) => `<g class="bird" transform="translate(${x * s} ${yy * s})" style="animation-delay:-${(k * 0.13).toFixed(2)}s">
+        <g class="wing-up"><rect x="0" y="0" width="${s}" height="${s}"/><rect x="${s}" y="${s}" width="${s}" height="${s}"/><rect x="${2 * s}" y="0" width="${s}" height="${s}"/></g>
+        <g class="wing-down"><rect x="0" y="${s}" width="${s}" height="${s}"/><rect x="${s}" y="0" width="${s}" height="${s}"/><rect x="${2 * s}" y="${s}" width="${s}" height="${s}"/></g></g>`;
+    drift("birds", `<svg width="${24 * s}" height="${12 * s}" viewBox="0 0 ${24 * s} ${12 * s}">${flock.map(one).join("")}</svg>`, y, 24 * s, 16 + Math.random() * 6);
+  }
+
+  // Searchlights sweeping across the sky from behind the skyline, for a perfect game.
+  function searchlights() {
+    if (reducedMotion() || !buildings.length || root.querySelector(".city-searchlights")) return;
+    const spots = W < 600 ? [0.12, 0.88] : [0.1, 0.2, 0.8, 0.9];
+    const beams = spots.map((f, k) => `<div class="searchlight" style="left:${(W * f).toFixed(0)}px;animation-delay:-${(k * 1.3).toFixed(1)}s;--swing:${k % 2 ? -1 : 1}"></div>`).join("");
+    root.insertAdjacentHTML("beforeend", `<div class="city-searchlights">${beams}</div>`);
+    const el = root.lastElementChild;
+    setTimeout(() => el.classList.add("fading"), 14000);
+    setTimeout(() => el.remove(), 15500);
+  }
+
+  // Windows flicking on and off: every few seconds someone somewhere turns a light on, or off.
+  function flickWindow() {
+    if (lively()) {
+      const lit = buildings.filter(b => b.el.classList.contains("on"));
+      const building = lit[Math.floor(Math.random() * lit.length)];
+      if (building) {
+        const dark = [...building.el.querySelectorAll("rect.dark")];
+        const glowing = [...building.el.querySelectorAll("rect:not(.dark)")];
+        const turnOn = dark.length && (Math.random() < 0.5 || glowing.length < 3);
+        const pick = list => list[Math.floor(Math.random() * list.length)];
+        if (turnOn) pick(dark).classList.remove("dark");
+        else if (glowing.length) pick(glowing).classList.add("dark");
+      }
+    }
+    setTimeout(flickWindow, 2000 + Math.random() * 4000);
+  }
+  setTimeout(flickWindow, 3000);
+
+  // New Year's and the Fourth of July: a firework over the city every several seconds.
+  function holidayFireworks() {
+    if ((holiday === "newyear" || holiday === "july4") && lively()) {
+      const left = Math.random() < 0.5;
+      const phone = W < 600;
+      launch([[phone ? (left ? 0.12 : 0.88) : left ? 0.05 + Math.random() * 0.17 : 0.78 + Math.random() * 0.17, (phone ? 0.25 : 0.12) + Math.random() * 0.25]], { repeat: 1 });
+    }
+    setTimeout(holidayFireworks, 5000 + Math.random() * 5000);
+  }
+  setTimeout(holidayFireworks, 4000);
+
+  // The billboard's two lines (empty lines are fine).
+  function showBillboard() {
+    const one = root.querySelector(".bb-1"), two = root.querySelector(".bb-2");
+    if (one) one.textContent = billboardText[0] || "";
+    if (two) two.textContent = billboardText[1] || "";
   }
 
   build();
@@ -600,10 +826,38 @@ export function createCity(root) {
       hour = next;
       refresh();
     },
+    // What the sky is doing now: how light it is (0 night to 1 day) and the endless clock's hour
+    // (null in the daily puzzle).
+    state() {
+      return { daylight: skyAt(hour ?? 0).day, hour };
+    },
+    setWeather(kind) {
+      weatherKind = kind || null;
+      refresh();
+    },
+    setHoliday(name) {
+      holiday = name || null;
+      refresh();
+    },
+    setSnow(levelNow, falling = false) {
+      snowLevel = Math.max(0, Math.min(1, levelNow));
+      snowFalling = falling;
+      refresh();
+    },
+    setBillboard(lines) {
+      billboardText = lines;
+      showBillboard();
+    },
     wave,
     plane,
+    shootingStar,
+    blimp,
+    helicopter,
+    birds,
     outOfCharge,
     strike,
-    fireworks
+    fireworks,
+    firework,
+    searchlights
   };
 }

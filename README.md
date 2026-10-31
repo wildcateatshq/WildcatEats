@@ -233,9 +233,25 @@ sky, sun and moon follow it. The moon shows its real phase for the night (`moonP
 Naval Observatory's 2026 phase times). The scene is drawn once per screen width and then only switches
 buildings and colors, and it holds still under reduced motion.
 
-Now and then (a 25% chance with each new question, at a random moment, at least 25 seconds apart)
-a small plane with lit cabin windows and blinking lights drifts across the sky between the moon and
-the question's button.
+The city has life of its own (all in `city.mjs`; none of it plays on the start screen, after the
+battery runs out, in a background tab, or with reduced motion):
+- Windows flick on and off every few seconds in the buildings that have power.
+- Visitors: one roll per new question, at least 25 seconds apart. A plane (25%), a shooting star at
+  night (15%), a blimp with a CHARGLE.IO banner (7%), a helicopter sweeping a searchlight over the
+  roofs late at night (8%), and a V of birds at dawn and dusk in endless (45%).
+- A guess within 3 points (not a supercharge) sets off one firework; a perfect game (five
+  supercharges) brings searchlights sweeping the sky on the results screen.
+- A rooftop billboard shows the player's streak (2 days or more), otherwise CHARGLE and the puzzle
+  number, or the best endless run. It goes dark with its building.
+- Real weather over Villanova from Open-Meteo, checked at most hourly: rain, snow or fog, with an
+  overcast sky. Snow settles on the roofs while it's snowing, and in winter endless runs it falls
+  and piles up round by round.
+- Holidays by the Eastern date: Halloween (Oct 27-31: orange windows and moon, bats), December
+  (colored lights along rooftops), New Year's (Dec 31-Jan 1) and the Fourth of July (Jul 3-5),
+  with fireworks every few seconds.
+
+On localhost, `?visitor=plane|shootingStar|blimp|helicopter|birds`, `?weather=rain|snow|fog|clear`
+and `?holiday=halloween|december|newyear|july4|none` force those for testing (they survive `?reset`).
 
 The palette is bright light rather than green: lit things look like a bulb, a white-hot face with a
 gold halo, warming to amber (40%), orange (20%) and deep red (5%) as the battery drains. The
