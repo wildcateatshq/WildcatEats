@@ -9,8 +9,6 @@ import {
   crowdRank,
   DRAIN_RATE,
   drainRateFor,
-  REACTIONS,
-  reactionFor,
   roundsSurvived,
   endlessClock,
   weatherForDay,
@@ -141,15 +139,6 @@ test("guesses glow brighter the closer they are, fully lit within the perfect ma
   assert.equal(litLevel(25), 0.5);
   assert.equal(litLevel(50), 0);
   assert.equal(litLevel(80), 0);
-});
-
-test("reactions match how close the guess was and stay the same on reload", () => {
-  const tierOf = line => REACTIONS.findIndex(tier => tier.lines.includes(line));
-  assert.equal(reactionFor(0, "q"), "", "perfect answers get the stamp instead");
-  assert.equal(tierOf(reactionFor(2, "q")), 0);
-  assert.equal(tierOf(reactionFor(10, "q")), 2);
-  assert.equal(tierOf(reactionFor(45, "q")), 4);
-  assert.equal(reactionFor(10, "same question"), reactionFor(10, "same question"));
 });
 
 test("result colors respect their point-off thresholds", () => {

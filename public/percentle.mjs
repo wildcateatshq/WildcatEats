@@ -1,4 +1,4 @@
-import { achievementsForGame, ACHIEVEMENTS, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, reactionFor, easternDate, endlessClock, finalCharge, weatherForDay, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { achievementsForGame, ACHIEVEMENTS, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, easternDate, endlessClock, finalCharge, weatherForDay, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
 import { createCity } from "/percentle/city.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
@@ -526,7 +526,7 @@ function render() {
   stage.innerHTML = `
     <div class="question-body">
       <h2 class="question-text">${escapeHtml(question.text)}</h2>
-      <div class="hint-row"><p class="question-hint">0-100%</p>${view.phase === "reveal" ? reactionLine(question, progress.guesses[index]) : ""}</div>
+      <div class="hint-row"><p class="question-hint">0-100%</p></div>
       ${view.phase === "reveal" ? reveal(question, progress.guesses[index], index) : guessForm(guess)}
     </div>`;
   if (view.phase === "guess") maybeFlyPlane();
@@ -624,7 +624,6 @@ function playReveal(animate) {
   const next = document.querySelector("#nextButton");
   const card = document.querySelector("#gameCard");
   card.classList.remove("struck");
-  document.querySelector(".reaction")?.classList.add(animate ? "pop" : "shown");
   clearTimeout(nextButtonTimer);
   if (isOutOfCharge(progressFor().guesses, currentQuestions, rateOf())) {
     next.remove();
@@ -753,12 +752,6 @@ function bindGuessControls(initial, index) {
   });
   input.value = Number(initial).toFixed(1);
 }
-
-function reactionLine(question, guess) {
-  const reaction = reactionFor(pointsOff(guess, question.answer), `${currentDate}:${question.text}`);
-  return reaction ? `<span class="reaction">${escapeHtml(reaction)}</span>` : "";
-}
-
 
 // A guess's number glows like it's charged: bright and glowing when close, dimming toward a
 // drained gray the further off it is (litLevel in game.mjs).
