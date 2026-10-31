@@ -592,8 +592,8 @@ function render() {
   const guess = progress.draft ?? 50;
   stage.innerHTML = `
     <div class="question-body">
-      <h2 class="question-text">${escapeHtml(question.text)}</h2>
-      <div class="hint-row"><p class="question-hint">${escapeHtml(scaleHint(question))}</p></div>
+      <div class="question-head"><h2 class="question-text">${escapeHtml(question.text)}</h2>
+        <div class="hint-row"><p class="question-hint">${escapeHtml(scaleHint(question))}</p></div></div>
       ${view.phase === "reveal" ? reveal(question, progress.guesses[index], index) : guessForm(guess, question)}
     </div>`;
   if (view.phase === "guess") maybeFlyPlane();
