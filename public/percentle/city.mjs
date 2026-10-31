@@ -332,6 +332,16 @@ export function createCity(root) {
     }
     const mr = Math.round(R * 0.2);
     const moonlet = `<g transform="translate(${(-R * 2.4).toFixed(0)} ${(-R * 1.2).toFixed(0)})"><circle r="${mr}"/><circle r="${mr}" cx="${(mr * 0.45).toFixed(1)}" fill="#02050c" opacity=".55"/></g>`;
+    // A pixel flying saucer that zips across the very top once the view is up: a glass dome, a gray
+    // hull with blinking rim lights, and a green glow underneath.
+    const u = phone ? 2 : 3;
+    const ur = ([x, y, w, h]) => `<rect x="${x * u}" y="${y * u}" width="${w * u}" height="${h * u}"/>`;
+    const ufo = `<g transform="translate(0 ${phone ? 26 : 34})"><g class="ufo" style="--travel:${W + 16 * u + 40}px">
+          <g class="ufo-glow">${[[5, 6, 6, 1], [6, 7, 4, 1]].map(ur).join("")}</g>
+          <g class="ufo-dome">${[[6, 0, 4, 1], [5, 1, 6, 2]].map(ur).join("")}</g>
+          <g class="ufo-hull">${[[2, 3, 12, 1], [0, 4, 16, 1], [2, 5, 12, 1]].map(ur).join("")}</g>
+          ${[2, 6, 10, 14].map((x, k) => `<rect class="ufo-light ufo-light-${k % 2}" x="${x * u}" y="${4 * u}" width="${u}" height="${u}"/>`).join("")}
+        </g></g>`;
     const space = `<svg class="city-space" viewBox="0 0 ${W} ${PAN}" preserveAspectRatio="none" style="height:${PAN}px;top:-${PAN}px">
         <defs>
           <linearGradient id="spaceFade" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#010208"/><stop offset=".7" stop-color="#02050c" stop-opacity=".6"/><stop offset="1" stop-color="#02050c" stop-opacity="0"/></linearGradient>
@@ -351,6 +361,7 @@ export function createCity(root) {
           <g class="planet-ring">${ringPixel(false)}</g>
           <g class="planet-moon">${moonlet}</g>
         </g>
+        ${ufo}
         <path class="shooting-star" d="M${(W * 0.15).toFixed(0)},${(PAN * 0.18).toFixed(0)} l${(W * 0.12).toFixed(0)},${(PAN * 0.06).toFixed(0)}"/>
       </svg>`;
 

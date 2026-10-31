@@ -457,7 +457,16 @@ body.dead .city:not(.skyward) .city-world{transition:none}
 .city .shooting-star{fill:none;stroke:#fffef8;stroke-width:2;stroke-linecap:round;stroke-dasharray:60 400;stroke-dashoffset:60;opacity:0}
 .city.skyward .shooting-star,body.dead .city .shooting-star{animation:shooting-star 7s ease-in 2.6s infinite}
 @keyframes shooting-star{0%{stroke-dashoffset:60;opacity:0}2%{opacity:1}9%{stroke-dashoffset:-340;opacity:0}100%{stroke-dashoffset:-340;opacity:0}}
-@media(prefers-reduced-motion:reduce){.city-world{transition:none}.city .shooting-star{animation:none!important}}
+/* A flying saucer zips across the top once, just before the out-of-charge screen pops up. */
+.city .ufo{transform:translateX(-60px);opacity:0}
+.city.skyward .ufo,body.dead .city .ufo{animation:ufo-zip 1.3s cubic-bezier(.5,0,.5,1) 4.4s forwards}
+@keyframes ufo-zip{0%{transform:translate(-60px,0);opacity:1}30%{transform:translate(calc(var(--travel) * .3),5px)}60%{transform:translate(calc(var(--travel) * .6),-3px)}99%{opacity:1}100%{transform:translate(var(--travel),2px);opacity:0}}
+.city .ufo-hull{fill:#8a94a3}
+.city .ufo-dome{fill:#a8f0dc;opacity:.85}
+.city .ufo-glow{fill:#6dffa8;opacity:.35}
+.city .ufo-light-0{fill:#7dffb0;animation:plane-blink .3s steps(1) infinite}
+.city .ufo-light-1{fill:#ffe9a6;animation:plane-blink .3s steps(1) -.15s infinite}
+@media(prefers-reduced-motion:reduce){.city-world{transition:none}.city .shooting-star,.city .ufo{animation:none!important}}
 
 /* A distant plane drifting across the sky (city.mjs plane()), with blinking wing lights. */
 .city-plane{position:absolute;left:0;transform:translateX(-80px);animation:plane-fly 20s linear forwards;shape-rendering:crispEdges}
