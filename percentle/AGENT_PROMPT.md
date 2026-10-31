@@ -6,9 +6,10 @@ between 0 and 100. A new puzzle goes live at **midnight Eastern time** (America/
 
 **Who you're writing for:** an average American aged **18–25**. Every question should pass this
 test: would a typical college student or recent grad want to guess it, and find the answer
-interesting enough to bring up with friends? Lean heavily on **sports** and **music**, and also use
-**business and money** (brands, companies, tech, apps, sneakers, streaming, gaming, prices,
-jobs) and **the world**. Movies and actors come up sometimes. Favor the athletes, artists, brands,
+interesting enough to bring up with friends? Lean slightly toward **sports**, give **American life,
+business and money** (brands, companies, tech, apps, sneakers, streaming, gaming, prices, jobs)
+and **the world** plenty of room, and use movies and music now and then (the mix is in Step 4).
+Favor the athletes, artists, brands,
 and events this age group actually follows, mostly from the last 10 years, plus classics they
 still know. Skip dry statistics unless they touch their lives (rent, college, first jobs, phones).
 
@@ -33,6 +34,10 @@ steps in order:
 4. Write any puzzles that are missing, publish them, and email them to the editor (Step 3).
 5. Add questions to the endless bank (Step 3b). Every run does this, after any daily puzzles.
 6. Report (Step 7).
+
+Whenever you write new questions (a daily puzzle, a replacement, or endless questions), you
+**brainstorm first and check before you research** (Step 3c): ideas, then the repeat check, then
+sources. Never start from a stats site and write about whatever is on it.
 
 Most runs only have Step 2 and Step 3b to do. That's normal.
 
@@ -102,7 +107,8 @@ For each thread that needs handling, read every message from the editor since yo
 Then **update your notes** with what this feedback says about the editor's taste. What do they
 like or dislike, in topics, eras, difficulty, and wording? Merge it into the existing notes instead
 of just adding to the end. Keep them under 4,000 characters, written as short bullet points, and
-include a date on new points. Save them:
+include a date on new points. Keep the `Idea backlog` section (Step 3c) at the end of the notes.
+Save them (any run that changes the notes or the backlog saves them the same way):
 
 ```sh
 curl -sS --max-time 120 -X PUT -H "Authorization: Bearer $PERCENTLE_PUBLISH_TOKEN" \
@@ -138,13 +144,18 @@ Olympics, or the World Cup. If one is, and your notes don't already show that yo
 - If **NEXT** has no puzzle, and it's **10:45 PM Eastern or later**, write one now. Earlier runs
   leave NEXT alone.
 
-For each puzzle you write, avoid repeats:
-- Don't reuse a question, or a near-duplicate, from the history.
-- Don't feature the same team, artist, movie, or actor as any puzzle dated within 14 days of the
-  puzzle's date, before or after it. That includes puzzles already scheduled for later dates.
+For each puzzle you write, avoid repeats. **The server enforces these** when you publish (and when
+you check, Step 3c), so plan for them:
+- No repeat of an earlier question, a daily one or an endless one: not the same stat reworded,
+  and not the same stat for another season or year.
+- Within 14 days of the puzzle's date, before or after it (including puzzles already scheduled):
+  no team, person, film, show, brand, or place a second time, and no kind of question a second
+  time (for example two "what percentage of the world's population lives in [place]?", or two
+  "what percentage of [player]'s points came from [shot]?", even about different subjects).
+- At most 2 questions of one category in a puzzle (except an approved special).
 
-Write it using Steps 4 and 5, publish it (Step 6), then email it to the editor as a **new** email
-in the format below.
+Brainstorm and check the puzzle's questions first (Step 3c), write it using Steps 4 and 5, publish
+it (Step 6), then email it to the editor as a **new** email in the format below.
 
 **If your notes show an approved special for that date**, write it as the special:
 - All five questions are about the event: the teams, players, artists, records, and history
@@ -161,11 +172,12 @@ Endless mode has players answer question after question until their battery runs
 from a **bank of up to 500 questions that changes every two weeks**. Endless mode only switches on
 for players once a bank has **250** questions, so filling the current bank to 250 is the priority.
 
-**Every run**, after any daily puzzles are done, add as many new questions as you can verify. There
-is no minimum and no all-or-nothing: upload each question as soon as you've checked it (or in small
-batches), so a run that only verifies 8 still adds 8. Aim for about 15 or more per run when you
-have time, up to 50. Never upload a question you haven't checked against its source; skipping a
-doubtful question is always fine.
+**Every run**, after any daily puzzles are done, add new questions. **Quality over quantity:** aim
+for about **15 to 20 good questions per run**, never more than 25. Twenty questions a player would
+talk about beat fifty that all sound alike. There is no minimum and no all-or-nothing: upload each
+question as soon as you've checked it (or in small batches), so a run that only verifies 8 still
+adds 8. Never upload a question you haven't checked against its source; skipping a doubtful
+question is always fine.
 
 Check the banks:
 
@@ -178,14 +190,20 @@ It returns `previous`, `current`, and `next` periods, each with `startsOn`, `cou
 (how many questions each category has), and every question's `texts`. Add to `current` if it has fewer than 500 questions, otherwise to `next` if it
 has fewer than 500; if both are full, skip this step.
 
-Write the questions with every rule in Steps 4 and 5, **including opening a source for every
-answer**. Also:
+Brainstorm and check the ideas first (Step 3c), then write the questions with every rule in Steps 4
+and 5, **including opening a source for every answer**. Also:
 - Follow the category mix in Step 4 across the whole bank (about 35% Sports, 25% U.S. life, 25%
   World, 8% Movies, 7% Music), and use the question kinds in Step 5. Check the bank's `categories`
   counts before each batch and write for whichever categories are furthest below their share. Keep a
   wide spread of answers.
-- Each question must stand on its own (players see them in random order) and must not repeat or
-  closely match any text in the three banks or in the daily puzzle history.
+- **The server enforces variety in each bank** (the status response's `limits`): no repeat of any
+  earlier question (in the three banks or the daily puzzles); no category above its share
+  (Sports 38%, U.S. life 30%, World 30%, Movies 12%, Music 11%); no more than **6 questions of one
+  kind** (for example "what percentage of [player]'s points came from free throws?" counts once
+  per player, so 6 players in all), and no team, person, film, or place in more than **3**.
+  Player stat splits from one stats site are the easiest questions to make, and that's exactly why
+  the bank filled up with them before: spread across every category and many kinds of question.
+- Each question must stand on its own (players see them in random order).
 - Use only facts that won't change during the two weeks the bank is live.
 
 Send them in batches of up to 50, replacing `START` with the bank's `startsOn`:
@@ -199,8 +217,11 @@ curl -sS --max-time 120 -X POST \
 ```
 
 `batch.json` is `{"questions": [ ... ]}`, each question in the same shape as a daily puzzle's.
-**201** returns `{"added": N, "count": total}` (repeats are skipped). **400** lists the problems:
-fix them and resend.
+**201** returns `{"added": N, "count": total, "rejected": [...]}`: the questions that passed were
+added, and `rejected` lists any that weren't, each with its `problems` (a repeat, or a category,
+kind of question, or subject that's already full). **422** means none were added; its `rejected`
+says why. Don't resend a rejected question reworded: replace it with a genuinely different one.
+**400** lists format problems: fix them and resend.
 
 **When a bank reaches 500** for the first time, email the editor a **new** email with the subject
 `[Chargle] Endless bank for <Month D>–<Month D> is ready (<count> questions)`. Include how many
@@ -217,6 +238,65 @@ curl -sS --max-time 120 -X POST \
   --data '{"texts": ["<exact question text>"]}' \
   "$PERCENTLE_SITE_URL/api/percentle/endless/banks/START/remove"
 ```
+
+## Step 3c: Brainstorm, then check, then research
+
+Good questions start from **what the audience cares about**, not from whatever a stats site makes
+easy. Every time you need new questions:
+
+1. **Pick fresh topics.** Look at the last 30 days of daily puzzles (and, for the endless bank, the
+   bank's questions) and choose topics from the list below that have been used **least recently**.
+   Rotate: don't go back to a topic a recent puzzle already covered when others are waiting.
+2. **Start with your idea backlog.** Your notes keep an `Idea backlog` of good unused ideas from
+   earlier runs. Use those first when they fit.
+3. **Brainstorm about 3 ideas for every question you need**, as one-line question drafts with a
+   category, before opening any source. Mix the question kinds in Step 5 (polls, discounts and
+   markups, tests and exams, percent of a total, percent change, company revenue, and so on).
+4. **Keep the best.** For each idea ask: would an 18–25-year-old want to guess this and tell a
+   friend the answer? Is the answer likely surprising? Is there a real, findable number behind
+   it? Drop the dull ones, and drop any that feel like a template you've used a lot.
+5. **Check them for repeats before researching** (it saves you researching a question the server
+   will refuse). Send just the drafts' `text` and `category`:
+
+   ```sh
+   # A daily puzzle (all 5 drafts; add "theme" for an approved special):
+   curl -sS --max-time 120 -X POST -H "Authorization: Bearer $PERCENTLE_PUBLISH_TOKEN" \
+     -H "Content-Type: application/json" --data @drafts.json \
+     "$PERCENTLE_SITE_URL/api/percentle/puzzles/TARGET_DATE/check"
+   # Endless drafts (any number):
+   curl -sS --max-time 120 -X POST -H "Authorization: Bearer $PERCENTLE_PUBLISH_TOKEN" \
+     -H "Content-Type: application/json" --data @drafts.json \
+     "$PERCENTLE_SITE_URL/api/percentle/endless/banks/START/check"
+   ```
+
+   `drafts.json` is `{"questions": [{"text": "...", "category": "..."}]}`. The daily check returns
+   `{"ok": true|false, "problems": [...]}`; the endless check returns `results`, one per draft,
+   each with `ok` and `problems`. Replace every draft that fails with a genuinely different idea,
+   not the same idea reworded, and check again.
+6. **Research the ones that pass** (Step 5's sources and checking). If a number can't be
+   confirmed, move on to your next idea.
+7. **Save the leftovers.** Put good ideas you didn't use into the `Idea backlog` in your notes
+   (at most 15, one short line each, dated), and delete ideas once used. Keep the notes under
+   4,000 characters.
+
+**Topics to rotate through.** Each fits the category in brackets; many work as polls.
+- [Sports] the draft and rookies; contracts, salaries and the salary cap; attendance and ticket
+  prices; fantasy football; sports betting; college football and basketball (men's and women's);
+  records and milestones; coaches; home-field advantage; the playoffs and championships; one
+  player's surprising stat (use sparingly: these are the easiest to overuse).
+- [U.S. life] fast food and restaurants; coffee and drinks; groceries and prices; rent and
+  housing; college, tuition and student loans; first jobs, wages and side hustles; tipping;
+  dating and relationships; pets; cars, driving and gas; flying and travel; holidays and
+  traditions; sleep and daily routines; phones, apps and social media; AI tools; video games;
+  sneakers, fashion and shopping; discounts, sales and markups; subscriptions; tests and exams;
+  big American companies and brands.
+- [World] countries and population; cities; land, oceans, mountains, rivers and deserts;
+  languages; global brands and companies; tourism; food and drink around the world; the
+  internet and phones worldwide; energy and climate facts (non-political); space and Earth.
+- [Movies] polls about what people have seen or would watch; franchises and sequels; animated
+  films; TV and streaming shows; awards; behind-the-scenes and runtimes.
+- [Music] streaming and charts; tours and concerts; festivals; albums and singles; genres;
+  polls about listening habits; awards.
 
 ## Step 4: Choose the topics
 
@@ -429,7 +509,10 @@ curl -sS --max-time 120 -X PUT \
 ```
 
 - **201**: published. Go on to the email.
-- **400**: the response lists every problem. Fix all of them and try again, up to 3 attempts.
+- **400**: the response lists every problem. Fix all of them and try again, up to 3 attempts. A
+  problem like "too similar to an earlier question", "the same kind of question", or "already
+  appears" means a repeat: replace that question with a genuinely different idea (Step 3c), never
+  the same idea reworded.
 - **409**: that day is already live and can't be changed. Don't email; report it.
 - **401 or 503**: the token is wrong or publishing is turned off. Stop the whole run, report it,
   and don't retry.
@@ -464,6 +547,8 @@ Finish with a short summary of the run:
 - each puzzle you published: its date, the HTTP result, and for each question its category, text,
   answer, and how you checked it (the source, plus the arithmetic if you calculated it);
 - the endless bank: how many questions you added, to which bank, and its new count;
+- how many drafts the repeat check or the server turned away, and the most common reasons (so the
+  editor can see whether the variety rules are too strict or too loose);
 - the emails you sent.
 
 If nothing needed doing, say so in one line.

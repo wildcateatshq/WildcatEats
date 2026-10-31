@@ -432,9 +432,9 @@ app.get("/api/me", async (req, res) => {
 app.use("/api/percentle/crowd", createCrowdRouter(percentleCrowd));
 // Daily Percentle puzzles are written by a scheduled AI agent (see percentle/AGENT_PROMPT.md)
 // using PERCENTLE_PUBLISH_TOKEN; players can only read today's and earlier puzzles.
-app.use("/api/percentle/puzzles", createPuzzleRouter(percentlePuzzles));
+app.use("/api/percentle/puzzles", createPuzzleRouter(percentlePuzzles, { endless: percentleEndless }));
 // Endless mode's two-week question banks and anonymous best runs (percentle/endless.js).
-app.use("/api/percentle/endless", createEndlessRouter(percentleEndless));
+app.use("/api/percentle/endless", createEndlessRouter(percentleEndless, { puzzles: percentlePuzzles }));
 // Daily player stats (anonymous visits, sources, shares) and the editor's spreadsheet feed.
 app.use("/api/percentle/stats", createStatsRouter(percentleStats, percentleCrowd));
 

@@ -8,6 +8,7 @@ const os = require("node:os");
 const path = require("node:path");
 const { createPuzzleStore, easternDate, puzzleNumber, secondsUntilEasternMidnight, validatePuzzle } = require("./puzzles");
 const { createPuzzleRouter } = require("./puzzle-router");
+const { questionText } = require("./test-questions");
 
 const question = (category, overrides = {}) => ({
   text: `What percentage of ${category} things happened in 2024?`,
@@ -18,8 +19,9 @@ const question = (category, overrides = {}) => ({
   sourceUrl: "https://example.com/source",
   ...overrides
 });
-const validPuzzle = () => ["Sports", "Music", "Movies", "U.S. life", "Sports"].map((category, index) =>
-  question(category, { text: `What percentage of ${category} item ${index} happened in 2024?` })
+// A valid puzzle; each seed gives a different set of questions.
+const validPuzzle = (seed = 0) => ["Sports", "Music", "Movies", "U.S. life", "Sports"].map((category, index) =>
+  question(category, { text: questionText(seed * 5 + index) })
 );
 
 test("puzzle numbers count Eastern calendar days from launch", () => {
@@ -89,7 +91,7 @@ test("puzzle API publishes with a token and never leaks future puzzles", async t
     await fs.rm(folder, { recursive: true, force: true });
   });
   const url = `http://127.0.0.1:${server.address().port}/api/percentle/puzzles`;
-  const publish = (date, token = "secret-token", questions = validPuzzle()) => fetch(`${url}/${date}`, {
+  const publish = (date, token = "secret-token", questions = validPuzzle(Number(date.slice(-2)))) => fetch(`${url}/${date}`, {
     method: "PUT",
     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
     body: JSON.stringify({ questions })
@@ -97,7 +99,7 @@ test("puzzle API publishes with a token and never leaks future puzzles", async t
 
   assert.equal((await fetch(`${url}/today`)).status, 404);
   assert.equal((await publish("2026-10-06", "wrong-token")).status, 401);
-  const bad = validPuzzle();
+  const bad = validPuzzle(6);
   bad[0].answer = 0;
   const rejected = await publish("2026-10-06", "secret-token", bad);
   assert.equal(rejected.status, 400);
@@ -176,12 +178,12 @@ test("a special carries its theme through publishing, reading, and a restart; no
   t.after(() => server.close());
   const url = `http://localhost:${server.address().port}/p`;
   const auth = { "Content-Type": "application/json", Authorization: "Bearer secret" };
-  const questions = ["Sports", "Sports", "Music", "World", "U.S. life"].map((category, i) => question(category, { text: `Themed question number ${i + 1}?` }));
+  const questions = (seed = 0) => ["Sports", "Sports", "Music", "World", "U.S. life"].map((category, i) => question(category, { text: questionText(seed * 5 + i) }));
   const publish = (date, body) => fetch(`${url}/${date}`, { method: "PUT", headers: auth, body: JSON.stringify(body) });
 
-  assert.equal((await publish("2026-10-08", { questions, theme: "  World Series Special " })).status, 201);
-  assert.equal((await publish("2026-10-09", { questions })).status, 201);
-  assert.equal((await publish("2026-10-10", { questions, theme: "x".repeat(41) })).status, 400, "themes are at most 40 characters");
+  assert.equal((await publish("2026-10-08", { questions: questions(0), theme: "  World Series Special " })).status, 201);
+  assert.equal((await publish("2026-10-09", { questions: questions(1) })).status, 201);
+  assert.equal((await publish("2026-10-10", { questions: questions(2), theme: "x".repeat(41) })).status, 400, "themes are at most 40 characters");
 
   const special = await (await fetch(`${url}/2026-10-08`, { headers: auth })).json();
   assert.equal(special.theme, "World Series Special", "trimmed");

@@ -3,8 +3,11 @@
 const crypto = require("node:crypto");
 const express = require("express");
 const { MAX_DAYS_AHEAD, addDays, daysBetween, easternDate, isCalendarDate, puzzleNumber, secondsUntilEasternMidnight, validatePuzzle, validateTheme } = require("./puzzles");
+const { DAILY_WINDOW_DAYS, checkPuzzle } = require("./variety");
 
 const ARCHIVE_DAYS = 30;
+// How far back the variety checks look for repeats.
+const VARIETY_HISTORY_DAYS = 365;
 const MAX_NOTES_LENGTH = 20_000;
 
 // The publish token check, shared by the puzzle and endless-bank routes. Only the daily agent
@@ -39,6 +42,25 @@ function createPuzzleRouter(store, options = {}) {
   const router = express.Router();
   const today = options.today || (() => easternDate());
   const { isPublisher, requirePublisher } = publisherAuth(options);
+  // The endless bank store, when there is one, so a daily question doesn't repeat a bank's.
+  const endless = options.endless;
+
+  // A puzzle for `date` against everything already written: puzzles within two weeks of it, older
+  // ones, and the endless banks. The date's own puzzle is left out, since this one replaces it.
+  async function varietyProblems(date, questions, special) {
+    const nearby = [], others = [];
+    for (const day of await store.dates(addDays(date, -VARIETY_HISTORY_DAYS), addDays(date, MAX_DAYS_AHEAD + DAILY_WINDOW_DAYS))) {
+      if (day === date) continue;
+      const puzzle = await store.getPuzzle(day);
+      (Math.abs(daysBetween(day, date)) <= DAILY_WINDOW_DAYS ? nearby : others).push(...puzzle.questions);
+    }
+    if (endless) {
+      const { periodStart, PERIOD_DAYS } = require("./endless");
+      const current = periodStart(today());
+      for (const startsOn of [addDays(current, -PERIOD_DAYS), current, addDays(current, PERIOD_DAYS)]) others.push(...await endless.getBank(startsOn));
+    }
+    return checkPuzzle(questions, { nearby, others, special });
+  }
 
   // A special also carries its theme (e.g. "World Series Special"); normal days leave it out.
   const send = (res, date, { questions, theme }) => res.json({ date, number: puzzleNumber(date), ...(theme ? { theme } : {}), questions });
@@ -121,6 +143,24 @@ function createPuzzleRouter(store, options = {}) {
     }
   });
 
+  // For the agent: checks a draft puzzle's questions for repeats before it researches them. Only
+  // each question's text and category are needed. Nothing is saved.
+  router.post("/:date/check", requirePublisher, async (req, res, next) => {
+    noStore(res);
+    try {
+      const { date } = req.params;
+      if (!isCalendarDate(date)) return res.status(400).json({ error: "Date must be YYYY-MM-DD." });
+      const questions = req.body?.questions;
+      if (!Array.isArray(questions) || !questions.length || !questions.every(question => typeof question?.text === "string")) {
+        return res.status(400).json({ error: "questions must be a list of { text, category }." });
+      }
+      const problems = await varietyProblems(date, questions, Boolean(req.body?.theme));
+      res.json({ ok: !problems.length, problems });
+    } catch (error) {
+      next(error);
+    }
+  });
+
   router.get("/:date", async (req, res, next) => {
     try {
       const { date } = req.params;
@@ -153,6 +193,8 @@ function createPuzzleRouter(store, options = {}) {
       }
       const questions = validatePuzzle(req.body?.questions);
       const theme = validateTheme(req.body?.theme);
+      const problems = await varietyProblems(date, questions, Boolean(theme));
+      if (problems.length) return res.status(400).json({ error: problems.join(" ") });
       await store.put(date, questions, theme);
       res.status(201);
       send(res, date, { questions, theme });

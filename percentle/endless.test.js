@@ -8,11 +8,12 @@ const os = require("node:os");
 const path = require("node:path");
 const { createEndlessStore, periodStart } = require("./endless");
 const { createEndlessRouter } = require("./endless-router");
+const { categoryFor, questionText } = require("./test-questions");
 
 const question = n => ({
-  text: `Endless question number ${n} for testing?`,
+  text: questionText(n),
   answer: 40 + (n % 50),
-  category: "Sports",
+  category: categoryFor(n),
   funFact: "A short fun fact for testing.",
   sourceName: "Test Source",
   sourceUrl: "https://example.com/source"
@@ -51,8 +52,9 @@ test("the endless API fills banks in batches, goes live at 250 questions, and co
     const response = await post("/banks/2026-10-06/questions", { questions: Array.from({ length: 50 }, (_, i) => question(batch * 50 + i)) });
     assert.equal(response.status, 201);
   }
-  const duplicate = await (await post("/banks/2026-10-06/questions", { questions: [question(3)] })).json();
-  assert.deepEqual(duplicate, { added: 0, count: 250 }, "repeats are skipped");
+  const duplicate = await post("/banks/2026-10-06/questions", { questions: [question(3)] });
+  assert.equal(duplicate.status, 422, "repeats are turned away");
+  assert.match((await duplicate.json()).rejected[0].problems[0], /too similar/);
 
   assert.equal((await (await fetch(`${url}/availability`)).json()).live, true);
   const bank = await (await fetch(`${url}/bank`)).json();

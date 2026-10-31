@@ -198,6 +198,14 @@ All routes are under `/api/percentle/puzzles`. Publishing and history need the h
 | `GET /:date` | Players | A past or current puzzle. Future dates are hidden unless the token is sent |
 | `GET /history?days=90` | Agent | Recent and scheduled puzzles, so the agent can avoid repeats |
 | `PUT /:date` | Agent | Publish `{ "questions": [...] }` for today (if it isn't live yet) or up to 7 days ahead |
+| `POST /:date/check` | Agent | Check draft questions (`text`, `category`) for repeats before researching them; nothing is saved |
+
+**Variety checks** (`percentle/variety.js`) keep the agent from repeating itself. Publishing a
+puzzle is refused (400) if a question repeats an earlier daily or endless question (the same kind
+of question about the same subject, even reworded or for another season), or if, within 14 days
+of its date, it reuses a subject (team, person, film, brand, place) or a kind of question, or if
+it has more than 2 questions of one category. Specials (with a `theme`) may repeat their event's
+subjects and kinds.
 
 Each question has `text` (ending in "?"), `answer` (strictly between 0 and 100, at most one
 decimal), `category`, `funFact` (shown after the answer), `sourceName`, and an `https://`
@@ -274,7 +282,11 @@ the period. A run takes the hard switch's setting when it starts: hard runs drai
 are saved separately (`endless-hard:<startsOn>` progress, their own personal bests), and are
 compared only with other hard runs (`mode` on `POST /runs`, with a separate anonymous ID). Routes are under `/api/percentle/endless`: `GET /bank` (players), `POST /runs`
 (players, rate-limited), and, with the publish token, `GET /status`,
-`POST /banks/:startsOn/questions` (batches of up to 50) and `POST /banks/:startsOn/remove`.
+`POST /banks/:startsOn/questions` (batches of up to 50), `POST /banks/:startsOn/check` and
+`POST /banks/:startsOn/remove`. The variety checks hold each bank to: no repeat of any banked or
+daily question, at most 6 questions of one kind and 3 about one subject, and category caps
+(Sports 38%, U.S. life 30%, World 30%, Movies 12%, Music 11%). Questions that fail are returned
+in `rejected` with their reasons while the rest are added (422 if none are).
 Banks and runs are stored in `percentle_endless_banks` / `percentle_endless_runs` with Postgres,
 otherwise in `data/percentle-endless.json`.
 

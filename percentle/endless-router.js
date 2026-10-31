@@ -5,6 +5,10 @@ const { createRateLimit } = require("./crowd-router");
 const { MAX_BATCH, MIN_LIVE_QUESTIONS, PERIOD_DAYS, periodStart, validateQuestions } = require("./endless");
 const { publisherAuth } = require("./puzzle-router");
 const { addDays, easternDate, secondsUntilEasternMidnight } = require("./puzzles");
+const { BANK_CATEGORY_CAPS, BANK_MAX_SAME_NAME, BANK_MAX_SAME_SHAPE, checkBankBatch } = require("./variety");
+
+// How far back the variety checks look in the daily puzzles for repeats.
+const VARIETY_HISTORY_DAYS = 365;
 
 // Run submissions per address per minute: generous, like the daily crowd line's, since a whole
 // campus can share one address.
@@ -21,6 +25,24 @@ function createEndlessRouter(store, options = {}) {
   const today = options.today || (() => easternDate());
   const { requirePublisher } = publisherAuth(options);
   const allowRun = createRateLimit(options.runsPerMinute ?? RUNS_PER_MINUTE, options.now);
+  // The daily puzzle store, when there is one, so a bank question doesn't repeat a daily one.
+  const puzzles = options.puzzles;
+
+  // Checks questions for a bank against that bank, the other two open periods' banks, and the
+  // daily puzzles. Returns the questions that pass and why the rest don't.
+  async function checkForBank(startsOn, questions) {
+    const current = periodStart(today());
+    const others = [];
+    for (const period of [addDays(current, -PERIOD_DAYS), current, addDays(current, PERIOD_DAYS)]) {
+      if (period !== startsOn) others.push(...await store.getBank(period));
+    }
+    if (puzzles) {
+      for (const day of await puzzles.dates(addDays(today(), -VARIETY_HISTORY_DAYS), addDays(today(), PERIOD_DAYS))) {
+        others.push(...(await puzzles.getPuzzle(day)).questions);
+      }
+    }
+    return checkBankBatch(questions, { bank: await store.getBank(startsOn), others });
+  }
 
   // The bank players use: this period's once it has enough questions, otherwise last period's.
   async function liveBank() {
@@ -67,7 +89,11 @@ function createEndlessRouter(store, options = {}) {
     try {
       const current = periodStart(today());
       const periods = { previous: addDays(current, -PERIOD_DAYS), current, next: addDays(current, PERIOD_DAYS) };
-      const result = { today: today(), minLive: MIN_LIVE_QUESTIONS, maxBatch: MAX_BATCH };
+      const result = {
+        today: today(), minLive: MIN_LIVE_QUESTIONS, maxBatch: MAX_BATCH,
+        // The variety limits each bank is held to (see variety.js).
+        limits: { categoryShares: BANK_CATEGORY_CAPS, maxSameKind: BANK_MAX_SAME_SHAPE, maxSameSubject: BANK_MAX_SAME_NAME }
+      };
       for (const [name, startsOn] of Object.entries(periods)) {
         const questions = await store.getBank(startsOn);
         const categories = {};
@@ -95,10 +121,32 @@ function createEndlessRouter(store, options = {}) {
       if (!writablePeriod(req, res)) return;
       const batch = req.body?.questions;
       if (!Array.isArray(batch) || batch.length > MAX_BATCH) return res.status(400).json({ error: `Send 1 to ${MAX_BATCH} questions at a time.` });
-      const result = await store.addQuestions(req.params.startsOn, validateQuestions(batch));
-      res.status(201).json(result);
+      // Questions that would repeat, or crowd one category, kind of question, or subject, are turned
+      // away with the reasons; the rest are added.
+      const { accepted, rejected } = await checkForBank(req.params.startsOn, validateQuestions(batch));
+      if (!accepted.length) return res.status(422).json({ error: "None of these questions were added.", added: 0, rejected });
+      const result = await store.addQuestions(req.params.startsOn, accepted);
+      res.status(201).json({ ...result, rejected });
     } catch (error) {
       if (error instanceof RangeError) return res.status(400).json({ error: error.message });
+      next(error);
+    }
+  });
+
+  // For the agent: checks draft questions (text and category) against a bank before it researches
+  // them. Nothing is saved.
+  router.post("/banks/:startsOn/check", requirePublisher, async (req, res, next) => {
+    res.set("Cache-Control", "no-store");
+    try {
+      if (!writablePeriod(req, res)) return;
+      const questions = req.body?.questions;
+      if (!Array.isArray(questions) || !questions.length || !questions.every(question => typeof question?.text === "string")) {
+        return res.status(400).json({ error: "questions must be a list of { text, category }." });
+      }
+      const { rejected } = await checkForBank(req.params.startsOn, questions);
+      const problems = new Map(rejected.map(item => [item.text, item.problems]));
+      res.json({ results: questions.map(question => ({ text: question.text, ok: !problems.has(question.text), problems: problems.get(question.text) || [] })) });
+    } catch (error) {
       next(error);
     }
   });
