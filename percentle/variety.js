@@ -127,6 +127,11 @@ const BANK_MAX_SAME_SHAPE = 6;
 const BANK_MAX_SAME_NAME = 3;
 const DAILY_WINDOW_DAYS = 14;
 const DAILY_MAX_PER_CATEGORY = 2;
+// Questions on a custom scale (a salary, a rating out of 10...) are meant to be about 1 in 4: at
+// most 30% of a bank, and at most 2 in a daily puzzle.
+const BANK_MAX_CUSTOM_SHARE = 0.3;
+const DAILY_MAX_CUSTOM = 2;
+const isCustom = question => Boolean(question.scale);
 
 // Checks a batch for an endless bank. `bank` is the bank's current questions, `others` are every
 // other question to avoid repeating (the other banks and the daily puzzles). Returns the questions
@@ -136,6 +141,7 @@ function checkBankBatch(batch, { bank = [], others = [] } = {}) {
   const elsewhere = others.map(profile);
   const counts = {};
   for (const question of inBank) counts[question.category] = (counts[question.category] || 0) + 1;
+  let custom = bank.filter(isCustom).length;
   const accepted = [], rejected = [];
   for (const question of batch) {
     const candidate = profile(question);
@@ -151,6 +157,9 @@ function checkBankBatch(batch, { bank = [], others = [] } = {}) {
         problems.push(`${candidate.category} already has ${counts[candidate.category]} of this bank's ${inBank.length} questions, its most for now; write a question in another category`);
       }
     }
+    if (isCustom(question) && custom + 1 > Math.ceil(BANK_MAX_CUSTOM_SHARE * Math.max(inBank.length + 1, BANK_CAP_FLOOR))) {
+      problems.push(`custom-scale questions are already ${custom} of this bank's ${inBank.length}, their most for now (about 30%); write a percentage question instead`);
+    }
     if (problems.length) {
       rejected.push({ text: question.text, problems });
       continue;
@@ -158,6 +167,7 @@ function checkBankBatch(batch, { bank = [], others = [] } = {}) {
     accepted.push(question);
     inBank.push(candidate);
     counts[candidate.category] = (counts[candidate.category] || 0) + 1;
+    if (isCustom(question)) custom++;
   }
   return { accepted, rejected };
 }
@@ -172,6 +182,7 @@ function checkPuzzle(questions, { nearby = [], others = [], special = false } = 
   const problems = [];
   const counts = {};
   const seen = [];
+  let custom = 0;
   questions.forEach((question, index) => {
     const candidate = profile(question);
     const issues = [
@@ -183,6 +194,7 @@ function checkPuzzle(questions, { nearby = [], others = [], special = false } = 
     if (!special && counts[candidate.category] === DAILY_MAX_PER_CATEGORY + 1) {
       issues.push(`a puzzle can have at most ${DAILY_MAX_PER_CATEGORY} ${candidate.category} questions`);
     }
+    if (isCustom(question) && ++custom === DAILY_MAX_CUSTOM + 1) issues.push(`a puzzle can have at most ${DAILY_MAX_CUSTOM} custom-scale questions`);
     seen.push(candidate);
     for (const issue of new Set(issues)) problems.push(`Question ${index + 1}: ${issue}.`);
   });
@@ -190,6 +202,6 @@ function checkPuzzle(questions, { nearby = [], others = [], special = false } = 
 }
 
 module.exports = {
-  BANK_CATEGORY_CAPS, BANK_MAX_SAME_NAME, BANK_MAX_SAME_SHAPE, DAILY_MAX_PER_CATEGORY, DAILY_WINDOW_DAYS,
+  BANK_CATEGORY_CAPS, BANK_MAX_CUSTOM_SHARE, BANK_MAX_SAME_NAME, BANK_MAX_SAME_SHAPE, DAILY_MAX_CUSTOM, DAILY_MAX_PER_CATEGORY, DAILY_WINDOW_DAYS,
   checkBankBatch, checkPuzzle, likeness, names, shape, words
 };

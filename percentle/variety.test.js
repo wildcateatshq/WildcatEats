@@ -80,6 +80,18 @@ test("an endless bank limits each kind of question, subject, and category, and t
   assert.match(repeat.rejected[0].problems[0], /too similar/);
 });
 
+test("custom-scale questions are capped at about 30% of a bank and 2 in a daily puzzle", () => {
+  const scaled = from => filler(from, 30).map(item => ({ ...item, scale: { min: 0, max: 1000 } }));
+  const { accepted, rejected } = checkBankBatch(scaled(400), { bank: filler(0, 60) });
+  assert.equal(accepted.length, 27, "up to about 30% of the bank: 27 of 87");
+  assert.match(rejected[0].problems.join(" "), /custom-scale questions are already 27 of this bank's 87/);
+  assert.equal(checkBankBatch([q(questionText(600), "World")], { bank: [...filler(0, 60), ...scaled(400).slice(0, 27)] }).accepted.length, 1, "percentage questions still go in");
+
+  const day = filler(0, 5).map((item, i) => (i < 3 ? { ...item, scale: { min: 0, max: 1000 } } : item));
+  assert.match(checkPuzzle(day).join(" "), /Question 3: a puzzle can have at most 2 custom-scale questions/);
+  assert.deepEqual(checkPuzzle(day.map((item, i) => (i === 2 ? { text: item.text, category: item.category } : item))), []);
+});
+
 test("publishing and the agent's check endpoints enforce variety across daily puzzles and banks", async t => {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), "percentle-variety-"));
   t.after(() => fs.rm(dir, { recursive: true, force: true }));

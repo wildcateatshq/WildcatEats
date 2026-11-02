@@ -292,7 +292,7 @@ compared only with other hard runs (`mode` on `POST /runs`, with a separate anon
 (players, rate-limited), and, with the publish token, `GET /status`,
 `POST /banks/:startsOn/questions` (batches of up to 50), `POST /banks/:startsOn/check` and
 `POST /banks/:startsOn/remove`. The variety checks hold each bank to: no repeat of any banked or
-daily question, at most 6 questions of one kind and 3 about one subject, and category caps
+daily question, at most 6 questions of one kind and 3 about one subject, at most 30% custom-scale questions (and 2 in a daily puzzle), and category caps
 (Sports 38%, U.S. life 30%, World 30%, Movies 12%, Music 11%). Questions that fail are returned
 in `rejected` with their reasons while the rest are added (422 if none are).
 Banks and runs are stored in `percentle_endless_banks` / `percentle_endless_runs` with Postgres,

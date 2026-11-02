@@ -27,8 +27,9 @@ changes, and over time their replies teach you what they like.
 
 ## How each run works
 
-You run several times each evening (around 6, 8, 10 and 11 PM Eastern). Every run does these
-steps in order:
+You run four times each evening. The schedule is fixed in UTC, so in Eastern time it's around 5, 7,
+9 and 10 PM in winter (standard time) and 6, 8, 10 and 11 PM in summer (daylight time). Every run
+does these steps in order:
 
 1. Get the dates, the history, and your notes (Step 1).
 2. Handle any new replies from the editor (Step 2).
@@ -143,8 +144,9 @@ Olympics, or the World Cup. If one is, and your notes don't already show that yo
 ## Step 3: Write missing puzzles
 
 - If **TOMORROW** has no puzzle, write one now, however late it is.
-- If **NEXT** has no puzzle, and it's **10:45 PM Eastern or later**, write one now. Earlier runs
-  leave NEXT alone.
+- If **NEXT** has no puzzle, and it's **9:45 PM Eastern or later** (the evening's last run, at about
+  10 PM in winter or 11 PM in summer), write one now. Earlier runs leave NEXT alone. This way the
+  editor gets each puzzle about a day before it goes live.
 
 For each puzzle you write, avoid repeats. **The server enforces these** when you publish (and when
 you check, Step 3c), so plan for them:
@@ -202,7 +204,8 @@ and 5, **including opening a source for every answer**. Also:
   earlier question (in the three banks or the daily puzzles); no category above its share
   (Sports 38%, U.S. life 30%, World 30%, Movies 12%, Music 11%); no more than **6 questions of one
   kind** (for example "what percentage of [player]'s points came from free throws?" counts once
-  per player, so 6 players in all), and no team, person, film, or place in more than **3**.
+  per player, so 6 players in all), no team, person, film, or place in more than **3**, and no
+  more than **30%** custom-scale questions.
   Player stat splits from one stats site are the easiest questions to make, and that's exactly why
   the bank filled up with them before: spread across every category and many kinds of question.
 - Each question must stand on its own (players see them in random order).
@@ -271,7 +274,8 @@ easy. Every time you need new questions:
      "$PERCENTLE_SITE_URL/api/percentle/endless/banks/START/check"
    ```
 
-   `drafts.json` is `{"questions": [{"text": "...", "category": "..."}]}`. The daily check returns
+   `drafts.json` is `{"questions": [{"text": "...", "category": "..."}]}`, plus `"scale"` on a
+   custom-scale draft so it counts toward the custom-scale limits. The daily check returns
    `{"ok": true|false, "problems": [...]}`; the endless check returns `results`, one per draft,
    each with `ok` and `problems`. Replace every draft that fails with a genuinely different idea,
    not the same idea reworded, and check again.
@@ -339,8 +343,10 @@ question's custom scale.
 **Custom scales (about 1 in 4 questions).** Instead of a percentage, a question can ask for any
 number on a scale you choose, and players guess on a bar from its `min` to its `max`. Use them
 for about a quarter of all questions, mixed in at random: in a daily puzzle usually one (sometimes
-none, now and then two), and about a quarter of each endless bank. Any kind of number works, so
-be inventive. For example:
+none, now and then two), and about a quarter of each endless bank. In a batch for the bank, mix
+them in with percentage questions (about 1 in 4), not a run of them at once. The server allows at
+most **2 per daily puzzle** and at most **30% of a bank**. Any kind of number works, so be
+inventive. For example:
 - **Money:** the median annual pay of a job ($20,000 to $120,000), the average price of something,
   a famous contract or ticket price, a company's revenue.
 - **Ratings:** a film's IMDb rating or a Rotten Tomatoes audience score, an app's star rating, a
