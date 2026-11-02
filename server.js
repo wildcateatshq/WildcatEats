@@ -23,6 +23,8 @@ const { createPuzzleRouter } = require("./percentle/puzzle-router");
 const percentleEndless = require("./percentle/endless").createEndlessStore();
 const { createEndlessRouter } = require("./percentle/endless-router");
 const percentleStats = require("./percentle/stats").createStatsStore();
+const percentleAccounts = require("./percentle/accounts").createAccountStore();
+const { createAccountsRouter } = require("./percentle/accounts-router");
 const { createStatsRouter } = require("./percentle/stats-router");
 
 // Push notifications are fully optional — with no VAPID keys set, the
@@ -45,6 +47,8 @@ const PORT = process.env.PORT || 3000;
 
 app.set("trust proxy", 1); // Render sits behind a proxy — needed for correct https:// URLs (Stripe Connect links)
 
+// A logged-in Chargle player's save can be bigger than the default 100 KB a request may carry.
+app.use("/api/percentle/accounts", express.json({ limit: "600kb" }));
 app.use(express.json());
 app.get("/admin.html", (req, res) => res.redirect(308, "/admin"));
 // The public website is now informational. Keep these legacy files in the
@@ -436,7 +440,8 @@ app.use("/api/percentle/puzzles", createPuzzleRouter(percentlePuzzles, { endless
 // Endless mode's two-week question banks and anonymous best runs (percentle/endless.js).
 app.use("/api/percentle/endless", createEndlessRouter(percentleEndless, { puzzles: percentlePuzzles }));
 // Daily player stats (anonymous visits, sources, shares) and the editor's spreadsheet feed.
-app.use("/api/percentle/stats", createStatsRouter(percentleStats, percentleCrowd));
+app.use("/api/percentle/stats", createStatsRouter(percentleStats, percentleCrowd, { accounts: percentleAccounts }));
+app.use("/api/percentle/accounts", createAccountsRouter(percentleAccounts));
 
 // "Late Night" is a pickup spot that only exists 9 PM – midnight, Eastern,
 // every day — computed off the server clock (not the client's) so it's
@@ -1195,7 +1200,7 @@ app.use((err, req, res, next) => {
 
 db.init()
   .then(() => {
-    return Promise.all([percentleCrowd.init(), percentlePuzzles.init(), percentleEndless.init(), percentleStats.init()]);
+    return Promise.all([percentleCrowd.init(), percentlePuzzles.init(), percentleEndless.init(), percentleStats.init(), percentleAccounts.init()]);
   })
   .then(() => {
     app.listen(PORT, () => console.log(`NovaDash running at http://localhost:${PORT} (storage: ${db.backend})`));

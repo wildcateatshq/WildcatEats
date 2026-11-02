@@ -44,7 +44,9 @@ const COLUMNS = [
   "Date", "Day", "Opened the game", "New players", "Returning players", "Total players so far",
   "Finished the puzzle", "Finish rate (%)", "Hard mode finishes", "Ran out of charge", "Average charge left (%)",
   "Endless runs", "Players who shared",
-  "From texts and apps (direct)", "From search", "From Instagram", "From TikTok", "From Reddit", "From other places", "Other places"
+  "From texts and apps (direct)", "From search", "From Instagram", "From TikTok", "From Reddit", "From other places", "Other places",
+  // Added after the rest so existing spreadsheets keep their columns in place.
+  "New accounts", "Total accounts"
 ];
 
 // One row per day from the first day with any data through `today`, oldest first; days with no
@@ -52,8 +54,11 @@ const COLUMNS = [
 //   visits:   [{ date, source, detail, players, shared, endless }] (grouped by day, source, detail)
 //   firsts:   [{ date, players }]  players whose first visit was that day
 //   finishes: [{ date, finished, hard, out, chargeSum }] chargeSum covers finishers who didn't run out
-function buildReport({ visits = [], firsts = [], finishes = [] }, today) {
-  const dates = [...visits, ...firsts, ...finishes].map(row => row.date).filter(date => date <= today).sort();
+//   signups:  [{ date, accounts }]  accounts created that day
+function buildReport({ visits = [], firsts = [], finishes = [], signups = [] }, today) {
+  const dates = [...visits, ...firsts, ...finishes, ...signups].map(row => row.date).filter(date => date <= today).sort();
+  const signupsByDay = new Map(signups.map(row => [row.date, row.accounts]));
+  let accounts = signups.filter(row => row.date < (dates[0] || today)).reduce((sum, row) => sum + row.accounts, 0);
   const firstDay = dates[0] || today;
   const trackedFrom = visits.map(row => row.date).sort()[0] || null;
   const newByDay = new Map(firsts.map(row => [row.date, row.players]));
@@ -85,7 +90,9 @@ function buildReport({ visits = [], firsts = [], finishes = [] }, today) {
       blank(dayVisits.reduce((sum, row) => sum + row.endless, 0)),
       blank(dayVisits.reduce((sum, row) => sum + row.shared, 0)),
       ...SOURCES.map(source => blank(bySource[source])),
-      [...others].sort((a, b) => b[1] - a[1]).map(([name, count]) => `${name} ${count}`).join(", ")
+      [...others].sort((a, b) => b[1] - a[1]).map(([name, count]) => `${name} ${count}`).join(", "),
+      signupsByDay.get(date) || 0,
+      (accounts += signupsByDay.get(date) || 0)
     ]);
   }
   return { columns: COLUMNS, rows };
@@ -199,8 +206,8 @@ function createStatsStore(options = {}) {
     });
   }
 
-  // finishes come from the crowd store; see buildReport for the shapes.
-  async function report(today, finishes) {
+  // finishes come from the crowd store, signups from the account store; see buildReport for the shapes.
+  async function report(today, finishes, signups = []) {
     if (pool) {
       const [grouped, firsts] = await Promise.all([
         pool.query(`select to_char(visit_date, 'YYYY-MM-DD') as date, source, detail, count(*)::int as players,
@@ -209,7 +216,7 @@ function createStatsStore(options = {}) {
         pool.query(`select to_char(first, 'YYYY-MM-DD') as date, count(*)::int as players
                     from (select min(visit_date) as first from percentle_visits group by player_id) as starts group by first`)
       ]);
-      return buildReport({ visits: grouped.rows, firsts: firsts.rows, finishes }, today);
+      return buildReport({ visits: grouped.rows, firsts: firsts.rows, finishes, signups }, today);
     }
     const grouped = new Map();
     const firstSeen = new Map();
@@ -227,7 +234,8 @@ function createStatsStore(options = {}) {
     return buildReport({
       visits: [...grouped.values()],
       firsts: [...firsts].map(([date, players]) => ({ date, players })),
-      finishes
+      finishes,
+      signups
     }, today);
   }
 

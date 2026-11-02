@@ -11,6 +11,21 @@ button{color:inherit}
 .wordmark{text-decoration:none;color:var(--ink);font:700 22px var(--display);letter-spacing:1.5px;text-transform:uppercase;display:flex;align-items:center;gap:10px}
 .brand-mark{display:grid;place-items:center;width:30px;height:30px;border-radius:7px;background:var(--charge);color:var(--charge-ink);box-shadow:0 0 14px var(--charge-glow)}
 .top-actions{display:flex;gap:8px}
+/* Log in (top right, until the player is logged in) and the log-in / create-account dialog. */
+.login-button{height:38px;padding:0 12px;border:1px solid var(--charge);border-radius:8px;background:transparent;color:var(--charge);font:700 11px var(--mono);letter-spacing:1px;text-transform:uppercase;cursor:pointer;white-space:nowrap;transition:background .2s,color .2s}
+.login-button:hover{background:var(--charge);color:var(--charge-ink)}
+.login-button[hidden]{display:none}
+.account-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 16px}
+.account-tabs button{padding:9px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--muted);font:700 11px var(--mono);letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.account-tabs button[aria-selected="true"]{border-color:var(--charge);color:var(--ink)}
+.account-form{display:grid;gap:12px}
+.account-form label{display:grid;gap:5px;font:500 10px var(--mono);letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.account-form input{padding:11px 12px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:500 15px var(--display);letter-spacing:0;text-transform:none;outline:none}
+.account-form input:focus{border-color:var(--charge)}
+.account-error{min-height:1em;margin:0;color:#ff8f7a!important}
+.account-note{margin:0;font-size:12px!important}
+.account-line{margin:0 0 4px}
+.link-button{border:0;padding:0;background:none;color:var(--charge);font:inherit;text-decoration:underline;cursor:pointer}
 .icon-button{width:38px;height:38px;border:1px solid var(--line);background:var(--card);border-radius:8px;cursor:pointer;font-size:16px;display:grid;place-items:center;transition:transform .2s,border-color .2s}
 .icon-button:hover{transform:translateY(-2px);border-color:var(--charge);box-shadow:0 0 12px var(--charge-glow)}
 main{padding:47px 0 34px}
@@ -115,7 +130,7 @@ main{padding:47px 0 34px}
 dialog{width:min(440px,calc(100% - 32px));border:1px solid var(--line);border-top:2px solid var(--charge);border-radius:10px;background:var(--card);color:var(--ink);padding:25px 27px 29px;box-shadow:0 24px 80px #0002}dialog::backdrop{background:#000b;backdrop-filter:blur(3px)}.dialog-head{position:absolute;top:18px;right:18px}.close-button{font-size:21px}.dialog-title{font:700 29px var(--display);margin:17px 0 12px}dialog h2{font:700 29px var(--display);margin:4px 48px 12px 0}dialog p,dialog li{font-size:13px;line-height:1.7;color:var(--muted)}dialog p strong{color:var(--ink)}.dialog-actions{display:flex;gap:9px}.dialog-actions button{flex:1}
 .toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,15px);opacity:0;pointer-events:none;border-radius:6px;background:var(--charge);color:var(--charge-ink);font-weight:700;box-shadow:0 0 22px var(--charge-glow);padding:11px 16px;font-size:12px;transition:.2s;z-index:5}.toast.visible{opacity:1;transform:translate(-50%,0)}
 [hidden]{display:none!important}
-@media(max-width:520px){.site-shell{width:min(100% - 28px,720px)}.topbar{height:64px}.return-button{padding:7px 10px;font-size:11px;gap:4px}.return-full{display:none}.return-short{display:inline}main{padding:36px 0 20px}.intro{margin-bottom:25px}.game-card{padding:2px 0 24px;min-height:380px}.question-body{padding-top:12px}.q-num{font-size:64px}.guess-input{font-size:44px}.reveal-num{font-size:36px}.reveal-num small{font-size:20px}.reveal-row.long .reveal-num{font-size:23px;letter-spacing:-1px}.reveal-row.long .reveal-num small{font-size:14px}.reveal-row{gap:10px}.dialog-actions{flex-direction:column}}
+@media(max-width:520px){.site-shell{width:min(100% - 28px,720px)}.topbar{height:64px}.return-button{padding:7px 10px;font-size:11px;gap:4px}.return-full{display:none}.return-short{display:inline}main{padding:36px 0 20px}.intro{margin-bottom:25px}.game-card{padding:2px 0 24px;min-height:380px}.question-body{padding-top:12px}.q-num{font-size:64px}.guess-input{font-size:44px}.reveal-num{font-size:36px}.reveal-num small{font-size:20px}.reveal-row.long .reveal-num{font-size:23px;letter-spacing:-1px}.reveal-row.long .reveal-num small{font-size:14px}.reveal-row{gap:10px}.dialog-actions{flex-direction:column}.top-actions{gap:6px}.login-button{padding:0 9px;font-size:10px;letter-spacing:.5px}}
 /* Start screen: shown on every visit until the player taps into the game. */
 .start-screen{display:none;text-align:center;max-width:440px;margin:0 auto;padding:12px 0 20px;animation:rise .84s cubic-bezier(.2,.8,.2,1) both}
 body.starting .start-screen{display:block}

@@ -298,6 +298,21 @@ in `rejected` with their reasons while the rest are added (422 if none are).
 Banks and runs are stored in `percentle_endless_banks` / `percentle_endless_runs` with Postgres,
 otherwise in `data/percentle-endless.json`.
 
+### Accounts
+Players can log in (the button at the top right, gone once they're logged in) with an email, a
+username, and a password, so their stats follow them across devices. The browser keeps its save as
+before; while logged in it also sends it to `PUT /api/percentle/accounts/state` a moment after each
+change, and the server merges it with the account's save (`mergeStates` in `percentle/accounts.js`:
+every game from either device, whichever device got further on a puzzle, all achievements, the
+higher endless bests) and sends the result back, which the page adopts on logging in and on
+opening. An endless run that's under way stays on its own device; its bests and run counts sync.
+Routes under `/api/percentle/accounts`: `POST /signup`, `POST /login`, `POST /logout`, `GET /me`,
+`PUT /state`. Passwords are stored as salted scrypt hashes; sessions are a one-year `HttpOnly`,
+`SameSite=Lax` cookie (`chargle_session`) whose token is stored only as a SHA-256 hash. Sign-ups
+and log-ins are rate-limited per address. Accounts are stored in `percentle_accounts` /
+`percentle_sessions` with Postgres, otherwise in `data/percentle-accounts.json`
+(`PERCENTLE_ACCOUNTS_FILE`). There's no password reset yet.
+
 ### Tests
 
 Run the scoring, Eastern-date, puzzle-validation, puzzle API, and crowd tests with `npm test`.
@@ -314,7 +329,7 @@ counted against the same ID. Rows live in `percentle_visits` (or `data/percentle
 `GET /api/percentle/stats/daily.csv?key=...` returns one row per day, oldest first, from the first
 day with data through today: players who opened the game, new and returning players, finishes,
 hard-mode finishes, outs, average charge left (hard games at their regular-mode equivalent),
-endless runs, shares, and sources. Visit columns
+endless runs, shares, sources, and new and total accounts. Visit columns
 are blank for days before tracking began. It needs `PERCENTLE_STATS_KEY` (unset turns it off),
 and is meant for Excel's Data > From Web, set to refresh when the workbook opens.
 

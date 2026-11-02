@@ -116,6 +116,15 @@ try {
 }
 const today = todayPuzzle.date;
 let state = readState();
+// The logged-in account, if any ({ username, email }; see Accounts below).
+let account = (() => {
+  try {
+    return JSON.parse(localStorage.getItem("percentle.account") || "null");
+  } catch {
+    return null;
+  }
+})();
+let accountSyncTimer = null;
 let currentDate = today;
 let currentNumber = todayPuzzle.number;
 // Endless mode: playing through the current two-week bank until the battery runs out.
@@ -322,24 +331,29 @@ function rangeLabels(question) {
 
 function readState() {
   try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
-    if (!Array.isArray(stored.games)) stored.games = [];
-    if (!stored.progress || typeof stored.progress !== "object") stored.progress = {};
-    if (!stored.achievements || typeof stored.achievements !== "object") stored.achievements = {};
-    if (!stored.endless || typeof stored.endless !== "object") stored.endless = { best: {}, allTime: 0, runs: 0 };
-    stored.endless.hardBest ??= {};
-    stored.endless.hardAllTime ??= 0;
-    for (const progress of Object.values(stored.progress)) {
-      if (!Array.isArray(progress.guesses)) progress.guesses = [];
-      if (!Array.isArray(progress.locked)) progress.locked = [];
-      if (!Number.isInteger(progress.revealed)) progress.revealed = Math.max(0, progress.guesses.length - 1);
-      if (progress.draft === undefined) progress.draft = null;
-    }
-    return stored;
+    return normalizeState(JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}"));
   } catch (error) {
     console.error("Could not read Percentle save data.", error);
     return { games: [], progress: {}, achievements: {}, endless: { best: {}, allTime: 0, runs: 0, hardBest: {}, hardAllTime: 0 } };
   }
+}
+
+// Fills in anything a save is missing (an older save, or one merged with an account's).
+function normalizeState(stored) {
+  if (!Array.isArray(stored.games)) stored.games = [];
+  if (!stored.progress || typeof stored.progress !== "object") stored.progress = {};
+  if (!stored.achievements || typeof stored.achievements !== "object") stored.achievements = {};
+  if (!stored.endless || typeof stored.endless !== "object") stored.endless = { best: {}, allTime: 0, runs: 0 };
+  stored.endless.best ??= {};
+  stored.endless.hardBest ??= {};
+  stored.endless.hardAllTime ??= 0;
+  for (const progress of Object.values(stored.progress)) {
+    if (!Array.isArray(progress.guesses)) progress.guesses = [];
+    if (!Array.isArray(progress.locked)) progress.locked = [];
+    if (!Number.isInteger(progress.revealed)) progress.revealed = Math.max(0, progress.guesses.length - 1);
+    if (progress.draft === undefined) progress.draft = null;
+  }
+  return stored;
 }
 
 function save() {
@@ -349,6 +363,145 @@ function save() {
     showToast("Your browser couldn't save this game.");
     console.error("Could not save Percentle progress.", error);
   }
+  if (account) scheduleAccountSync();
+}
+
+// ---------- Accounts ----------
+// Logging in (email, username, password) keeps a player's stats on every device: the browser keeps
+// its save as always, and while logged in also sends it to the account (a moment after each change),
+// where it's merged with what the account has from other devices. An endless run that's under way
+// stays on its own device (its question order is large); its bests and run counts are shared.
+const ACCOUNTS_URL = "/api/percentle/accounts";
+// Who's logged in, remembered so the page knows before asking the server. The session itself is
+// a cookie the page can't read.
+const ACCOUNT_KEY = "percentle.account"; // also read where `account` is declared, at the top
+const ACCOUNT_SYNC_DELAY_MS = 1500;
+
+const isEndlessKey = key => key.startsWith("endless");
+
+function rememberAccount(next) {
+  account = next;
+  try {
+    if (next) localStorage.setItem(ACCOUNT_KEY, JSON.stringify(next));
+    else localStorage.removeItem(ACCOUNT_KEY);
+  } catch {
+    // Without storage the page just asks the server again next time.
+  }
+  document.querySelector("#loginButton").hidden = Boolean(next);
+}
+
+function scheduleAccountSync() {
+  clearTimeout(accountSyncTimer);
+  accountSyncTimer = setTimeout(() => syncAccount(), ACCOUNT_SYNC_DELAY_MS);
+}
+
+// Sends this browser's save to the account and returns the merged save (null if it couldn't).
+// `apply` replaces this browser's save with the merged one, as on logging in or opening the page.
+async function syncAccount({ apply = false, keepalive = false } = {}) {
+  clearTimeout(accountSyncTimer);
+  accountSyncTimer = null;
+  const outgoing = { ...state, progress: Object.fromEntries(Object.entries(state.progress).filter(([key]) => !isEndlessKey(key))) };
+  try {
+    const response = await fetch(`${ACCOUNTS_URL}/state`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ state: outgoing }),
+      keepalive
+    });
+    if (response.status === 401) {
+      rememberAccount(null);
+      return null;
+    }
+    if (!response.ok) throw new Error(`Account sync failed (${response.status}).`);
+    const body = await response.json();
+    if (apply) {
+      const endlessRuns = Object.fromEntries(Object.entries(state.progress).filter(([key]) => isEndlessKey(key)));
+      state = normalizeState({ ...body.state, progress: { ...body.state.progress, ...endlessRuns } });
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      } catch (error) {
+        console.error("Could not save Percentle progress.", error);
+      }
+    }
+    return body.state;
+  } catch (error) {
+    console.error("Could not sync with the Chargle account.", error);
+    return null;
+  }
+}
+
+// On opening the page: if this browser is logged in, bring in what the account has from other
+// devices (and redraw while the start screen is still up, where nothing is mid-animation).
+async function loadAccount() {
+  try {
+    const response = await fetch(`${ACCOUNTS_URL}/me`);
+    if (!response.ok) throw new Error(`Account check failed (${response.status}).`);
+    rememberAccount((await response.json()).account);
+    if (!account) return;
+  } catch {
+    // Offline: carry on with this browser's save; it syncs on the next change.
+    rememberAccount(account);
+    return;
+  }
+  if (await syncAccount({ apply: true }) && document.body.classList.contains("starting")) render();
+}
+
+function showLogin(mode = "login") {
+  const signup = mode === "signup";
+  openDialog(signup ? "Create an account" : "Log in", `<div class="account-tabs" role="tablist">
+      <button type="button" role="tab" data-mode="login" aria-selected="${!signup}">Log in</button>
+      <button type="button" role="tab" data-mode="signup" aria-selected="${signup}">Create account</button></div>
+    <form class="account-form" id="accountForm" novalidate>
+      <label>Email<input type="email" name="email" autocomplete="email" required></label>
+      ${signup ? `<label>Username<input name="username" autocomplete="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" required></label>` : ""}
+      <label>Password<input type="password" name="password" autocomplete="${signup ? "new-password" : "current-password"}" minlength="${signup ? 8 : 1}" required></label>
+      <p class="account-error" role="alert"></p>
+      <button class="share-button" type="submit">${signup ? "Create account" : "Log in"}</button>
+      <p class="account-note">${signup ? "Usernames are 3 to 20 letters, numbers, or underscores. Passwords need at least 8 characters. " : ""}Your stats and daily games follow you to any device you log in on.</p>
+    </form>`);
+  dialog.querySelectorAll("[data-mode]").forEach(tab => tab.addEventListener("click", () => showLogin(tab.dataset.mode)));
+  const form = dialog.querySelector("#accountForm");
+  form.querySelector("input").focus();
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const error = form.querySelector(".account-error");
+    const button = form.querySelector("button[type=submit]");
+    const fields = Object.fromEntries(new FormData(form));
+    button.disabled = true;
+    error.textContent = "";
+    try {
+      const response = await fetch(`${ACCOUNTS_URL}/${signup ? "signup" : "login"}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(fields)
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "That didn't work. Try again.");
+      rememberAccount(body.account);
+      await syncAccount({ apply: true });
+      dialog.close();
+      render();
+      showToast(signup ? `Welcome, ${body.account.username}! Your stats are saved to your account.` : `Logged in as ${body.account.username}.`);
+    } catch (problem) {
+      error.textContent = problem.message === "Failed to fetch" ? "Couldn't reach Chargle. Check your connection and try again." : problem.message;
+      button.disabled = false;
+    }
+  });
+}
+
+async function logOut() {
+  if (accountSyncTimer) await syncAccount();
+  await fetch(`${ACCOUNTS_URL}/logout`, { method: "POST" }).catch(() => {});
+  rememberAccount(null);
+  dialog.close();
+  showToast("Logged out. Your stats stay on this device too.");
+}
+
+// The account line at the top of the stats dialog: who's logged in, or an invitation to.
+function accountLine() {
+  return account
+    ? `<p class="account-line">Logged in as <strong>${escapeHtml(account.username)}</strong> · <button type="button" class="link-button" id="logoutButton">Log out</button></p>`
+    : `<p class="account-line">Keep your stats on every device: <button type="button" class="link-button" id="statsLoginButton">Log in or create an account</button></p>`;
 }
 
 // The scoring rule in words, kept in step with the drain rate (hard mode's is double).
@@ -1262,7 +1415,7 @@ function showStats() {
   const charges = games.map(game => Math.max(0, statsCharge(gameCharge(game), game.hard)));
   const average = charges.length ? charges.reduce((a, b) => a + b, 0) / charges.length : null;
   const best = charges.length ? Math.max(...charges) : null;
-  openDialog("Your stats", `<div class="stat-cards">
+  openDialog("Your stats", `${accountLine()}<div class="stat-cards">
     <div class="stat-card"><span>GAMES PLAYED</span><strong>${games.length}</strong></div>
     <div class="stat-card"><span>AVERAGE CHARGE</span><strong>${average === null ? "—" : formatCharge(average)}</strong></div>
     <div class="stat-card"><span>BEST CHARGE</span><strong>${best === null ? "—" : formatCharge(best)}</strong></div>
@@ -1275,6 +1428,8 @@ function showStats() {
     <h3 class="dialog-title">Past puzzles</h3><p>${isTodayFinished() ? "Replay any of the last 30 daily puzzles." : "Finish today's puzzle to unlock the archive."}</p>
     <div class="archive-list" id="archiveList">${isTodayFinished() ? "<span class='hist-empty'>Loading past puzzles…</span>" : "<span class='hist-empty'>The archive unlocks after today's five questions.</span>"}</div>`);
   bindLastTenGames();
+  dialog.querySelector("#logoutButton")?.addEventListener("click", logOut);
+  dialog.querySelector("#statsLoginButton")?.addEventListener("click", () => showLogin());
   if (isTodayFinished()) loadArchive();
 }
 
@@ -1628,6 +1783,9 @@ document.querySelector("#returnButton").addEventListener("click", () => {
   showStats();
 });
 document.querySelector("#achievementsButton").addEventListener("click", showAchievements);
+document.querySelector("#loginButton").addEventListener("click", () => showLogin());
+// A change still waiting to go to the account goes before the page closes.
+window.addEventListener("pagehide", () => { if (accountSyncTimer) syncAccount({ keepalive: true }); });
 document.querySelector("#hardSwitch").addEventListener("click", toggleHardMode);
 document.querySelectorAll("[data-close]").forEach(button => button.addEventListener("click", () => dialog.close()));
 dialog.addEventListener("click", event => { if (event.target === dialog) dialog.close(); });
@@ -1650,3 +1808,5 @@ creditPastAchievements();
 save();
 render();
 showStartScreen();
+rememberAccount(account);
+loadAccount();

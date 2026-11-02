@@ -15,6 +15,8 @@ const { createEndlessStore } = require("./endless");
 const { createEndlessRouter } = require("./endless-router");
 const { createStatsStore } = require("./stats");
 const { createStatsRouter } = require("./stats-router");
+const { createAccountStore } = require("./accounts");
+const { createAccountsRouter } = require("./accounts-router");
 
 const PORT = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, "..", "public");
@@ -22,6 +24,7 @@ const crowd = createCrowdStore();
 const puzzles = createPuzzleStore();
 const endless = createEndlessStore();
 const stats = createStatsStore();
+const accounts = createAccountStore();
 const app = express();
 
 // The page itself is always re-checked so a deploy shows up straight away; its styles, scripts,
@@ -30,6 +33,8 @@ const ASSET_CACHE_MS = 5 * 60 * 1000;
 const page = { headers: { "Cache-Control": "no-cache" } };
 const asset = { maxAge: ASSET_CACHE_MS };
 
+// A logged-in player's save can be bigger than the default 100 KB a request may carry.
+app.use("/api/percentle/accounts", express.json({ limit: "600kb" }));
 app.use(express.json());
 app.get(["/", "/percentle.html"], (req, res) => res.sendFile(path.join(publicDir, "percentle.html"), page));
 app.get("/percentle.css", (req, res) => res.sendFile(path.join(publicDir, "percentle.css"), asset));
@@ -46,14 +51,15 @@ app.get("/sitemap.xml", (req, res) => res.type("application/xml").send(
 app.use("/api/percentle/crowd", createCrowdRouter(crowd));
 app.use("/api/percentle/puzzles", createPuzzleRouter(puzzles, { endless }));
 app.use("/api/percentle/endless", createEndlessRouter(endless, { puzzles }));
-app.use("/api/percentle/stats", createStatsRouter(stats, crowd));
+app.use("/api/percentle/stats", createStatsRouter(stats, crowd, { accounts }));
+app.use("/api/percentle/accounts", createAccountsRouter(accounts));
 app.use((req, res) => res.redirect("/"));
 app.use((err, req, res, next) => {
   console.error(err);
   res.status(500).json({ error: "Something went wrong." });
 });
 
-Promise.all([crowd.init(), puzzles.init(), endless.init(), stats.init()])
+Promise.all([crowd.init(), puzzles.init(), endless.init(), stats.init(), accounts.init()])
   .then(() => app.listen(PORT, () => console.log(`Percentle running at http://localhost:${PORT} (storage: ${process.env.DATABASE_URL ? "postgres" : "json-file"})`)))
   .catch(error => {
     console.error("Failed to set up Percentle storage:", error.message);

@@ -53,7 +53,7 @@ function createStatsRouter(stats, crowd, options = {}) {
     const given = req.query.key || (req.get("authorization") || "").replace(/^Bearer\s+/i, "");
     if (!given || !sameSecret(given, key)) return res.status(401).json({ error: "Wrong stats key." });
     try {
-      const report = await stats.report(currentDate(), await crowd.dailyFinishes());
+      const report = await stats.report(currentDate(), await crowd.dailyFinishes(), options.accounts ? await options.accounts.dailySignups() : []);
       res.type("text/csv").set("Content-Disposition", 'inline; filename="chargle-daily-stats.csv"').send(toCsv(report));
     } catch (error) {
       next(error);
