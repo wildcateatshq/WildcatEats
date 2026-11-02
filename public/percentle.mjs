@@ -1578,7 +1578,7 @@ function enterFromStart(enter) {
 
 function showHowToPlay() {
   openDialog("How to play", `<ul class="rules">
-      <li>Guess the percentage for each of 5 questions.</li>
+      <li>Guess the answer to each of 5 questions, from percentages to prices and ratings.</li>
       <li>${drainRule(rateOf())}</li>
       <li>A new puzzle arrives every day at midnight Eastern.</li>
     </ul>
