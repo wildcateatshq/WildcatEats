@@ -170,6 +170,25 @@ test("without email set up, a live server says reset emails aren't available", a
   assert.equal(await forgot(`localhost:${server.address().port}`), 200, "a local test server still works (the link goes to its log)");
 });
 
+test("reset emails go through Resend when its key is set", async () => {
+  const { createMailer } = require("./mailer");
+  const calls = [];
+  const fakeFetch = async (url, options) => {
+    calls.push({ url, options });
+    return { ok: true, text: async () => "" };
+  };
+  const mailer = createMailer({ RESEND_API_KEY: "re_test", CHARGLE_MAIL_FROM: "Chargle <noreply@chargle.io>" }, fakeFetch);
+  assert.equal(mailer.configured, true);
+  assert.equal(await mailer.sendPasswordReset("sam@example.com", "sam", "https://chargle.io/?password-token=abc", 60), true);
+  assert.equal(calls[0].url, "https://api.resend.com/emails");
+  assert.equal(calls[0].options.headers.Authorization, "Bearer re_test");
+  const body = JSON.parse(calls[0].options.body);
+  assert.equal(body.from, "Chargle <noreply@chargle.io>");
+  assert.equal(body.to, "sam@example.com");
+  assert.match(body.text, /https:\/\/chargle\.io\/\?password-token=abc/);
+  assert.equal(createMailer({}).configured, false, "nothing set: not configured");
+});
+
 test("the stats spreadsheet counts new and total accounts per day", () => {
   const { columns, rows } = buildReport({ signups: [{ date: "2026-11-01", accounts: 2 }, { date: "2026-11-03", accounts: 1 }] }, "2026-11-03");
   assert.deepEqual(columns.slice(-2), ["New accounts", "Total accounts"]);

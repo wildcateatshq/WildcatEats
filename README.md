@@ -317,9 +317,10 @@ and log-ins are rate-limited per address. Accounts are stored in `percentle_acco
 stored only as a hash in `percentle_password_resets`); the page opens "Choose a new password", and
 `POST /reset` sets it, logs the account out everywhere else, and logs it in. The answer is the same
 whether or not the email has an account, and an account gets at most one link per two minutes.
-Links always point at `CHARGLE_URL` (default `https://chargle.io`). Email goes through any SMTP
-account set in the environment (`percentle/mailer.js`): `SMTP_HOST`, `SMTP_PORT` (465 or 587),
-`SMTP_USER`, `SMTP_PASS`, and optionally `CHARGLE_MAIL_FROM`. Without them a live server answers
+Links always point at `CHARGLE_URL` (default `https://chargle.io`). Email goes through Resend
+(`RESEND_API_KEY`, with `CHARGLE_MAIL_FROM` on a domain verified in Resend, e.g. `Chargle
+<noreply@chargle.io>`), which works on hosts that block mail ports like Render's free plan, or any
+SMTP account (`SMTP_HOST`, `SMTP_PORT` 465 or 587, `SMTP_USER`, `SMTP_PASS`); see `percentle/mailer.js`. Without them a live server answers
 503 ("reset emails aren't set up yet"); a localhost server writes the link to its log instead.
 
 **Privacy:** a short note (what's kept and why, and how to delete it) is linked from the log-in box
