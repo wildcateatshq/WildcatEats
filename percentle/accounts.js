@@ -17,6 +17,8 @@ const USERNAME_PATTERN = /^[A-Za-z0-9_]{3,20}$/;
 const MIN_PASSWORD = 8;
 const MAX_PASSWORD = 200;
 const SESSION_DAYS = 365;
+// A password-reset link works for an hour, and only once.
+const RESET_MINUTES = 60;
 // A save is small (a few kilobytes a month of daily play); this leaves years of room.
 const MAX_STATE_BYTES = 512 * 1024;
 
@@ -54,6 +56,19 @@ async function verifyPassword(password, stored) {
 function newSession() {
   const token = crypto.randomBytes(32).toString("base64url");
   return { token, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + SESSION_DAYS * 86_400_000) };
+}
+
+// A password-reset link's token: sent in the email; only its hash is stored.
+function newReset() {
+  const token = crypto.randomBytes(32).toString("base64url");
+  return { token, tokenHash: hashToken(token), expiresAt: new Date(Date.now() + RESET_MINUTES * 60_000) };
+}
+
+function validatePassword(password) {
+  if (typeof password !== "string" || password.length < MIN_PASSWORD || password.length > MAX_PASSWORD) {
+    throw new RangeError(`Passwords need at least ${MIN_PASSWORD} characters.`);
+  }
+  return password;
 }
 
 function hashToken(token) {
@@ -126,8 +141,8 @@ function createAccountStore(options = {}) {
     ? null
     : new (require("pg").Pool)({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false } }));
   // File storage: { accounts: [{ id, email, username, passwordHash, createdAt, state }],
-  // sessions: { tokenHash: { accountId, expiresAt } } }
-  let data = { accounts: [], sessions: {} };
+  // sessions: { tokenHash: { accountId, expiresAt } }, resets: { tokenHash: { accountId, expiresAt, createdAt, used } } }
+  let data = { accounts: [], sessions: {}, resets: {} };
   let writes = Promise.resolve();
 
   async function persist() {
@@ -173,11 +188,20 @@ function createAccountStore(options = {}) {
           expires_at timestamptz not null
         )
       `);
+      await pool.query(`
+        create table if not exists percentle_password_resets (
+          token_hash text primary key,
+          account_id uuid not null references percentle_accounts(id) on delete cascade,
+          expires_at timestamptz not null,
+          created_at timestamptz not null default now(),
+          used boolean not null default false
+        )
+      `);
       return;
     }
     try {
       const loaded = JSON.parse(await fs.readFile(filePath, "utf8"));
-      data = { accounts: loaded.accounts || [], sessions: loaded.sessions || {} };
+      data = { accounts: loaded.accounts || [], sessions: loaded.sessions || {}, resets: loaded.resets || {} };
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
     }
@@ -274,6 +298,85 @@ function createAccountStore(options = {}) {
     });
   }
 
+  // A password-reset link for an account. Returns false (and makes none) if one was made in the
+  // last couple of minutes, so a form pressed again and again can't flood someone's inbox.
+  async function createReset(accountId, { tokenHash, expiresAt }) {
+    if (pool) {
+      const { rows } = await pool.query(
+        "select 1 from percentle_password_resets where account_id = $1 and created_at > now() - interval '2 minutes'", [accountId]
+      );
+      if (rows.length) return false;
+      await pool.query("insert into percentle_password_resets (token_hash, account_id, expires_at) values ($1, $2, $3)", [tokenHash, accountId, expiresAt]);
+      return true;
+    }
+    return queued(() => {
+      const recent = Object.values(data.resets).some(reset => reset.accountId === accountId && Date.now() - Date.parse(reset.createdAt) < 120_000);
+      if (recent) return false;
+      data.resets[tokenHash] = { accountId, expiresAt: expiresAt.toISOString(), createdAt: new Date().toISOString(), used: false };
+      return true;
+    });
+  }
+
+  // Uses up a password-reset link: sets the new password and logs the account out everywhere.
+  // Returns the account, or null if the link is unknown, used, or expired.
+  async function resetPassword(tokenHash, passwordHash) {
+    if (pool) {
+      const client = await pool.connect();
+      try {
+        await client.query("begin");
+        const { rows } = await client.query(
+          "update percentle_password_resets set used = true where token_hash = $1 and not used and expires_at > now() returning account_id", [tokenHash]
+        );
+        if (!rows.length) {
+          await client.query("rollback");
+          return null;
+        }
+        const accountId = rows[0].account_id;
+        const updated = await client.query("update percentle_accounts set password_hash = $2 where id = $1 returning id, email, username", [accountId, passwordHash]);
+        await client.query("delete from percentle_sessions where account_id = $1", [accountId]);
+        await client.query("commit");
+        return updated.rows[0];
+      } catch (error) {
+        await client.query("rollback");
+        throw error;
+      } finally {
+        client.release();
+      }
+    }
+    return queued(() => {
+      const reset = data.resets[tokenHash];
+      if (!reset || reset.used || Date.parse(reset.expiresAt) <= Date.now()) return null;
+      reset.used = true;
+      const account = data.accounts.find(item => item.id === reset.accountId);
+      if (!account) return null;
+      account.passwordHash = passwordHash;
+      for (const [hash, session] of Object.entries(data.sessions)) if (session.accountId === account.id) delete data.sessions[hash];
+      return account;
+    });
+  }
+
+  // Deletes an account with its saved stats, sessions, and reset links.
+  async function deleteAccount(accountId) {
+    if (pool) {
+      await pool.query("delete from percentle_accounts where id = $1", [accountId]);
+      return;
+    }
+    await queued(() => {
+      data.accounts = data.accounts.filter(account => account.id !== accountId);
+      for (const [hash, session] of Object.entries(data.sessions)) if (session.accountId === accountId) delete data.sessions[hash];
+      for (const [hash, reset] of Object.entries(data.resets)) if (reset.accountId === accountId) delete data.resets[hash];
+    });
+  }
+
+  // The stored password hash for an account (to confirm a deletion).
+  async function passwordHashFor(accountId) {
+    if (pool) {
+      const { rows } = await pool.query("select password_hash from percentle_accounts where id = $1", [accountId]);
+      return rows[0]?.password_hash || null;
+    }
+    return data.accounts.find(account => account.id === accountId)?.passwordHash || null;
+  }
+
   // New accounts per Eastern day, for the stats spreadsheet: [{ date, accounts }].
   async function dailySignups() {
     if (pool) {
@@ -291,10 +394,13 @@ function createAccountStore(options = {}) {
     return [...days].map(([date, accounts]) => ({ date, accounts }));
   }
 
-  return { init, createAccount, findByEmail, createSession, accountForSession, deleteSession, mergeState, dailySignups };
+  return {
+    init, createAccount, findByEmail, createSession, accountForSession, deleteSession, mergeState, dailySignups,
+    createReset, resetPassword, deleteAccount, passwordHashFor
+  };
 }
 
 module.exports = {
-  AccountTaken, createAccountStore, hashPassword, hashToken, mergeStates, newSession, publicAccount,
-  validateSignup, validateState, verifyPassword
+  AccountTaken, RESET_MINUTES, createAccountStore, hashPassword, hashToken, mergeStates, newReset, newSession, publicAccount,
+  validatePassword, validateSignup, validateState, verifyPassword
 };

@@ -99,6 +99,77 @@ test("players sign up, log in on another device, sync their save, and log out", 
   assert.equal((await reopened.dailySignups()).reduce((sum, day) => sum + day.accounts, 0), 1);
 });
 
+test("a forgotten password is reset by a one-time emailed link, and an account can be deleted", async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "percentle-reset-"));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const store = createAccountStore({ filePath: path.join(dir, "accounts.json") });
+  await store.init();
+  const sent = [];
+  const mailer = { configured: true, sendPasswordReset: async (to, username, link) => sent.push({ to, username, link }) };
+  const app = express();
+  app.use(express.json());
+  app.use("/a", createAccountsRouter(store, { mailer, siteUrl: "https://chargle.io" }));
+  const server = app.listen(0);
+  t.after(() => server.close());
+  const url = `http://localhost:${server.address().port}/a`;
+  const send = (pathname, body, cookie) => fetch(url + pathname, {
+    method: "POST", headers: { "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body)
+  });
+  const cookieOf = response => response.headers.get("set-cookie").split(";")[0];
+
+  const phone = cookieOf(await send("/signup", { email: "sam@example.com", username: "sam", password: "old-password" }));
+  assert.deepEqual(await (await send("/forgot", { email: "nobody@example.com" })).json(), { ok: true }, "the same answer for an email with no account");
+  assert.equal(sent.length, 0);
+  assert.equal((await send("/forgot", { email: "SAM@example.com" })).status, 200);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].to, "sam@example.com");
+  assert.match(sent[0].link, /^https:\/\/chargle\.io\/\?password-token=[\w-]+$/, "the link always points at the real site");
+  await send("/forgot", { email: "sam@example.com" });
+  assert.equal(sent.length, 1, "asking again right away doesn't send another email");
+
+  const token = new URL(sent[0].link).searchParams.get("password-token");
+  assert.equal((await send("/reset", { token, password: "short" })).status, 400);
+  assert.equal((await send("/reset", { token: "made-up", password: "new-password" })).status, 400);
+  const reset = await send("/reset", { token, password: "new-password" });
+  assert.equal(reset.status, 200);
+  assert.equal((await reset.json()).account.username, "sam");
+  assert.equal((await send("/reset", { token, password: "another-password" })).status, 400, "a link works only once");
+  assert.equal((await send("/login", { email: "sam@example.com", password: "old-password" })).status, 401, "the old password is gone");
+  assert.equal((await (await fetch(`${url}/me`, { headers: { Cookie: phone } })).json()).account, null, "other devices are logged out");
+  const laptop = cookieOf(await send("/login", { email: "sam@example.com", password: "new-password" }));
+
+  assert.equal((await send("/delete", { password: "wrong-password" }, laptop)).status, 401, "deleting needs the password");
+  assert.equal((await send("/delete", { password: "new-password" }, laptop)).status, 204);
+  assert.equal(await store.findByEmail("sam@example.com"), null, "the account is gone");
+  assert.equal((await send("/login", { email: "sam@example.com", password: "new-password" })).status, 401);
+  assert.equal((await send("/signup", { email: "sam@example.com", username: "sam", password: "fresh-start" })).status, 201, "the email and username are free again");
+});
+
+test("without email set up, a live server says reset emails aren't available", async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "percentle-nomail-"));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const store = createAccountStore({ filePath: path.join(dir, "accounts.json") });
+  await store.init();
+  const app = express();
+  app.use(express.json());
+  app.use("/a", createAccountsRouter(store, { mailer: { configured: false, sendPasswordReset: async () => false } }));
+  const server = app.listen(0);
+  t.after(() => server.close());
+  // fetch can't set the Host header, so this asks with node:http.
+  const forgot = host => new Promise((resolve, reject) => {
+    const request = require("node:http").request({
+      port: server.address().port, path: "/a/forgot", method: "POST", headers: { "Content-Type": "application/json", Host: host }
+    }, response => {
+      response.resume();
+      resolve(response.statusCode);
+    });
+    request.on("error", reject);
+    request.end(JSON.stringify({ email: "a@example.com" }));
+  });
+  assert.equal(await forgot("chargle.io"), 503);
+  assert.equal(await forgot(`localhost:${server.address().port}`), 200, "a local test server still works (the link goes to its log)");
+});
+
 test("the stats spreadsheet counts new and total accounts per day", () => {
   const { columns, rows } = buildReport({ signups: [{ date: "2026-11-01", accounts: 2 }, { date: "2026-11-03", accounts: 1 }] }, "2026-11-03");
   assert.deepEqual(columns.slice(-2), ["New accounts", "Total accounts"]);

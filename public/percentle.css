@@ -26,6 +26,8 @@ button{color:inherit}
 .account-note{margin:0;font-size:12px!important}
 .account-line{margin:0 0 4px}
 .link-button{border:0;padding:0;background:none;color:var(--charge);font:inherit;text-decoration:underline;cursor:pointer}
+.account-forgot{justify-self:center;font-size:13px}
+.share-button.danger-button{background:#c9473a;color:#fff;box-shadow:0 6px 22px rgba(201,71,58,.35)}
 .icon-button{width:38px;height:38px;border:1px solid var(--line);background:var(--card);border-radius:8px;cursor:pointer;font-size:16px;display:grid;place-items:center;transition:transform .2s,border-color .2s}
 .icon-button:hover{transform:translateY(-2px);border-color:var(--charge);box-shadow:0 0 12px var(--charge-glow)}
 main{padding:47px 0 34px}

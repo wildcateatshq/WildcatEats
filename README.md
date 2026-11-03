@@ -307,11 +307,26 @@ every game from either device, whichever device got further on a puzzle, all ach
 higher endless bests) and sends the result back, which the page adopts on logging in and on
 opening. An endless run that's under way stays on its own device; its bests and run counts sync.
 Routes under `/api/percentle/accounts`: `POST /signup`, `POST /login`, `POST /logout`, `GET /me`,
-`PUT /state`. Passwords are stored as salted scrypt hashes; sessions are a one-year `HttpOnly`,
+`PUT /state`, `POST /forgot`, `POST /reset`, `POST /delete`. Passwords are stored as salted scrypt hashes; sessions are a one-year `HttpOnly`,
 `SameSite=Lax` cookie (`chargle_session`) whose token is stored only as a SHA-256 hash. Sign-ups
 and log-ins are rate-limited per address. Accounts are stored in `percentle_accounts` /
 `percentle_sessions` with Postgres, otherwise in `data/percentle-accounts.json`
-(`PERCENTLE_ACCOUNTS_FILE`). There's no password reset yet.
+(`PERCENTLE_ACCOUNTS_FILE`).
+
+**Forgot password:** `POST /forgot` emails a one-time link (`/?password-token=...`, good for an hour,
+stored only as a hash in `percentle_password_resets`); the page opens "Choose a new password", and
+`POST /reset` sets it, logs the account out everywhere else, and logs it in. The answer is the same
+whether or not the email has an account, and an account gets at most one link per two minutes.
+Links always point at `CHARGLE_URL` (default `https://chargle.io`). Email goes through any SMTP
+account set in the environment (`percentle/mailer.js`): `SMTP_HOST`, `SMTP_PORT` (465 or 587),
+`SMTP_USER`, `SMTP_PASS`, and optionally `CHARGLE_MAIL_FROM`. Without them a live server answers
+503 ("reset emails aren't set up yet"); a localhost server writes the link to its log instead.
+
+**Privacy:** a short note (what's kept and why, and how to delete it) is linked from the log-in box
+and the stats dialog, and pops up once after a player first logs in or creates an account; the
+"seen" mark is saved with their stats, so it's once across devices. **Delete account** (in the stats
+dialog, password required, `POST /delete`) removes the account, its saved stats, sessions, and
+reset links.
 
 ### Tests
 

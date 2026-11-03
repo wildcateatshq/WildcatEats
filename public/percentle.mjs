@@ -457,9 +457,12 @@ function showLogin(mode = "login") {
       <label>Password<input type="password" name="password" autocomplete="${signup ? "new-password" : "current-password"}" minlength="${signup ? 8 : 1}" required></label>
       <p class="account-error" role="alert"></p>
       <button class="share-button" type="submit">${signup ? "Create account" : "Log in"}</button>
-      <p class="account-note">${signup ? "Usernames are 3 to 20 letters, numbers, or underscores. Passwords need at least 8 characters. " : ""}Your stats and daily games follow you to any device you log in on.</p>
+      ${signup ? "" : `<button type="button" class="link-button account-forgot" id="forgotButton">Forgot password?</button>`}
+      <p class="account-note">${signup ? "Usernames are 3 to 20 letters, numbers, or underscores. Passwords need at least 8 characters. " : ""}Your stats and daily games follow you to any device you log in on. <button type="button" class="link-button" id="privacyLink">Privacy</button></p>
     </form>`);
   dialog.querySelectorAll("[data-mode]").forEach(tab => tab.addEventListener("click", () => showLogin(tab.dataset.mode)));
+  dialog.querySelector("#forgotButton")?.addEventListener("click", () => showForgot(dialog.querySelector('input[name="email"]').value));
+  dialog.querySelector("#privacyLink").addEventListener("click", () => showPrivacy({ back: () => showLogin(mode) }));
   const form = dialog.querySelector("#accountForm");
   form.querySelector("input").focus();
   form.addEventListener("submit", async event => {
@@ -482,6 +485,7 @@ function showLogin(mode = "login") {
       dialog.close();
       render();
       showToast(signup ? `Welcome, ${body.account.username}! Your stats are saved to your account.` : `Logged in as ${body.account.username}.`);
+      showPrivacyOnce();
     } catch (problem) {
       error.textContent = problem.message === "Failed to fetch" ? "Couldn't reach Chargle. Check your connection and try again." : problem.message;
       button.disabled = false;
@@ -497,10 +501,150 @@ async function logOut() {
   showToast("Logged out. Your stats stay on this device too.");
 }
 
+// What Chargle keeps and why. Shown once to everyone who logs in or creates an account (the
+// "seen" mark is saved with their stats, so it's once across all their devices), and from the
+// Privacy links in the log-in box and the stats dialog.
+const PRIVACY_HTML = `<ul class="rules">
+    <li>If you create an account, Chargle keeps your <strong>email</strong>, your <strong>username</strong>, and your <strong>game stats</strong> (scores, achievements, and progress). Your password is stored scrambled, so no one can read it, including us.</li>
+    <li>Your email is only used to log you in and to send a password reset link when you ask for one. No newsletters, no ads, and it's never sold or shared.</li>
+    <li>Without an account, your stats stay in your browser. Chargle counts visits and finished games anonymously to see how the game is doing.</li>
+    <li>You can delete your account any time from <strong>Your stats → Delete account</strong>. That removes your email, username, and saved stats from Chargle's server.</li>
+  </ul>`;
+
+function showPrivacy({ back = null, onDone = null } = {}) {
+  openDialog("Your privacy", `${PRIVACY_HTML}<button class="share-button" id="privacyDone">${back ? "Back" : "Got it"}</button>`);
+  dialog.querySelector("#privacyDone").addEventListener("click", () => {
+    if (back) back();
+    else dialog.close();
+    onDone?.();
+  });
+}
+
+function showPrivacyOnce() {
+  if (state.privacyNoticeSeen) return;
+  showPrivacy({ onDone: () => {
+    state.privacyNoticeSeen = easternDate();
+    save();
+  } });
+}
+
+// Forgot password: asks for the email and sends a one-time reset link to it.
+function showForgot(email = "") {
+  openDialog("Reset your password", `<form class="account-form" id="forgotForm" novalidate>
+      <p class="account-note">Enter your account's email and we'll send you a link to choose a new password.</p>
+      <label>Email<input type="email" name="email" autocomplete="email" required value="${escapeAttr(email)}"></label>
+      <p class="account-error" role="alert"></p>
+      <button class="share-button" type="submit">Send reset link</button>
+      <button type="button" class="link-button account-forgot" id="backToLogin">Back to log in</button>
+    </form>`);
+  dialog.querySelector("#backToLogin").addEventListener("click", () => showLogin());
+  const form = dialog.querySelector("#forgotForm");
+  form.querySelector("input").focus();
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const error = form.querySelector(".account-error");
+    const button = form.querySelector("button[type=submit]");
+    const email = form.email.value.trim();
+    button.disabled = true;
+    error.textContent = "";
+    try {
+      const response = await fetch(`${ACCOUNTS_URL}/forgot`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "That didn't work. Try again.");
+      form.innerHTML = `<p class="account-note">If <strong>${escapeHtml(email)}</strong> has a Chargle account, a reset link is on its way. It works once, for the next hour. Check your spam folder if it doesn't show up in a few minutes.</p>
+        <button type="button" class="share-button" id="forgotDone">Done</button>`;
+      form.querySelector("#forgotDone").addEventListener("click", () => dialog.close());
+    } catch (problem) {
+      error.textContent = problem.message === "Failed to fetch" ? "Couldn't reach Chargle. Check your connection and try again." : problem.message;
+      button.disabled = false;
+    }
+  });
+}
+
+// Opened from a reset email's link (?password-token=...): choose a new password, then log in.
+function showResetPassword(token) {
+  openDialog("Choose a new password", `<form class="account-form" id="resetForm" novalidate>
+      <label>New password<input type="password" name="password" autocomplete="new-password" minlength="8" required></label>
+      <p class="account-note">At least 8 characters. Saving it logs your account out on your other devices.</p>
+      <p class="account-error" role="alert"></p>
+      <button class="share-button" type="submit">Save password</button>
+    </form>`);
+  const form = dialog.querySelector("#resetForm");
+  form.querySelector("input").focus();
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const error = form.querySelector(".account-error");
+    const button = form.querySelector("button[type=submit]");
+    button.disabled = true;
+    error.textContent = "";
+    try {
+      const response = await fetch(`${ACCOUNTS_URL}/reset`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token, password: form.password.value })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(body.error || "That didn't work. Try again.");
+      rememberAccount(body.account);
+      await syncAccount({ apply: true });
+      dialog.close();
+      render();
+      showToast(`Password changed. You're logged in as ${body.account.username}.`);
+      showPrivacyOnce();
+    } catch (problem) {
+      error.textContent = problem.message === "Failed to fetch" ? "Couldn't reach Chargle. Check your connection and try again." : problem.message;
+      button.disabled = false;
+    }
+  });
+}
+
+// Deleting the account (after the password is confirmed). The stats stay in this browser.
+function showDeleteAccount() {
+  openDialog("Delete your account?", `<form class="account-form" id="deleteForm" novalidate>
+      <p class="account-note">This removes your email, username, and saved stats from Chargle's server, for good. Your stats stay on this device.</p>
+      <label>Password<input type="password" name="password" autocomplete="current-password" required></label>
+      <p class="account-error" role="alert"></p>
+      <button class="share-button danger-button" type="submit">Delete my account</button>
+      <button type="button" class="link-button account-forgot" id="keepAccount">Keep my account</button>
+    </form>`);
+  dialog.querySelector("#keepAccount").addEventListener("click", showStats);
+  const form = dialog.querySelector("#deleteForm");
+  form.querySelector("input").focus();
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    const error = form.querySelector(".account-error");
+    const button = form.querySelector("button[type=submit]");
+    button.disabled = true;
+    error.textContent = "";
+    try {
+      const response = await fetch(`${ACCOUNTS_URL}/delete`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: form.password.value })
+      });
+      if (!response.ok) throw new Error((await response.json().catch(() => ({}))).error || "That didn't work. Try again.");
+      clearTimeout(accountSyncTimer);
+      accountSyncTimer = null;
+      rememberAccount(null);
+      delete state.privacyNoticeSeen;
+      save();
+      dialog.close();
+      showToast("Your account is deleted.");
+    } catch (problem) {
+      error.textContent = problem.message === "Failed to fetch" ? "Couldn't reach Chargle. Check your connection and try again." : problem.message;
+      button.disabled = false;
+    }
+  });
+}
+
 // The account line at the top of the stats dialog: who's logged in, or an invitation to.
 function accountLine() {
   return account
-    ? `<p class="account-line">Logged in as <strong>${escapeHtml(account.username)}</strong> · <button type="button" class="link-button" id="logoutButton">Log out</button></p>`
+    ? `<p class="account-line">Logged in as <strong>${escapeHtml(account.username)}</strong> · <button type="button" class="link-button" id="logoutButton">Log out</button> · <button type="button" class="link-button" id="privacyStatsLink">Privacy</button> · <button type="button" class="link-button" id="deleteAccountButton">Delete account</button></p>`
     : `<p class="account-line">Keep your stats on every device: <button type="button" class="link-button" id="statsLoginButton">Log in or create an account</button></p>`;
 }
 
@@ -1429,6 +1573,8 @@ function showStats() {
     <div class="archive-list" id="archiveList">${isTodayFinished() ? "<span class='hist-empty'>Loading past puzzles…</span>" : "<span class='hist-empty'>The archive unlocks after today's five questions.</span>"}</div>`);
   bindLastTenGames();
   dialog.querySelector("#logoutButton")?.addEventListener("click", logOut);
+  dialog.querySelector("#privacyStatsLink")?.addEventListener("click", () => showPrivacy({ back: showStats }));
+  dialog.querySelector("#deleteAccountButton")?.addEventListener("click", showDeleteAccount);
   dialog.querySelector("#statsLoginButton")?.addEventListener("click", () => showLogin());
   if (isTodayFinished()) loadArchive();
 }
@@ -1809,4 +1955,12 @@ save();
 render();
 showStartScreen();
 rememberAccount(account);
+// A password-reset email's link: take the token out of the address bar and ask for the new password.
+const passwordToken = new URLSearchParams(location.search).get("password-token");
+if (passwordToken) {
+  const url = new URL(location.href);
+  url.searchParams.delete("password-token");
+  history.replaceState(null, "", url);
+  showResetPassword(passwordToken);
+}
 loadAccount();

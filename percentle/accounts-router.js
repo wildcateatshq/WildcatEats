@@ -2,7 +2,8 @@
 
 const express = require("express");
 const { createRateLimit } = require("./crowd-router");
-const { AccountTaken, hashPassword, hashToken, newSession, publicAccount, validateSignup, validateState, verifyPassword } = require("./accounts");
+const { AccountTaken, RESET_MINUTES, hashPassword, hashToken, newReset, newSession, publicAccount, validatePassword, validateSignup, validateState, verifyPassword } = require("./accounts");
+const { createMailer } = require("./mailer");
 
 // Sign-ups and log-ins per address per minute: plenty for a person (or a campus sharing one
 // address), too few to guess passwords.
@@ -31,9 +32,15 @@ function setSessionCookie(req, res, token, maxAgeSeconds) {
   res.set("Set-Cookie", `${COOKIE}=${encodeURIComponent(token)}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${secure}`);
 }
 
+// Reset links always point at the real site (never at whatever host a request claims to be for,
+// which someone could fake to send people a link to their own site).
+const SITE_URL = process.env.CHARGLE_URL || "https://chargle.io";
+
 function createAccountsRouter(store, options = {}) {
   const router = express.Router();
   const allow = createRateLimit(options.attemptsPerMinute ?? ATTEMPTS_PER_MINUTE, options.now);
+  const mailer = options.mailer || createMailer();
+  const siteUrl = options.siteUrl || SITE_URL;
   router.use((req, res, next) => {
     res.set("Cache-Control", "no-store");
     next();
@@ -111,6 +118,56 @@ function createAccountsRouter(store, options = {}) {
       next(error);
     }
   });
+
+  // Forgot password: emails a one-time reset link if the email has an account. The answer is the
+  // same either way, so the form can't be used to find out who has an account.
+  router.post("/forgot", async (req, res, next) => {
+    if (!allow(clientAddress(req))) return res.status(429).json({ error: "Too many tries. Wait a minute and try again." });
+    try {
+      // Without email set up nobody would get the link (on a local test server it's in the log).
+      const local = /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.get("host") || "");
+      if (!mailer.configured && !local) return res.status(503).json({ error: "Password reset emails aren't set up yet. Try again later." });
+      const email = typeof req.body?.email === "string" ? req.body.email.trim().toLowerCase() : "";
+      const account = email ? await store.findByEmail(email) : null;
+      if (account) {
+        const reset = newReset();
+        if (await store.createReset(account.id, reset)) {
+          const link = `${siteUrl}/?password-token=${encodeURIComponent(reset.token)}`;
+          await mailer.sendPasswordReset(account.email, account.username, link, RESET_MINUTES);
+        }
+      }
+      res.json({ ok: true });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // A reset link's new password: sets it, logs the account out everywhere else, and logs it in here.
+  router.post("/reset", async (req, res, next) => {
+    if (!allow(clientAddress(req))) return res.status(429).json({ error: "Too many tries. Wait a minute and try again." });
+    try {
+      const password = validatePassword(req.body?.password);
+      const token = typeof req.body?.token === "string" ? req.body.token : "";
+      const account = token ? await store.resetPassword(hashToken(token), await hashPassword(password)) : null;
+      if (!account) return res.status(400).json({ error: "That reset link has expired or was already used. Ask for a new one." });
+      await startSession(req, res, account);
+      res.json({ account: publicAccount(account) });
+    } catch (error) {
+      if (error instanceof RangeError) return res.status(400).json({ error: error.message });
+      next(error);
+    }
+  });
+
+  // Deletes the logged-in account and its saved stats, after the password is confirmed.
+  router.post("/delete", signedIn(async (req, res, account) => {
+    if (!allow(clientAddress(req))) return res.status(429).json({ error: "Too many tries. Wait a minute and try again." });
+    if (!await verifyPassword(req.body?.password, await store.passwordHashFor(account.id))) {
+      return res.status(401).json({ error: "That password isn't right." });
+    }
+    await store.deleteAccount(account.id);
+    setSessionCookie(req, res, "", 0);
+    res.status(204).end();
+  }));
 
   // A signed-in browser's save: merged into the account's, and the combined save sent back.
   router.put("/state", signedIn(async (req, res, account) => {
