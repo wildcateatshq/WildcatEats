@@ -110,7 +110,8 @@ test("coins: a daily game pays its charge, an endless run pays 1 + 2 + ... per r
   assert.equal(endlessCoins(5, ENDLESS_COINS_PER_DAY), 0);
   const wallet = { endless: { a: { date: "2026-11-02", coins: 55 }, b: { date: "2026-11-01", coins: 30 } }, owned: { "color-ice": "2026-11-02" }, equipped: { colors: { id: "color-ice", at: 1 }, lightning: { id: "lightning-pink", at: 2 } } };
   assert.equal(endlessCoinsOn(wallet, "2026-11-02"), 55);
-  assert.deepEqual(coinBalance({ games: [{ charge: 60 }, { charge: 90 }], wallet }), { earned: 235, spent: 150, balance: 85 });
+  assert.deepEqual(coinBalance({ games: [{ charge: 60 }, { charge: 90 }], wallet: { ...wallet, owned: { "color-ice": { date: "2026-11-02", price: 150 } } } }),
+    { earned: 235, spent: 150, balance: 85 }, "an item costs what was paid for it, even if its price goes up later");
   assert.equal(equippedItem(wallet, "colors").id, "color-ice");
   assert.equal(equippedItem(wallet, "lightning").id, "lightning-gold", "an item that wasn't bought can't be in use");
   assert.equal(equippedItem(wallet, "visitors").id, "visitor-none");

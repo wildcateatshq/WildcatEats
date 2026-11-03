@@ -389,7 +389,8 @@ export function weatherForDay(date) {
 //     ENDLESS_COINS_PER_DAY a day from endless runs.
 // What's been earned and bought lives in the save (state.wallet), so it syncs with the account:
 //   wallet.endless  { runId: { date, coins } }  coins each endless run paid
-//   wallet.owned    { itemId: date }             items bought
+//   wallet.owned    { itemId: { date, price } }  items bought, and what they cost then (older
+//                                                saves have just the date)
 //   wallet.equipped { category: { id, at } }     what's in use, and when it was picked
 export const ENDLESS_COINS_PER_DAY = 150;
 
@@ -402,24 +403,24 @@ export const MARKET_CATEGORIES = [
 // Free items are what everyone starts with.
 export const MARKET_ITEMS = [
   { id: "visitor-none", category: "visitors", name: "Just the usual", price: 0 },
-  { id: "visitor-paper-plane", category: "visitors", name: "Paper plane", price: 100 },
-  { id: "visitor-balloon", category: "visitors", name: "Hot-air balloon", price: 150 },
-  { id: "visitor-rocket", category: "visitors", name: "Rocket", price: 200 },
-  { id: "visitor-whale", category: "visitors", name: "Sky whale", price: 250 },
-  { id: "visitor-dragon", category: "visitors", name: "Dragon", price: 300 },
-  { id: "visitor-ufo", category: "visitors", name: "UFO", price: 350 },
+  { id: "visitor-paper-plane", category: "visitors", name: "Paper plane", price: 150 },
+  { id: "visitor-balloon", category: "visitors", name: "Hot-air balloon", price: 250 },
+  { id: "visitor-rocket", category: "visitors", name: "Rocket", price: 300 },
+  { id: "visitor-whale", category: "visitors", name: "Sky whale", price: 400 },
+  { id: "visitor-dragon", category: "visitors", name: "Dragon", price: 500 },
+  { id: "visitor-ufo", category: "visitors", name: "UFO", price: 600 },
   { id: "color-gold", category: "colors", name: "Gold", price: 0, swatch: "#ffd86b" },
-  { id: "color-ice", category: "colors", name: "Ice", price: 150, swatch: "#7fdcff" },
-  { id: "color-rose", category: "colors", name: "Rose", price: 150, swatch: "#ff8fc8" },
-  { id: "color-lime", category: "colors", name: "Lime", price: 150, swatch: "#a8f06a" },
-  { id: "color-ember", category: "colors", name: "Ember", price: 200, swatch: "#ff8a4c" },
-  { id: "color-silver", category: "colors", name: "Silver", price: 250, swatch: "#dfe6ee" },
+  { id: "color-ice", category: "colors", name: "Ice", price: 250, swatch: "#7fdcff" },
+  { id: "color-rose", category: "colors", name: "Rose", price: 250, swatch: "#ff8fc8" },
+  { id: "color-lime", category: "colors", name: "Lime", price: 250, swatch: "#a8f06a" },
+  { id: "color-ember", category: "colors", name: "Ember", price: 350, swatch: "#ff8a4c" },
+  { id: "color-silver", category: "colors", name: "Silver", price: 400, swatch: "#dfe6ee" },
   { id: "lightning-gold", category: "lightning", name: "Gold", price: 0, swatch: "#ffd56a" },
-  { id: "lightning-blue", category: "lightning", name: "Electric blue", price: 100, swatch: "#6ab8ff" },
-  { id: "lightning-pink", category: "lightning", name: "Pink", price: 100, swatch: "#ff6ad5" },
-  { id: "lightning-green", category: "lightning", name: "Toxic green", price: 150, swatch: "#6aff7c" },
-  { id: "lightning-red", category: "lightning", name: "Red", price: 150, swatch: "#ff5a4c" },
-  { id: "lightning-rainbow", category: "lightning", name: "Rainbow", price: 250, swatch: "linear-gradient(90deg,#ff5a4c,#ffd84d,#6aff7c,#6ab8ff,#c46aff)" }
+  { id: "lightning-blue", category: "lightning", name: "Electric blue", price: 150, swatch: "#6ab8ff" },
+  { id: "lightning-pink", category: "lightning", name: "Pink", price: 150, swatch: "#ff6ad5" },
+  { id: "lightning-green", category: "lightning", name: "Toxic green", price: 250, swatch: "#6aff7c" },
+  { id: "lightning-red", category: "lightning", name: "Red", price: 250, swatch: "#ff5a4c" },
+  { id: "lightning-rainbow", category: "lightning", name: "Rainbow", price: 400, swatch: "linear-gradient(90deg,#ff5a4c,#ffd84d,#6aff7c,#6ab8ff,#c46aff)" }
 ];
 
 export const marketItem = id => MARKET_ITEMS.find(item => item.id === id) || null;
@@ -448,7 +449,8 @@ export function coinBalance(state) {
   const wallet = state.wallet || emptyWallet();
   const earned = (state.games || []).reduce((sum, game) => sum + dailyCoins(game), 0) +
     Object.values(wallet.endless || {}).reduce((sum, run) => sum + run.coins, 0);
-  const spent = Object.keys(wallet.owned || {}).reduce((sum, id) => sum + (marketItem(id)?.price || 0), 0);
+  // What each item cost when it was bought, so a later price change doesn't touch it.
+  const spent = Object.entries(wallet.owned || {}).reduce((sum, [id, bought]) => sum + (Number.isFinite(bought?.price) ? bought.price : marketItem(id)?.price || 0), 0);
   return { earned, spent, balance: earned - spent };
 }
 

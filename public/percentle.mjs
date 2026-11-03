@@ -717,7 +717,7 @@ function showMarket(category = MARKET_CATEGORIES[0].id) {
   dialog.querySelectorAll("[data-buy]").forEach(button => button.addEventListener("click", () => {
     const item = marketItem(button.dataset.buy);
     if (!item || coinBalance(state).balance < item.price) return;
-    wallet.owned[item.id] = easternDate();
+    wallet.owned[item.id] = { date: easternDate(), price: item.price };
     use(item.id);
     showMarket(category);
     showToast(`${item.name} is yours!`);
