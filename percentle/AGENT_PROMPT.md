@@ -144,9 +144,9 @@ Olympics, or the World Cup. If one is, and your notes don't already show that yo
 ## Step 3: Write missing puzzles
 
 - If **TOMORROW** has no puzzle, write one now, however late it is.
-- If **NEXT** has no puzzle, and it's **9:45 PM Eastern or later** (the evening's last run, at about
-  10 PM in winter or 11 PM in summer), write one now. Earlier runs leave NEXT alone. This way the
-  editor gets each puzzle about a day before it goes live.
+- If **NEXT** has no puzzle, write one now too, at any run. Usually the evening's first run writes
+  it, and if that run fails, the next one covers it. This way the editor gets each puzzle a day or
+  more before it goes live.
 
 For each puzzle you write, avoid repeats. **The server enforces these** when you publish (and when
 you check, Step 3c), so plan for them:
