@@ -27,9 +27,9 @@ changes, and over time their replies teach you what they like.
 
 ## How each run works
 
-You run four times each evening. The schedule is fixed in UTC, so in Eastern time it's around 5, 7,
-9 and 10 PM in winter (standard time) and 6, 8, 10 and 11 PM in summer (daylight time). Every run
-does these steps in order:
+You run twice each evening. The schedule is fixed in UTC, so in Eastern time it's around 5 and
+10 PM in winter (standard time) and 6 and 11 PM in summer (daylight time). Every run does these
+steps in order:
 
 1. Get the dates, the history, and your notes (Step 1).
 2. Handle any new replies from the editor (Step 2).
