@@ -323,6 +323,11 @@ Links always point at `CHARGLE_URL` (default `https://chargle.io`). Email goes t
 SMTP account (`SMTP_HOST`, `SMTP_PORT` 465 or 587, `SMTP_USER`, `SMTP_PASS`); see `percentle/mailer.js`. Without them a live server answers
 503 ("reset emails aren't set up yet"); a localhost server writes the link to its log instead.
 
+**Local testing:** a server started with `CHARGLE_DEV=1` (never set on the live site) adds
+`POST /dev-login` and `POST /dev-reset`: on localhost the page logs itself in to a test account
+(`local_tester`), and `?reset` also empties that account's save, so a reset starts fresh while
+staying logged in.
+
 **Privacy:** a short note (what's kept and why, and how to delete it) is linked from the log-in box
 and the stats dialog, and pops up once after a player first logs in or creates an account; the
 "seen" mark is saved with their stats, so it's once across devices. **Delete account** (in the stats

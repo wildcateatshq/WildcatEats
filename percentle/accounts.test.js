@@ -198,6 +198,29 @@ test("reset emails go through Resend when its key is set", async () => {
   assert.equal(createMailer({}).configured, false, "nothing set: not configured");
 });
 
+test("the local test account exists only on a server started for local testing", async t => {
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), "percentle-dev-"));
+  t.after(() => fs.rm(dir, { recursive: true, force: true }));
+  const store = createAccountStore({ filePath: path.join(dir, "accounts.json") });
+  await store.init();
+  const app = express();
+  app.use(express.json());
+  app.use("/live", createAccountsRouter(store, { dev: false }));
+  app.use("/local", createAccountsRouter(store, { dev: true }));
+  const server = app.listen(0);
+  t.after(() => server.close());
+  const url = `http://localhost:${server.address().port}`;
+  assert.equal((await fetch(`${url}/live/dev-login`, { method: "POST" })).status, 404, "not on the live site");
+  const login = await fetch(`${url}/local/dev-login`, { method: "POST" });
+  assert.equal((await login.json()).account.username, "local_tester");
+  const cookie = login.headers.get("set-cookie").split(";")[0];
+  const put = state => fetch(`${url}/local/state`, { method: "PUT", headers: { "Content-Type": "application/json", Cookie: cookie }, body: JSON.stringify({ state }) });
+  await put({ games: [{ date: "2026-11-01", score: 10, charge: 90 }] });
+  assert.equal((await fetch(`${url}/local/dev-reset`, { method: "POST", headers: { Cookie: cookie } })).status, 204);
+  assert.deepEqual((await (await put({})).json()).state.games, [], "reset empties the test account's save");
+  assert.equal((await (await fetch(`${url}/local/dev-login`, { method: "POST" })).json()).account.username, "local_tester", "the same account next time");
+});
+
 test("the stats spreadsheet counts new and total accounts per day", () => {
   const { columns, rows } = buildReport({ signups: [{ date: "2026-11-01", accounts: 2 }, { date: "2026-11-03", accounts: 1 }] }, "2026-11-03");
   assert.deepEqual(columns.slice(-2), ["New accounts", "Total accounts"]);

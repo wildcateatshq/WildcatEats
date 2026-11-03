@@ -32,8 +32,10 @@ const STORAGE_KEY = "percentle.v2";
 const stage = document.querySelector("#questionStage");
 const dialog = document.querySelector("#infoDialog");
 const toast = document.querySelector("#toast");
-// Local testing only: http://localhost:3000/percentle.html?reset clears saved progress and stats.
-if (location.hostname === "localhost" && new URLSearchParams(location.search).has("reset")) {
+// Local testing only: http://localhost:3000/percentle.html?reset clears saved progress and stats
+// (and, logged in to the local test account, that account's save too; see loadAccount).
+const LOCAL_RESET = location.hostname === "localhost" && new URLSearchParams(location.search).has("reset");
+if (LOCAL_RESET) {
   try { localStorage.removeItem(STORAGE_KEY); } catch {}
   // Only "reset" goes; other local testing options (?visitor=, ?weather=, ?holiday=) stay.
   const params = new URLSearchParams(location.search);
@@ -448,6 +450,15 @@ async function loadAccount() {
     const response = await fetch(`${ACCOUNTS_URL}/me`);
     if (!response.ok) throw new Error(`Account check failed (${response.status}).`);
     rememberAccount((await response.json()).account);
+    // Local testing on a server started with CHARGLE_DEV=1: log in to the local test account, and
+    // let ?reset start it over too.
+    if (location.hostname === "localhost") {
+      if (!account) {
+        const login = await fetch(`${ACCOUNTS_URL}/dev-login`, { method: "POST" });
+        if (login.ok) rememberAccount((await login.json()).account);
+      }
+      if (account && LOCAL_RESET) await fetch(`${ACCOUNTS_URL}/dev-reset`, { method: "POST" });
+    }
     if (!account) return;
   } catch {
     // Offline: carry on with this browser's save; it syncs on the next change.

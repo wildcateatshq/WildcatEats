@@ -389,6 +389,18 @@ function createAccountStore(options = {}) {
     return data.accounts.find(account => account.id === accountId)?.passwordHash || null;
   }
 
+  // Empties an account's saved stats (for local testing's ?reset).
+  async function clearState(accountId) {
+    if (pool) {
+      await pool.query("update percentle_accounts set state = null where id = $1", [accountId]);
+      return;
+    }
+    await queued(() => {
+      const account = data.accounts.find(item => item.id === accountId);
+      if (account) account.state = null;
+    });
+  }
+
   // New accounts per Eastern day, for the stats spreadsheet: [{ date, accounts }].
   async function dailySignups() {
     if (pool) {
@@ -408,7 +420,7 @@ function createAccountStore(options = {}) {
 
   return {
     init, createAccount, findByEmail, createSession, accountForSession, deleteSession, mergeState, dailySignups,
-    createReset, resetPassword, deleteAccount, passwordHashFor
+    createReset, resetPassword, deleteAccount, passwordHashFor, clearState
   };
 }
 

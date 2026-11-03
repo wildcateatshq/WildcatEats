@@ -1,5 +1,6 @@
 "use strict";
 
+const crypto = require("node:crypto");
 const express = require("express");
 const { createRateLimit } = require("./crowd-router");
 const { AccountTaken, RESET_MINUTES, hashPassword, hashToken, newReset, newSession, publicAccount, validatePassword, validateSignup, validateState, verifyPassword } = require("./accounts");
@@ -168,6 +169,28 @@ function createAccountsRouter(store, options = {}) {
     setSessionCookie(req, res, "", 0);
     res.status(204).end();
   }));
+
+  // Local testing only, on a server started with CHARGLE_DEV=1 (never set on the live site): the
+  // page on localhost logs itself in to a test account, and ?reset also clears that account's save.
+  if (options.dev ?? process.env.CHARGLE_DEV === "1") {
+    const DEV_EMAIL = "local@chargle.test";
+    router.post("/dev-login", async (req, res, next) => {
+      try {
+        let account = await store.findByEmail(DEV_EMAIL);
+        if (!account) {
+          account = await store.createAccount({ email: DEV_EMAIL, username: "local_tester", passwordHash: await hashPassword(crypto.randomUUID()) });
+        }
+        await startSession(req, res, account);
+        res.json({ account: publicAccount(account) });
+      } catch (error) {
+        next(error);
+      }
+    });
+    router.post("/dev-reset", signedIn(async (req, res, account) => {
+      await store.clearState(account.id);
+      res.status(204).end();
+    }));
+  }
 
   // A signed-in browser's save: merged into the account's, and the combined save sent back.
   router.put("/state", signedIn(async (req, res, account) => {
