@@ -14,6 +14,7 @@ button{color:inherit}
 /* Log in (top right, until the player is logged in) and the log-in / create-account dialog. */
 .login-button{height:38px;padding:0 12px;border:1px solid var(--charge);border-radius:8px;background:transparent;color:var(--charge);font:700 11px var(--mono);letter-spacing:1px;text-transform:uppercase;cursor:pointer;white-space:nowrap;transition:background .2s,color .2s}
 .login-button:hover{background:var(--charge);color:var(--charge-ink)}
+.market-button{display:inline-flex;align-items:center;gap:6px}.market-button .coin{font-size:13px}
 .login-button[hidden]{display:none}
 .account-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 16px}
 .account-tabs button{padding:9px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--muted);font:700 11px var(--mono);letter-spacing:1px;text-transform:uppercase;cursor:pointer}
@@ -506,6 +507,69 @@ body.dead .city:not(.skyward) .city-world{transition:none}
 .city .shooting-star{fill:none;stroke:#fffef8;stroke-width:2;stroke-linecap:round;stroke-dasharray:60 400;stroke-dashoffset:60;opacity:0}
 .city.skyward .shooting-star,body.dead .city .shooting-star{animation:shooting-star 7s ease-in 2.6s infinite}
 @keyframes shooting-star{0%{stroke-dashoffset:60;opacity:0}2%{opacity:1}9%{stroke-dashoffset:-340;opacity:0}100%{stroke-dashoffset:-340;opacity:0}}
+/* ---------- Market (percentle.mjs showMarket; items in game.mjs MARKET_ITEMS) ----------
+   Colors: the game's accent colors and the city's lights (hard mode stays purple). Lightning: the
+   supercharge bolt (not the storm's). Visitors: pixel art from city.mjs VISITOR_ART. */
+body[data-color="ice"]:not(.hard){--halo:#2ec4ff;--charge:#d9f6ff;--charge-glow:#3cc8ffcc;--charge-ink:#002a3a;--green:#7fdcff;--lime:#08222c;--lit:#f0fbff}
+body[data-color="ice"]:not(.hard) .city .w0{fill:#a6ecff}body[data-color="ice"]:not(.hard) .city .w1{fill:#7fd4ff}body[data-color="ice"]:not(.hard) .city .w2{fill:#e3f8ff}body[data-color="ice"]:not(.hard) .city .wn{fill:#c9f3ff}
+body[data-color="ice"]:not(.hard) .city-glow{background:radial-gradient(ellipse 60% 70% at 50% 100%,rgba(80,190,255,.4),transparent 70%)}
+body[data-color="ice"]:not(.hard) .city .billboard.on .bb-1{fill:#7fdcff;filter:drop-shadow(0 0 3px #3cc8ffcc)}body[data-color="ice"]:not(.hard) .city .billboard.on .bulb{fill:#f0fbff}
+body[data-color="rose"]:not(.hard){--halo:#ff5cb4;--charge:#ffe0f0;--charge-glow:#ff5cb4cc;--charge-ink:#3a0020;--green:#ff8fc8;--lime:#2e0a1c;--lit:#fff0f8}
+body[data-color="rose"]:not(.hard) .city .w0{fill:#ffb3da}body[data-color="rose"]:not(.hard) .city .w1{fill:#ff8fc8}body[data-color="rose"]:not(.hard) .city .w2{fill:#ffe3f2}body[data-color="rose"]:not(.hard) .city .wn{fill:#ffc9e4}
+body[data-color="rose"]:not(.hard) .city-glow{background:radial-gradient(ellipse 60% 70% at 50% 100%,rgba(255,110,180,.4),transparent 70%)}
+body[data-color="rose"]:not(.hard) .city .billboard.on .bb-1{fill:#ff8fc8;filter:drop-shadow(0 0 3px #ff5cb4cc)}body[data-color="rose"]:not(.hard) .city .billboard.on .bulb{fill:#fff0f8}
+body[data-color="lime"]:not(.hard){--halo:#86f03c;--charge:#e8ffd6;--charge-glow:#7cf03ccc;--charge-ink:#142a00;--green:#a8f06a;--lime:#16260a;--lit:#f6fff0}
+body[data-color="lime"]:not(.hard) .city .w0{fill:#c8ff9a}body[data-color="lime"]:not(.hard) .city .w1{fill:#a8f06a}body[data-color="lime"]:not(.hard) .city .w2{fill:#efffe0}body[data-color="lime"]:not(.hard) .city .wn{fill:#d8ffb8}
+body[data-color="lime"]:not(.hard) .city-glow{background:radial-gradient(ellipse 60% 70% at 50% 100%,rgba(140,240,90,.38),transparent 70%)}
+body[data-color="lime"]:not(.hard) .city .billboard.on .bb-1{fill:#a8f06a;filter:drop-shadow(0 0 3px #7cf03ccc)}body[data-color="lime"]:not(.hard) .city .billboard.on .bulb{fill:#f6fff0}
+body[data-color="ember"]:not(.hard){--halo:#ff7a3c;--charge:#ffe6d4;--charge-glow:#ff6a2ccc;--charge-ink:#3a1300;--green:#ff8a4c;--lime:#2e1206;--lit:#fff3ea}
+body[data-color="ember"]:not(.hard) .city .w0{fill:#ffb58a}body[data-color="ember"]:not(.hard) .city .w1{fill:#ff8a4c}body[data-color="ember"]:not(.hard) .city .w2{fill:#ffe2cc}body[data-color="ember"]:not(.hard) .city .wn{fill:#ffc7a3}
+body[data-color="ember"]:not(.hard) .city-glow{background:radial-gradient(ellipse 60% 70% at 50% 100%,rgba(255,120,60,.42),transparent 70%)}
+body[data-color="ember"]:not(.hard) .city .billboard.on .bb-1{fill:#ff8a4c;filter:drop-shadow(0 0 3px #ff6a2ccc)}body[data-color="ember"]:not(.hard) .city .billboard.on .bulb{fill:#fff3ea}
+body[data-color="silver"]:not(.hard){--halo:#c9d6e3;--charge:#f2f5f8;--charge-glow:#c9d6e3cc;--charge-ink:#1a2026;--green:#dfe6ee;--lime:#1c2228;--lit:#ffffff}
+body[data-color="silver"]:not(.hard) .city .w0{fill:#e6edf5}body[data-color="silver"]:not(.hard) .city .w1{fill:#c9d6e3}body[data-color="silver"]:not(.hard) .city .w2{fill:#ffffff}body[data-color="silver"]:not(.hard) .city .wn{fill:#dfe6ee}
+body[data-color="silver"]:not(.hard) .city-glow{background:radial-gradient(ellipse 60% 70% at 50% 100%,rgba(210,225,240,.35),transparent 70%)}
+body[data-color="silver"]:not(.hard) .city .billboard.on .bb-1{fill:#dfe6ee;filter:drop-shadow(0 0 3px #c9d6e3cc)}body[data-color="silver"]:not(.hard) .city .billboard.on .bulb{fill:#ffffff}
+body[data-lightning="blue"] .city-bolt:not(.outage){--bolt-glow:#6ab8ff}body[data-lightning="blue"] .city-bolt:not(.outage) .bolt-core{stroke:#e6f3ff}
+body[data-lightning="pink"] .city-bolt:not(.outage){--bolt-glow:#ff6ad5}body[data-lightning="pink"] .city-bolt:not(.outage) .bolt-core{stroke:#ffe6f7}
+body[data-lightning="green"] .city-bolt:not(.outage){--bolt-glow:#6aff7c}body[data-lightning="green"] .city-bolt:not(.outage) .bolt-core{stroke:#eaffec}
+body[data-lightning="red"] .city-bolt:not(.outage){--bolt-glow:#ff5a4c}body[data-lightning="red"] .city-bolt:not(.outage) .bolt-core{stroke:#ffe8e6}
+body[data-lightning="rainbow"] .city-bolt:not(.outage){--bolt-glow:#ffffff}body[data-lightning="rainbow"] .city-bolt:not(.outage) .bolt-glow{opacity:.5;animation:rainbow-stroke .6s linear infinite}
+@keyframes rainbow-stroke{0%{stroke:#ff5a4c}20%{stroke:#ffd84d}40%{stroke:#6aff7c}60%{stroke:#6ab8ff}80%{stroke:#c46aff}100%{stroke:#ff5a4c}}
+.visitor-art .pp-top{fill:#f4f7fb}.visitor-art .pp-fold{fill:#c9d3df}.visitor-art .pp-under{fill:#9aa7b6}
+.visitor-art .bl-red{fill:#e8473b}.visitor-art .bl-gold{fill:#ffd24d}.visitor-art .bl-rope{fill:#6b5a44}.visitor-art .bl-basket{fill:#8a5a2b}
+.visitor-art .rk-body{fill:#eef2f6}.visitor-art .rk-fin{fill:#e8473b}.visitor-art .rk-window{fill:#59b8ff}.visitor-art .rk-flame{fill:#ffb02e}
+.visitor-art .wh-body{fill:#3d6fa8}.visitor-art .wh-belly{fill:#a9c8e8}.visitor-art .wh-eye{fill:#0d1a2a}.visitor-art .wh-spout{fill:#cfeaff}
+.visitor-art .dg-body{fill:#3fae5a}.visitor-art .dg-belly{fill:#c8e86a}.visitor-art .dg-eye{fill:#ffd24d}.visitor-art .dg-wing-up,.visitor-art .dg-wing-down{fill:#2b7a40}
+.visitor-art .uf-hull{fill:#8a94a3}.visitor-art .uf-dome{fill:#a8f0dc;opacity:.85}.visitor-art .uf-glow{fill:#6dffa8;opacity:.35}.visitor-art .uf-light{fill:#7dffb0}
+.market-visitor .rk-flame{animation:plane-blink .2s steps(1) infinite}
+.market-visitor .dg-wing-up{animation:bird-up .45s steps(1) infinite}.market-visitor .dg-wing-down{animation:bird-down .45s steps(1) infinite}
+.market-visitor .uf-light{animation:plane-blink .3s steps(1) infinite}
+.market-visitor.visitor-fly-balloon svg,.market-visitor.visitor-fly-whale svg{animation:market-bob 3.2s ease-in-out infinite alternate}
+@keyframes market-bob{from{translate:0 -4px}to{translate:0 4px}}
+.market-tabs{position:sticky;top:-25px;z-index:2;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 -2px 14px;padding:8px 2px;background:var(--card)}
+.market-tabs button{padding:9px 4px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--muted);font:700 11px var(--mono);letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.market-tabs button[aria-selected="true"]{border-color:var(--charge);color:var(--ink);box-shadow:0 0 12px -4px var(--charge-glow)}
+.market-balance{display:flex;align-items:center;gap:8px;margin:0 0 4px;font:700 22px var(--mono);color:var(--ink)}
+.market-blurb{margin:0 0 12px}
+.market-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}
+.market-item{display:grid;gap:7px;justify-items:center;padding:12px 10px;border:1px solid var(--line);border-radius:8px;background:var(--paper);text-align:center}
+.market-item.equipped{border-color:var(--charge);box-shadow:0 0 14px -6px var(--charge-glow)}
+.market-preview{height:60px;width:100%;display:grid;place-items:center}
+.market-swatch{width:44px;height:44px;border-radius:50%;box-shadow:0 0 16px -2px currentColor}
+.market-bolt{width:22px;height:46px;clip-path:polygon(60% 0,0 58%,45% 58%,30% 100%,100% 38%,55% 38%,75% 0)}
+.market-none{font:500 11px var(--mono);color:var(--muted)}
+.market-name{font:700 13px var(--display);letter-spacing:.5px}
+.market-item button{width:100%;padding:8px;border:1px solid var(--charge);border-radius:6px;background:transparent;color:var(--charge);font:700 11px var(--mono);letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.market-item button.buy{background:var(--charge);color:var(--charge-ink)}
+.market-item button:disabled{border-color:var(--line);background:transparent;color:var(--muted);cursor:default}
+.coin{display:inline-grid;place-items:center;width:1em;height:1em;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fff3b0,#ffc93c 55%,#c98a12);box-shadow:inset 0 -2px 0 #a8700c55;flex:none}
+/* The coin total in the corner of the results, counting up to the new total. */
+.final-score{position:relative}
+.coin-total{position:absolute;top:0;right:0;display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:var(--card);font:700 14px var(--mono);color:var(--ink)}
+.coin-total small{font:500 10px var(--mono);color:var(--charge)}
+.coin-total.counting{border-color:var(--charge);box-shadow:0 0 16px -4px var(--charge-glow)}
+
 /* An endless run that runs out in daylight ends in a storm (city.mjs outOfCharge): a front of heavy
    clouds rolls in over the city, the sky turns slate, rain sweeps the whole screen, and the view
    rises into storm clouds with lightning flickering inside them instead of into space. */

@@ -379,3 +379,82 @@ export function weatherForDay(date) {
   }
   return null;
 }
+
+// ---------- Coins and the market ----------
+// Logged-in players spend coins in the market on looks: a visitor that flies over the city, the
+// game's colors, and the color of the supercharge lightning. Coins come from playing:
+//   - a daily puzzle pays its final charge in coins (finish on 60% and get 60; running out pays 0),
+//     with hard games counted at their regular-mode equivalent (statsCharge);
+//   - an endless run pays 1 coin for round 1, 2 for round 2, and so on (10 rounds pay 55), up to
+//     ENDLESS_COINS_PER_DAY a day from endless runs.
+// What's been earned and bought lives in the save (state.wallet), so it syncs with the account:
+//   wallet.endless  { runId: { date, coins } }  coins each endless run paid
+//   wallet.owned    { itemId: date }             items bought
+//   wallet.equipped { category: { id, at } }     what's in use, and when it was picked
+export const ENDLESS_COINS_PER_DAY = 150;
+
+export const MARKET_CATEGORIES = [
+  { id: "visitors", name: "Visitors", blurb: "Something of yours that flies over the city now and then." },
+  { id: "colors", name: "Colors", blurb: "The color of the battery, the buttons, and the city's lights. Hard mode stays purple." },
+  { id: "lightning", name: "Lightning", blurb: "The color of the bolt that strikes the city when you supercharge." }
+];
+
+// Free items are what everyone starts with.
+export const MARKET_ITEMS = [
+  { id: "visitor-none", category: "visitors", name: "Just the usual", price: 0 },
+  { id: "visitor-paper-plane", category: "visitors", name: "Paper plane", price: 100 },
+  { id: "visitor-balloon", category: "visitors", name: "Hot-air balloon", price: 150 },
+  { id: "visitor-rocket", category: "visitors", name: "Rocket", price: 200 },
+  { id: "visitor-whale", category: "visitors", name: "Sky whale", price: 250 },
+  { id: "visitor-dragon", category: "visitors", name: "Dragon", price: 300 },
+  { id: "visitor-ufo", category: "visitors", name: "UFO", price: 350 },
+  { id: "color-gold", category: "colors", name: "Gold", price: 0, swatch: "#ffd86b" },
+  { id: "color-ice", category: "colors", name: "Ice", price: 150, swatch: "#7fdcff" },
+  { id: "color-rose", category: "colors", name: "Rose", price: 150, swatch: "#ff8fc8" },
+  { id: "color-lime", category: "colors", name: "Lime", price: 150, swatch: "#a8f06a" },
+  { id: "color-ember", category: "colors", name: "Ember", price: 200, swatch: "#ff8a4c" },
+  { id: "color-silver", category: "colors", name: "Silver", price: 250, swatch: "#dfe6ee" },
+  { id: "lightning-gold", category: "lightning", name: "Gold", price: 0, swatch: "#ffd56a" },
+  { id: "lightning-blue", category: "lightning", name: "Electric blue", price: 100, swatch: "#6ab8ff" },
+  { id: "lightning-pink", category: "lightning", name: "Pink", price: 100, swatch: "#ff6ad5" },
+  { id: "lightning-green", category: "lightning", name: "Toxic green", price: 150, swatch: "#6aff7c" },
+  { id: "lightning-red", category: "lightning", name: "Red", price: 150, swatch: "#ff5a4c" },
+  { id: "lightning-rainbow", category: "lightning", name: "Rainbow", price: 250, swatch: "linear-gradient(90deg,#ff5a4c,#ffd84d,#6aff7c,#6ab8ff,#c46aff)" }
+];
+
+export const marketItem = id => MARKET_ITEMS.find(item => item.id === id) || null;
+
+export function emptyWallet() {
+  return { endless: {}, owned: {}, equipped: {} };
+}
+
+// What a finished daily game pays.
+export function dailyCoins(game) {
+  return Math.max(0, Math.round(statsCharge(game.charge ?? chargeLeft(game.score), game.hard)));
+}
+
+// What an endless run of `rounds` pays (1 + 2 + ... + rounds), given what endless runs have already
+// paid today.
+export function endlessCoins(rounds, paidToday = 0) {
+  return Math.max(0, Math.min((rounds * (rounds + 1)) / 2, ENDLESS_COINS_PER_DAY - paidToday));
+}
+
+export function endlessCoinsOn(wallet, date) {
+  return Object.values(wallet?.endless || {}).filter(run => run.date === date).reduce((sum, run) => sum + run.coins, 0);
+}
+
+// Coins earned, spent, and left.
+export function coinBalance(state) {
+  const wallet = state.wallet || emptyWallet();
+  const earned = (state.games || []).reduce((sum, game) => sum + dailyCoins(game), 0) +
+    Object.values(wallet.endless || {}).reduce((sum, run) => sum + run.coins, 0);
+  const spent = Object.keys(wallet.owned || {}).reduce((sum, id) => sum + (marketItem(id)?.price || 0), 0);
+  return { earned, spent, balance: earned - spent };
+}
+
+// The item in use for a category (the free one if nothing else is).
+export function equippedItem(wallet, category) {
+  const chosen = marketItem(wallet?.equipped?.[category]?.id);
+  const usable = chosen && (chosen.price === 0 || wallet.owned?.[chosen.id]);
+  return usable ? chosen : MARKET_ITEMS.find(item => item.category === category && item.price === 0);
+}

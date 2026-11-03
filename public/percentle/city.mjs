@@ -63,6 +63,72 @@ function random(seed) {
 
 const reducedMotion = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 
+// Visitors from the market (game.mjs MARKET_ITEMS): pixel art made of rectangles, facing right, as
+// { w, h, seconds (to cross), parts: [[class, [[x, y, w, h], ...]], ...] } in art pixels.
+const ellipseRows = (cx, cy, rx, ry, keep = () => true) => {
+  const rows = [];
+  for (let y = -ry; y <= ry; y++) {
+    const half = Math.round(rx * Math.sqrt(1 - (y / (ry + 0.5)) ** 2));
+    if (half > 0 && keep(cy + y)) rows.push([cx - half, cy + y, half * 2, 1]);
+  }
+  return rows;
+};
+const balloonStripes = () => {
+  const red = [], gold = [];
+  for (let y = 0; y <= 11; y++) {
+    const half = Math.round(6 * Math.sqrt(1 - ((y - 5.5) / 6.5) ** 2) * (y > 7 ? 1 - (y - 7) * 0.12 : 1));
+    for (let x = 6 - half; x < 6 + half; x++) (Math.floor(x / 2) % 2 ? gold : red).push([x, y, 1, 1]);
+  }
+  return [red, gold];
+};
+const [balloonRed, balloonGold] = balloonStripes();
+const VISITOR_ART = {
+  "paper-plane": { w: 16, h: 7, seconds: 10, parts: [
+    ["pp-top", [[11, 0, 2, 1], [8, 1, 6, 1], [4, 2, 11, 1]]],
+    ["pp-fold", [[0, 3, 16, 1]]],
+    ["pp-under", [[4, 4, 11, 1], [8, 5, 5, 1], [11, 6, 2, 1]]]
+  ] },
+  balloon: { w: 12, h: 18, seconds: 34, parts: [
+    ["bl-red", balloonRed],
+    ["bl-gold", balloonGold],
+    ["bl-rope", [[3, 12, 1, 3], [8, 12, 1, 3]]],
+    ["bl-basket", [[3, 15, 6, 3]]]
+  ] },
+  rocket: { w: 20, h: 8, seconds: 7, parts: [
+    ["rk-flame", [[0, 3, 4, 2], [1, 2, 3, 1], [1, 5, 3, 1]]],
+    ["rk-fin", [[4, 0, 3, 2], [4, 6, 3, 2], [15, 2, 1, 4], [16, 3, 2, 2]]],
+    ["rk-body", [[4, 2, 11, 4]]],
+    ["rk-window", [[11, 3, 2, 2]]]
+  ] },
+  whale: { w: 28, h: 14, seconds: 42, parts: [
+    ["wh-body", [...ellipseRows(16, 7, 11, 6, y => y < 10), [0, 2, 3, 2], [0, 9, 3, 2], [2, 4, 3, 6]]],
+    ["wh-belly", ellipseRows(16, 7, 11, 6, y => y >= 10)],
+    ["wh-eye", [[23, 6, 1, 1]]],
+    ["wh-spout", [[19, 0, 1, 1], [21, 0, 1, 1], [20, 1, 1, 1]]]
+  ] },
+  dragon: { w: 24, h: 12, seconds: 13, parts: [
+    ["dg-body", [[6, 6, 12, 3], [18, 4, 4, 4], [22, 6, 2, 2], [0, 7, 6, 1], [0, 6, 2, 1], [9, 9, 1, 2], [14, 9, 1, 2]]],
+    ["dg-belly", [[7, 8, 10, 1]]],
+    ["dg-eye", [[20, 5, 1, 1]]],
+    ["dg-wing-up", [[9, 1, 2, 5], [11, 0, 3, 6], [14, 2, 2, 4]]],
+    ["dg-wing-down", [[9, 9, 3, 2], [12, 9, 3, 3]]]
+  ] },
+  ufo: { w: 16, h: 8, seconds: 9, parts: [
+    ["uf-glow", [[5, 6, 6, 1], [6, 7, 4, 1]]],
+    ["uf-dome", [[6, 0, 4, 1], [5, 1, 6, 2]]],
+    ["uf-hull", [[2, 3, 12, 1], [0, 4, 16, 1], [2, 5, 12, 1]]],
+    ["uf-light", [[2, 4, 1, 1], [6, 4, 1, 1], [10, 4, 1, 1], [14, 4, 1, 1]]]
+  ] }
+};
+
+// A market visitor as a small picture, s screen pixels per art pixel (also for the market's previews).
+export function visitorSvg(kind, s = 3) {
+  const art = VISITOR_ART[kind];
+  if (!art) return "";
+  const parts = art.parts.map(([cls, rects]) => `<g class="${cls}">${rects.map(([x, y, w, h]) => `<rect x="${x * s}" y="${y * s}" width="${w * s}" height="${h * s}"/>`).join("")}</g>`).join("");
+  return `<svg class="visitor-art visitor-${kind}" width="${art.w * s}" height="${art.h * s}" viewBox="0 0 ${art.w * s} ${art.h * s}" shape-rendering="crispEdges">${parts}</svg>`;
+}
+
 // Where the moon is in its cycle at a moment: 0 new, 0.25 first quarter, 0.5 full, 0.75 last
 // quarter. It counts lunar months (29.53 days on average) from a known new moon; the real sky can
 // run up to about half a day either side of that average, which can't be seen at this size.
@@ -820,6 +886,14 @@ export function createCity(root) {
     return el;
   }
 
+  // The player's market visitor crossing the sky at height y (screen pixels).
+  function marketVisitor(kind, y) {
+    const art = VISITOR_ART[kind];
+    if (!art || !lively()) return;
+    const s = W < 600 ? 2 : 3;
+    drift(`market-visitor visitor-fly-${kind}`, visitorSvg(kind, s), y, art.w * s, art.seconds * (0.9 + Math.random() * 0.2));
+  }
+
   // A shooting star: a quick streak of light with a fading tail, high in the sky.
   function shootingStar(y) {
     if (!lively()) return;
@@ -1021,6 +1095,7 @@ export function createCity(root) {
     birds,
     outOfCharge,
     ufo,
+    marketVisitor,
     strike,
     fireworks,
     firework,

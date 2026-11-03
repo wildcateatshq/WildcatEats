@@ -7,6 +7,13 @@ import {
   chargeTrack,
   chargeLeft,
   statsCharge,
+  coinBalance,
+  dailyCoins,
+  endlessCoins,
+  endlessCoinsOn,
+  equippedItem,
+  ENDLESS_COINS_PER_DAY,
+  MARKET_ITEMS,
   formatValue,
   fromPosition,
   roundToScale,
@@ -90,6 +97,26 @@ test("typing a guess follows the scale's digits and decimals", () => {
   assert.equal(type(18.5, { min: 1, max: 36 }, "194"), "19.4");
   assert.equal(type(70000, { min: 20000, max: 120000 }, "65000"), "65000");
   assert.equal(type(70000, { min: 20000, max: 120000 }, "6.5"), "65", "no decimals on a scale that steps by 100");
+});
+
+test("coins: a daily game pays its charge, an endless run pays 1 + 2 + ... per round, up to a daily limit", () => {
+  assert.equal(dailyCoins({ charge: 60 }), 60, "finish on 60% and get 60");
+  assert.equal(dailyCoins({ charge: 59.6 }), 60);
+  assert.equal(dailyCoins({ charge: 40, hard: true }), 70, "hard games pay their regular-mode equivalent");
+  assert.equal(dailyCoins({ charge: -12 }), 0, "running out pays nothing");
+  assert.equal(endlessCoins(1), 1);
+  assert.equal(endlessCoins(10), 55);
+  assert.equal(endlessCoins(20, 120), ENDLESS_COINS_PER_DAY - 120, "no more than the day's endless limit");
+  assert.equal(endlessCoins(5, ENDLESS_COINS_PER_DAY), 0);
+  const wallet = { endless: { a: { date: "2026-11-02", coins: 55 }, b: { date: "2026-11-01", coins: 30 } }, owned: { "color-ice": "2026-11-02" }, equipped: { colors: { id: "color-ice", at: 1 }, lightning: { id: "lightning-pink", at: 2 } } };
+  assert.equal(endlessCoinsOn(wallet, "2026-11-02"), 55);
+  assert.deepEqual(coinBalance({ games: [{ charge: 60 }, { charge: 90 }], wallet }), { earned: 235, spent: 150, balance: 85 });
+  assert.equal(equippedItem(wallet, "colors").id, "color-ice");
+  assert.equal(equippedItem(wallet, "lightning").id, "lightning-gold", "an item that wasn't bought can't be in use");
+  assert.equal(equippedItem(wallet, "visitors").id, "visitor-none");
+  for (const category of ["visitors", "colors", "lightning"]) {
+    assert.equal(MARKET_ITEMS.filter(item => item.category === category && item.price === 0).length, 1, `one free ${category} item to start with`);
+  }
 });
 
 test("a hard game counts in stats as the charge the same guesses would leave in regular mode", () => {

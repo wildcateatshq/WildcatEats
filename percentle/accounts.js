@@ -115,9 +115,21 @@ function mergeStates(saved, incoming) {
     for (const [key, value] of Object.entries(x)) out[key] = higher(value, out[key]);
     return out;
   };
+  // The market wallet: coins from every endless run on either device, everything bought on either,
+  // and in each category whichever device picked something most recently.
+  const walletA = isObject(a.wallet) ? a.wallet : {}, walletB = isObject(b.wallet) ? b.wallet : {};
+  const equipped = { ...(walletB.equipped || {}) };
+  for (const [category, pick] of Object.entries(walletA.equipped || {})) {
+    if (!equipped[category] || (pick?.at ?? 0) >= (equipped[category]?.at ?? 0)) equipped[category] = pick;
+  }
   return {
     ...b,
     ...a,
+    wallet: {
+      endless: { ...(walletB.endless || {}), ...(walletA.endless || {}) },
+      owned: { ...(walletB.owned || {}), ...(walletA.owned || {}) },
+      equipped
+    },
     games: [...games.values()].sort((x, y) => x.date.localeCompare(y.date)),
     progress,
     achievements: { ...(b.achievements || {}), ...(a.achievements || {}) },

@@ -329,6 +329,22 @@ and the stats dialog, and pops up once after a player first logs in or creates a
 dialog, password required, `POST /delete`) removes the account, its saved stats, sessions, and
 reset links.
 
+### Market
+Logged-in players get a **Market** button at the top right (where Log in was; never both) to spend
+coins on looks, in three tabs: **Visitors** (something of theirs that flies over the city on about 3
+questions in 10: a paper plane, hot-air balloon, rocket, sky whale, dragon, or UFO; pixel art in
+`city.mjs` `VISITOR_ART`), **Colors** (the battery, buttons, and city lights in Ice, Rose, Lime, Ember,
+or Silver; hard mode stays purple), and **Lightning** (the supercharge bolt in blue, pink, green, red,
+or rainbow). Items and prices are `MARKET_ITEMS` in `game.mjs`. Coins: a daily puzzle pays its final
+charge (60% pays 60; hard games at their regular-mode equivalent; running out pays 0), and an
+endless run pays 1 + 2 + ... per round survived, up to 150 a day from endless. Every game played
+counts, including ones from before the market. The wallet (`state.wallet`: endless payouts, items
+owned, and what's in use) is part of the save, so it syncs with the account; `mergeStates` keeps
+every payout and purchase from both devices and the most recent pick in each tab. The results show
+the coin total in their top corner, counting up to the new total after a game; it opens the market
+(or log-in). Coins are kept in the browser's save, so a determined player could edit them; it's
+only looks.
+
 ### Tests
 
 Run the scoring, Eastern-date, puzzle-validation, puzzle API, and crowd tests with `npm test`.

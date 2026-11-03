@@ -1,5 +1,6 @@
 import { achievementsForGame, ACHIEVEMENTS, formatValue, fromPosition, roundToScale, scaleDecimals, scaleOf, scaleStep, toPosition, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, statsCharge, easternDate, endlessClock, finalCharge, weatherForDay, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
-import { createCity } from "/percentle/city.mjs";
+import { createCity, visitorSvg } from "/percentle/city.mjs";
+import { MARKET_CATEGORIES, MARKET_ITEMS, coinBalance, dailyCoins, emptyWallet, endlessCoins, endlessCoinsOn, equippedItem, marketItem } from "/percentle/game.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
 const GAME_NAME = "Chargle";
@@ -175,6 +176,7 @@ const VISITORS = [
   { name: "birds", chance: 0.45, fits: sky => sky.hour !== null && [5, 6, 7, 17, 18, 19].includes(Math.floor(((sky.hour % 24) + 24) % 24)) }
 ];
 const VISITOR_GAP_MS = 25000;
+const MARKET_VISITOR_CHANCE = 0.3;
 // Local testing only: http://localhost:3010/?clock=13 starts endless runs that many hours later
 // (13 = 10 AM), to see the daytime city without playing through the night.
 const CLOCK_SHIFT = location.hostname === "localhost" ? Number(new URLSearchParams(location.search).get("clock")) || 0 : 0;
@@ -189,8 +191,11 @@ function maybeFlyPlane() {
   let visitor = FORCED_VISITOR;
   if (!visitor) {
     if (Date.now() - lastVisitorAt < VISITOR_GAP_MS) return;
+    // A visitor bought in the market comes by on about 3 questions in 10.
+    const mine = equippedItem(state.wallet, "visitors");
+    if (mine.price > 0 && Math.random() < MARKET_VISITOR_CHANCE) visitor = `market:${mine.id.replace("visitor-", "")}`;
     let roll = Math.random();
-    visitor = VISITORS.filter(v => v.fits(sky)).find(v => (roll -= v.chance) < 0)?.name;
+    visitor ||= VISITORS.filter(v => v.fits(sky)).find(v => (roll -= v.chance) < 0)?.name;
     if (!visitor) return;
   }
   visitorTimer = setTimeout(() => {
@@ -205,6 +210,7 @@ function maybeFlyPlane() {
     if (visitor === "plane") city.plane(y);
     else if (visitor === "shootingStar") city.shootingStar(Math.max(20, y - 60));
     else if (visitor === "birds") city.birds(y);
+    else if (visitor.startsWith("market:")) city.marketVisitor(visitor.slice("market:".length), y);
     else city[visitor]?.();
   }, FORCED_VISITOR ? 1200 : 1500 + Math.random() * 6000);
 }
@@ -345,6 +351,8 @@ function normalizeState(stored) {
   if (!stored.achievements || typeof stored.achievements !== "object") stored.achievements = {};
   if (!stored.endless || typeof stored.endless !== "object") stored.endless = { best: {}, allTime: 0, runs: 0 };
   stored.endless.best ??= {};
+  if (!stored.wallet || typeof stored.wallet !== "object") stored.wallet = emptyWallet();
+  for (const key of ["endless", "owned", "equipped"]) if (!stored.wallet[key] || typeof stored.wallet[key] !== "object") stored.wallet[key] = {};
   stored.endless.hardBest ??= {};
   stored.endless.hardAllTime ??= 0;
   for (const progress of Object.values(stored.progress)) {
@@ -387,7 +395,9 @@ function rememberAccount(next) {
   } catch {
     // Without storage the page just asks the server again next time.
   }
+  // Log in until the player is logged in; then the market instead. Never both.
   document.querySelector("#loginButton").hidden = Boolean(next);
+  document.querySelector("#marketButton").hidden = !next;
 }
 
 function scheduleAccountSync() {
@@ -417,6 +427,7 @@ async function syncAccount({ apply = false, keepalive = false } = {}) {
     if (apply) {
       const endlessRuns = Object.fromEntries(Object.entries(state.progress).filter(([key]) => isEndlessKey(key)));
       state = normalizeState({ ...body.state, progress: { ...body.state.progress, ...endlessRuns } });
+      applyCosmetics();
       try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       } catch (error) {
@@ -641,6 +652,95 @@ function showDeleteAccount() {
   });
 }
 
+// ---------- Market ----------
+// Looks bought with coins (game.mjs MARKET_ITEMS), for logged-in players: the Market button sits
+// where Log in was. A category's tabs sit at the top; buying an item puts it to use straight away.
+function applyCosmetics() {
+  const pick = category => equippedItem(state.wallet, category).id.split("-").slice(1).join("-");
+  const color = pick("colors"), lightning = pick("lightning");
+  if (color === "gold") delete document.body.dataset.color;
+  else document.body.dataset.color = color;
+  if (lightning === "gold") delete document.body.dataset.lightning;
+  else document.body.dataset.lightning = lightning;
+}
+
+function marketPreview(item) {
+  if (item.category === "visitors") {
+    const kind = item.id.replace("visitor-", "");
+    return kind === "none" ? '<span class="market-none">Planes, birds and blimps as usual</span>' : visitorSvg(kind, 2);
+  }
+  if (item.category === "lightning") return `<span class="market-bolt" style="background:${item.swatch}"></span>`;
+  return `<span class="market-swatch" style="background:${item.swatch};color:${item.swatch}"></span>`;
+}
+
+function showMarket(category = MARKET_CATEGORIES[0].id) {
+  const { balance } = coinBalance(state);
+  const wallet = state.wallet;
+  const inUse = equippedItem(wallet, category);
+  const about = MARKET_CATEGORIES.find(group => group.id === category);
+  const cards = MARKET_ITEMS.filter(item => item.category === category).map(item => {
+    const owned = item.price === 0 || Boolean(wallet.owned[item.id]);
+    const using = inUse.id === item.id;
+    const button = using ? '<button type="button" disabled>In use</button>'
+      : owned ? `<button type="button" data-use="${item.id}">Use</button>`
+      : item.price <= balance ? `<button type="button" class="buy" data-buy="${item.id}">Buy · ${item.price}</button>`
+      : `<button type="button" disabled>${item.price} coins</button>`;
+    return `<article class="market-item${using ? " equipped" : ""}"><div class="market-preview">${marketPreview(item)}</div>
+        <span class="market-name">${escapeHtml(item.name)}</span>${button}</article>`;
+  }).join("");
+  openDialog("Market", `<p class="market-balance"><span class="coin" aria-hidden="true"></span>${balance} coins</p>
+    <p class="account-note">Earn coins by playing: a daily puzzle pays the charge you finish with (60% pays 60), and an endless run pays 1 coin for round 1, 2 for round 2, and so on, up to 150 a day.</p>
+    <div class="market-tabs" role="tablist">${MARKET_CATEGORIES.map(group => `<button type="button" role="tab" data-tab="${group.id}" aria-selected="${group.id === category}">${group.name}</button>`).join("")}</div>
+    <p class="market-blurb">${escapeHtml(about.blurb)}</p>
+    <div class="market-grid">${cards}</div>`);
+  dialog.querySelectorAll("[data-tab]").forEach(tab => tab.addEventListener("click", () => showMarket(tab.dataset.tab)));
+  const use = id => {
+    wallet.equipped[marketItem(id).category] = { id, at: Date.now() };
+    applyCosmetics();
+    save();
+  };
+  dialog.querySelectorAll("[data-use]").forEach(button => button.addEventListener("click", () => {
+    use(button.dataset.use);
+    showMarket(category);
+  }));
+  dialog.querySelectorAll("[data-buy]").forEach(button => button.addEventListener("click", () => {
+    const item = marketItem(button.dataset.buy);
+    if (!item || coinBalance(state).balance < item.price) return;
+    wallet.owned[item.id] = easternDate();
+    use(item.id);
+    showMarket(category);
+    showToast(`${item.name} is yours!`);
+  }));
+}
+
+// The coin total for the corner of the results: what it was before this game, counting up to now.
+function coinTotalMarkup(earned) {
+  const { balance } = coinBalance(state);
+  return `<button type="button" class="coin-total" id="coinTotal" data-from="${balance - earned}" data-to="${balance}" aria-label="${balance} coins${earned ? `, ${earned} from this game` : ""}">
+      <span class="coin" aria-hidden="true"></span><span class="coin-count">${balance}</span>${earned ? `<small>+${earned}</small>` : ""}</button>`;
+}
+
+function countUpCoins(animate) {
+  const total = document.querySelector("#coinTotal");
+  if (!total) return;
+  total.addEventListener("click", () => (account ? showMarket() : showLogin()));
+  const from = Number(total.dataset.from), to = Number(total.dataset.to);
+  const count = total.querySelector(".coin-count");
+  if (!animate || from === to || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  count.textContent = from;
+  setTimeout(() => {
+    total.classList.add("counting");
+    const start = performance.now(), duration = Math.min(1600, 500 + (to - from) * 6);
+    const step = now => {
+      const t = Math.min(1, (now - start) / duration);
+      count.textContent = Math.round(from + (to - from) * (1 - (1 - t) ** 3));
+      if (t < 1) requestAnimationFrame(step);
+      else total.classList.remove("counting");
+    };
+    requestAnimationFrame(step);
+  }, 700);
+}
+
 // The account line at the top of the stats dialog: who's logged in, or an invitation to.
 function accountLine() {
   return account
@@ -753,6 +853,9 @@ function isTodayFinished() {
     state.games.some(game => game.date === today);
 }
 
+// Whether today's game was just finished (its coins count up when the results first show).
+let freshDaily = false;
+
 function recordTodayIfComplete(progress, notify = true) {
   // Only the daily puzzle counts here; endless runs keep their own records.
   if (endlessMode) return;
@@ -764,6 +867,7 @@ function recordTodayIfComplete(progress, notify = true) {
   const charge = finalCharge(progress.guesses, questions, rate);
   state.games.push({ date: today, score, charge, ...(progress.hard ? { hard: true } : {}) });
   state.games.sort((a, b) => a.date.localeCompare(b.date));
+  freshDaily = notify;
   const supercharged = progress.guesses.filter((guess, i) => pointsOff(guess, questions[i].answer) === 0).length;
   unlockAchievements([
     ...achievementsForGame({ charge, out: charge < 0, supercharged, hard: Boolean(progress.hard) }),
@@ -1283,11 +1387,17 @@ function renderResults() {
   const out = isOutOfCharge(progress.guesses, currentQuestions, rate);
   const charge = finalCharge(progress.guesses, currentQuestions, rate);
   const animate = animateResults && !out;
+  // The coins count up on the first showing after the game, out of charge or not.
+  const animateCoins = freshDaily;
+  freshDaily = false;
   animateResults = false;
+  // Today's game pays its charge in coins (practice replays don't).
+  const todaysGame = !practiceMode && state.games.find(game => game.date === currentDate);
+  const coins = coinTotalMarkup(todaysGame ? dailyCoins(todaysGame) : 0);
   const headline = out
-    ? `<div class="final-score dead-score reveal"><div class="result-battery-wrap">${batteryMarkup("result-battery dead-battery", null, 0)}</div>
+    ? `<div class="final-score dead-score reveal">${coins}<div class="result-battery-wrap">${batteryMarkup("result-battery dead-battery", null, 0)}</div>
       <h2 class="out-title">Out of charge</h2><p class="out-where">Died on question ${answered} of ${currentQuestions.length}</p></div>`
-    : `<div class="final-score reveal"><span class="answer-label" id="resultLabel">${hard ? "HARD MODE · " : ""}${currentDate === today ? "" : "PRACTICE "}CHARGE LEFT</span>
+    : `<div class="final-score reveal">${coins}<span class="answer-label" id="resultLabel">${hard ? "HARD MODE · " : ""}${currentDate === today ? "" : "PRACTICE "}CHARGE LEFT</span>
       <div class="result-battery-wrap">${batteryMarkup("result-battery", "resultBattery", animate ? 100 : charge)}</div></div>`;
   stage.innerHTML = `${headline}
     ${practiceMode ? "" : `<section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">How you stack up${hard ? " · Hard mode" : ""}</h3><p class="crowd-copy">Your charge is added anonymously. Never your guesses, name, or account.</p><p class="crowd-status">Seeing how you stack up…</p></section>`}
@@ -1296,6 +1406,7 @@ function renderResults() {
     <button class="next-button secondary-button" id="statsInline">Your stats &amp; archives ${ICONS.right}</button>`;
   setCounterLabel(out ? "Power lost" : "Puzzle complete");
   renderRecap(progress);
+  countUpCoins(animateCoins);
   document.querySelector("#shareButton").addEventListener("click", () => {
     sendStat("event", { kind: "share" });
     shareResult(charge, progress, out);
@@ -1672,6 +1783,9 @@ async function startEndless() {
   return true;
 }
 
+// Whether the endless run just ended (its coins count up on this showing).
+let freshRun = false;
+
 // End of a run: rounds survived, personal bests, and how the best compares this period.
 function renderEndlessResults() {
   const progress = progressFor();
@@ -1683,7 +1797,12 @@ function renderEndlessResults() {
   const bests = endlessHard ? state.endless.hardBest : state.endless.best;
   const previousBest = bests[period] ?? 0;
   if (!progress.recorded) {
-    progress.recorded = { rounds, newBest: rounds > previousBest };
+    // The run's coins: 1 for round 1, 2 for round 2... up to the day's endless limit.
+    const date = easternDate();
+    const coins = endlessCoins(rounds, endlessCoinsOn(state.wallet, date));
+    state.wallet.endless[crypto.randomUUID()] = { date, coins };
+    progress.recorded = { rounds, newBest: rounds > previousBest, coins };
+    freshRun = true;
     state.endless.runs++;
     sendStat("event", { kind: "endless" });
     bests[period] = Math.max(previousBest, rounds);
@@ -1695,9 +1814,11 @@ function renderEndlessResults() {
   }
   const { newBest } = progress.recorded;
   const best = bests[period];
+  const countCoins = freshRun;
+  freshRun = false;
   const modeLabel = endlessHard ? " · Hard mode" : "";
   const inHard = endlessHard ? " in hard mode" : "";
-  stage.innerHTML = `<div class="final-score dead-score reveal"><div class="result-battery-wrap">${batteryMarkup("result-battery dead-battery", null, 0)}</div>
+  stage.innerHTML = `<div class="final-score dead-score reveal">${coinTotalMarkup(progress.recorded.coins ?? 0)}<div class="result-battery-wrap">${batteryMarkup("result-battery dead-battery", null, 0)}</div>
       <h2 class="out-title">${out ? "Run over" : "Bank cleared"}</h2><p class="out-where">Survived ${rounds} round${rounds === 1 ? "" : "s"}</p>
       <p class="endless-best${newBest ? " new" : ""}">${newBest ? `New personal best${inHard}!` : `Personal best${inHard} this period: ${best}`}</p></div>
     <section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">How you stack up · Endless${modeLabel}</h3><p class="crowd-status">Comparing your best run…</p></section>
@@ -1706,6 +1827,7 @@ function renderEndlessResults() {
     <button class="next-button secondary-button" id="todayButton">Back to today's puzzle</button>`;
   setCounterLabel("Run over");
   renderRecap(progress);
+  countUpCoins(countCoins);
   document.querySelector("#againButton").addEventListener("click", async () => {
     if (await startEndless()) render();
   });
@@ -1930,6 +2052,7 @@ document.querySelector("#returnButton").addEventListener("click", () => {
 });
 document.querySelector("#achievementsButton").addEventListener("click", showAchievements);
 document.querySelector("#loginButton").addEventListener("click", () => showLogin());
+document.querySelector("#marketButton").addEventListener("click", () => showMarket());
 // A change still waiting to go to the account goes before the page closes.
 window.addEventListener("pagehide", () => { if (accountSyncTimer) syncAccount({ keepalive: true }); });
 document.querySelector("#hardSwitch").addEventListener("click", toggleHardMode);
@@ -1955,6 +2078,7 @@ save();
 render();
 showStartScreen();
 rememberAccount(account);
+applyCosmetics();
 // A password-reset email's link: take the token out of the address bar and ask for the new password.
 const passwordToken = new URLSearchParams(location.search).get("password-token");
 if (passwordToken) {

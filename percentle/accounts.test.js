@@ -43,6 +43,15 @@ test("two devices' saves merge without losing anything", () => {
   assert.equal(merged.endless.runs, 5);
   assert.equal(merged.endless.hardAllTime, 3);
   assert.deepEqual(mergeStates(null, laptop).games, laptop.games, "a new account takes the device's save");
+
+  const wallets = mergeStates(
+    { wallet: { endless: { runA: { date: "2026-11-01", coins: 55 } }, owned: { "color-ice": "2026-11-01" }, equipped: { colors: { id: "color-ice", at: 100 } } } },
+    { wallet: { endless: { runB: { date: "2026-11-02", coins: 10 } }, owned: { "lightning-pink": "2026-11-02" }, equipped: { colors: { id: "color-gold", at: 200 }, lightning: { id: "lightning-pink", at: 150 } } } }
+  ).wallet;
+  assert.deepEqual(Object.keys(wallets.endless).sort(), ["runA", "runB"], "coins from runs on both devices");
+  assert.deepEqual(Object.keys(wallets.owned).sort(), ["color-ice", "lightning-pink"], "items bought on both devices");
+  assert.equal(wallets.equipped.colors.id, "color-gold", "the most recent pick wins");
+  assert.equal(wallets.equipped.lightning.id, "lightning-pink");
 });
 
 test("players sign up, log in on another device, sync their save, and log out", async t => {
