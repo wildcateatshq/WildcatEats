@@ -14,7 +14,7 @@ button{color:inherit}
 /* Log in (top right, until the player is logged in) and the log-in / create-account dialog. */
 .login-button{height:38px;padding:0 12px;border:1px solid var(--charge);border-radius:8px;background:transparent;color:var(--charge);font:700 11px var(--mono);letter-spacing:1px;text-transform:uppercase;cursor:pointer;white-space:nowrap;transition:background .2s,color .2s}
 .login-button:hover{background:var(--charge);color:var(--charge-ink)}
-.market-button{display:inline-flex;align-items:center;gap:6px}.market-button .coin{font-size:13px}
+.icon-button[hidden]{display:none}
 .login-button[hidden]{display:none}
 .account-tabs{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:0 0 16px}
 .account-tabs button{padding:9px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--muted);font:700 11px var(--mono);letter-spacing:1px;text-transform:uppercase;cursor:pointer}
