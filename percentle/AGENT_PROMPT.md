@@ -371,6 +371,11 @@ How to set the scale:
 - **Precision is automatic.** Guesses step by about a thousandth of the range: by 100 on a
   100,000-wide salary scale, by 0.01 on a 1–10 rating, by 0.1 on the ACT. Give the exact answer
   from your source; the server rounds it to the step.
+- **Counts are whole numbers.** If the answer can only be a whole number (Grammys won, time
+  zones, touchdown passes, games in a streak, countries, people), add `"whole": true` to the scale
+  and use a whole-number `min` and `max`. Players then guess only whole numbers. The server
+  refuses a `whole` answer that isn't a whole number. Leave it off for averages, rates, money and
+  ratings, which can have decimals.
 - Write the question for the scale ("What was the median annual pay for registered nurses in the
   U.S. in 2024?"), not "what percentage". The answer's units must match the scale's.
 - A miss drains the battery by the share of the range it misses, just like a percentage miss, so

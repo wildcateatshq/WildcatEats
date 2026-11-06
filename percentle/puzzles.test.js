@@ -74,6 +74,19 @@ test("a question can have its own scale, with its answer rounded to the scale's 
   assert.throws(() => validatePuzzle(backwards), /Question 1 scale needs a min of 0 or more and a larger max/);
 });
 
+test("a whole-number scale keeps its flag and refuses answers that aren't whole numbers", () => {
+  const puzzle = validPuzzle();
+  puzzle[0] = { ...puzzle[0], answer: 11, scale: { min: 1, max: 20, unit: "time zones", whole: true } };
+  assert.deepEqual(validatePuzzle(puzzle)[0].scale, { min: 1, max: 20, unit: "time zones", whole: true });
+
+  const fractional = validPuzzle();
+  fractional[0] = { ...fractional[0], answer: 11.5, scale: { min: 1, max: 20, whole: true } };
+  assert.throws(() => validatePuzzle(fractional), /Question 1 answer must be a whole number/);
+  const fractionalEnds = validPuzzle();
+  fractionalEnds[0] = { ...fractionalEnds[0], answer: 11, scale: { min: 0.5, max: 20, whole: true } };
+  assert.throws(() => validatePuzzle(fractionalEnds), /whole-number min and max/);
+});
+
 test("any category mix is allowed, but each puzzle has exactly five questions", () => {
   const allSports = validPuzzle().map((item, index) => ({ ...item, category: "Sports", text: `What percentage of sports thing ${index} happened?` }));
   assert.equal(validatePuzzle(allSports).length, 5);

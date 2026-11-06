@@ -78,12 +78,14 @@ function validatePuzzle(questions) {
 // `scale`: { min, max, unit, prefix }, like 1 to 36 for an average ACT score, or 20000 to 120000
 // with prefix "$" for a salary. Guesses step by about a thousandth of the range, rounded to a power
 // of ten (0.1 on 0–100, 100 on a 100,000-wide range, 0.01 on 1–10); public/percentle/game.mjs
-// (scaleStep) does the same for players.
+// (scaleStep) does the same for players. A scale with `whole: true` is for counts (Grammys won,
+// time zones): its answer must be a whole number and guesses step by at least 1.
 const PERCENT_SCALE = { min: 0, max: 100 };
 const SCALE_ANSWER_MARGIN = 0.1;
 
-function scaleStep({ min, max }) {
-  return 10 ** Math.round(Math.log10((max - min) / 1000));
+function scaleStep({ min, max, whole }) {
+  const step = 10 ** Math.round(Math.log10((max - min) / 1000));
+  return whole ? Math.max(1, step) : step;
 }
 
 function roundToStep(value, scale) {
@@ -101,10 +103,17 @@ function validateScale(scale, label, problems) {
     problems.push(`${label} scale needs a min of 0 or more and a larger max.`);
     return null;
   }
-  const unit = scale.unit ?? "", prefix = scale.prefix ?? "";
+  const unit = scale.unit ?? "", prefix = scale.prefix ?? "", whole = scale.whole ?? false;
   if (typeof unit !== "string" || unit.trim().length > 16) problems.push(`${label} scale unit must be text of at most 16 characters.`);
   if (typeof prefix !== "string" || prefix.trim().length > 3) problems.push(`${label} scale prefix must be text of at most 3 characters, like "$".`);
-  return { min, max, ...(String(unit).trim() ? { unit: String(unit).trim() } : {}), ...(String(prefix).trim() ? { prefix: String(prefix).trim() } : {}) };
+  if (typeof whole !== "boolean") problems.push(`${label} scale whole must be true or false.`);
+  if (whole === true && (!Number.isInteger(min) || !Number.isInteger(max))) problems.push(`${label} scale with whole: true needs a whole-number min and max.`);
+  return {
+    min, max,
+    ...(String(unit).trim() ? { unit: String(unit).trim() } : {}),
+    ...(String(prefix).trim() ? { prefix: String(prefix).trim() } : {}),
+    ...(whole === true ? { whole: true } : {})
+  };
 }
 
 // Checks a list of questions (a daily puzzle's or a batch for the endless bank) and reports every
@@ -133,6 +142,10 @@ function validateQuestions(questions) {
     if (result.text && !result.text.endsWith("?")) problems.push(`${label} text must be a question ending in "?".`);
     if (!scale && (!Number.isFinite(result.answer) || result.answer <= 0 || result.answer >= 100)) {
       problems.push(`${label} answer must be a number strictly between 0 and 100 after rounding to one decimal place.`);
+    }
+    // A count is never rounded into a whole number: an answer like 19.4 means the question isn't one.
+    if (scale?.whole && Number.isFinite(question.answer) && !Number.isInteger(question.answer)) {
+      problems.push(`${label} answer must be a whole number, since its scale has whole: true.`);
     }
     if (scale && Number.isFinite(result.answer)) {
       // Not so near either end that the range gives the answer away.

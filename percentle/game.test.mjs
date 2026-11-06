@@ -85,6 +85,11 @@ test("custom scales step by about a thousandth of the range and play by position
   assert.equal(formatValue(70000, salary), "$70,000");
   assert.equal(formatValue(7.25, rating), "7.25/10");
   assert.equal(formatValue(19.4, act), "19.4 points");
+  const grammys = { min: 0, max: 40, unit: "Grammys", whole: true };
+  assert.equal(scaleStep(grammys), 1, "a count steps by whole numbers");
+  assert.equal(fromPosition(33.3333, grammys), 13);
+  assert.equal(formatValue(13, grammys), "13 Grammys");
+  assert.equal(scaleStep({ ...salary, whole: true }), 100, "a big count keeps its bigger step");
   assert.equal(formatValue(42.5, scaleOf({})), "42.5%", "percentages look the same as ever");
   // Missing by a tenth of the range drains like 10 points off a percentage.
   assert.equal(pointsOff(toPosition(80000, salary), toPosition(70000, salary)), 10);

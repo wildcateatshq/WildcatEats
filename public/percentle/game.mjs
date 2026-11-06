@@ -127,9 +127,11 @@ export function scaleOf(question) {
 }
 
 // Guesses move in steps of about a thousandth of the range, rounded to a power of ten: 0.1 on
-// 0–100, 100 on a range 100,000 wide, 0.01 on 1–10.
+// 0–100, 100 on a range 100,000 wide, 0.01 on 1–10. A `whole` scale (a count, like Grammys won)
+// never steps by less than 1.
 export function scaleStep(scale = PERCENT_SCALE) {
-  return 10 ** Math.round(Math.log10((scale.max - scale.min) / 1000));
+  const step = 10 ** Math.round(Math.log10((scale.max - scale.min) / 1000));
+  return scale.whole ? Math.max(1, step) : step;
 }
 
 export function scaleDecimals(scale = PERCENT_SCALE) {
