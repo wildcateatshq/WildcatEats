@@ -234,25 +234,25 @@ struct HandoffRecipientView: View {
         ZStack(alignment: .topLeading) {
             Capsule()
                 .fill(Color("NovaDashNavy"))
-                .frame(width: 305, height: 77)
+                .frame(width: NovaDashMenuSize.width, height: 77)
 
             Capsule()
                 .fill(Color("NovaDashIvory"))
                 .overlay(Capsule().stroke(Color("NovaDashNavy"), lineWidth: 2))
-                .frame(width: 107, height: 77)
+                .frame(width: NovaDashMenuSize.pillWidth, height: 77)
 
             recipientTabButton(index: 0, label: "Order")
                 .offset(x: 0)
             recipientTabButton(index: 1, label: "Deliver")
-                .offset(x: 101.667)
+                .offset(x: NovaDashMenuSize.segment)
             recipientTabButton(index: 2, label: "Account")
-                .offset(x: 203.333)
+                .offset(x: 2 * NovaDashMenuSize.segment)
 
             Image(systemName: "cart")
                 .font(.system(size: 28, weight: .light))
                 .foregroundColor(Color("NovaDashNavy"))
                 .frame(width: 30, height: 30)
-                .offset(x: 38, y: 24)
+                .offset(x: NovaDashMenuSize.iconCenter(0) - 15, y: 24)
                 .allowsHitTesting(false)
 
             Image("NovaDashScooterInner")
@@ -260,18 +260,19 @@ struct HandoffRecipientView: View {
                 .resizable()
                 .foregroundColor(Color("NovaDashIvory"))
                 .frame(width: 44.95, height: 35.187)
-                .offset(x: 130.7, y: 20.8)
+                .offset(x: NovaDashMenuSize.iconCenter(1) - 22.475, y: 20.8)
                 .allowsHitTesting(false)
 
             Image("NovaDashAccount")
                 .resizable()
                 .frame(width: 23, height: 28)
-                .offset(x: 241, y: 25)
+                .offset(x: NovaDashMenuSize.iconCenter(2) - 11.5, y: 25)
                 .allowsHitTesting(false)
         }
-        .frame(width: 305, height: 77)
-        // Same spot as the app's main bottom menu, so it lines up exactly.
-        .offset(x: 49, y: 772)
+        .frame(width: NovaDashMenuSize.width, height: 77)
+        .scaleEffect(NovaDashMenuSize.scale, anchor: .bottom)
+        // Same spot and size as the app's main bottom menu, so it lines up exactly.
+        .offset(x: NovaDashMenuSize.left, y: 772)
     }
 
     private func recipientTabButton(index: Int, label: String) -> some View {
@@ -281,7 +282,7 @@ struct HandoffRecipientView: View {
         } label: {
             Rectangle()
                 .fill(Color.white.opacity(0.001))
-                .frame(width: 101.667, height: 77)
+                .frame(width: NovaDashMenuSize.segment, height: 77)
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

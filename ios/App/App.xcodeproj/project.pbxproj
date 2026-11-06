@@ -7,16 +7,12 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
-		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		504EC3191FED79650016851F /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC31A1FED79650016851F /* SceneDelegate.swift */; };
 		504EC31C1FED79650016851F /* NativeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC31D1FED79650016851F /* NativeApp.swift */; };
-		DC1A00012026102100000001 /* DeliveryHandoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC1A00022026102100000001 /* DeliveryHandoff.swift */; };
-		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		70A0B01D1FEDC1A000F3C39B /* Fonts/BarlowCondensed-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 70B0B01D1FEDC1A000F3C39B /* Fonts/BarlowCondensed-Bold.ttf */; };
 		70A0C01D1FEDC1A000F3C39B /* Fonts/BarlowCondensed-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 70B0C01D1FEDC1A000F3C39B /* Fonts/BarlowCondensed-SemiBold.ttf */; };
 		70A0D01D1FEDC1A000F3C39B /* Fonts/Inter-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 70B0D01D1FEDC1A000F3C39B /* Fonts/Inter-Regular.ttf */; };
@@ -24,11 +20,10 @@
 		70A0F01D1FEDC1A000F3C39B /* Fonts/Inter-SemiBold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 70B0F01D1FEDC1A000F3C39B /* Fonts/Inter-SemiBold.ttf */; };
 		70A1001D1FEDC1A000F3C39B /* Fonts/Inter-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 70B1001D1FEDC1A000F3C39B /* Fonts/Inter-Bold.ttf */; };
 		70A1101D1FEDC1A000F3C39B /* Fonts/BarlowCondensed-BoldItalic.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 70B1101D1FEDC1A000F3C39B /* Fonts/BarlowCondensed-BoldItalic.ttf */; };
+		DC1A00012026102100000001 /* DeliveryHandoff.swift in Sources */ = {isa = PBXBuildFile; fileRef = DC1A00022026102100000001 /* DeliveryHandoff.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
-		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
-		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
 		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
@@ -37,8 +32,6 @@
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		504EC31A1FED79650016851F /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		504EC31D1FED79650016851F /* NativeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeApp.swift; sourceTree = "<group>"; };
-		DC1A00022026102100000001 /* DeliveryHandoff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeliveryHandoff.swift; sourceTree = "<group>"; };
-		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		70B0B01D1FEDC1A000F3C39B /* Fonts/BarlowCondensed-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fonts/BarlowCondensed-Bold.ttf"; sourceTree = "<group>"; };
 		70B0C01D1FEDC1A000F3C39B /* Fonts/BarlowCondensed-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fonts/BarlowCondensed-SemiBold.ttf"; sourceTree = "<group>"; };
 		70B0D01D1FEDC1A000F3C39B /* Fonts/Inter-Regular.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fonts/Inter-Regular.ttf"; sourceTree = "<group>"; };
@@ -47,6 +40,7 @@
 		70B1001D1FEDC1A000F3C39B /* Fonts/Inter-Bold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fonts/Inter-Bold.ttf"; sourceTree = "<group>"; };
 		70B1101D1FEDC1A000F3C39B /* Fonts/BarlowCondensed-BoldItalic.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Fonts/BarlowCondensed-BoldItalic.ttf"; sourceTree = "<group>"; };
 		AC33D5F0307C958A00CEBA6A /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		DC1A00022026102100000001 /* DeliveryHandoff.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeliveryHandoff.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -80,7 +74,6 @@
 			isa = PBXGroup;
 			children = (
 				AC33D5F0307C958A00CEBA6A /* App.entitlements */,
-				50379B222058CBB4000EE86E /* capacitor.config.json */,
 				504EC3071FED79650016851F /* AppDelegate.swift */,
 				504EC31A1FED79650016851F /* SceneDelegate.swift */,
 				504EC31D1FED79650016851F /* NativeApp.swift */,
@@ -89,8 +82,6 @@
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
 				504EC3131FED79650016851F /* Info.plist */,
-				2FAD9762203C412B000D30F8 /* config.xml */,
-				50B271D01FEDC1A000F3C39B /* public */,
 				70B0B01D1FEDC1A000F3C39B /* Fonts/BarlowCondensed-Bold.ttf */,
 				70B0C01D1FEDC1A000F3C39B /* Fonts/BarlowCondensed-SemiBold.ttf */,
 				70B0D01D1FEDC1A000F3C39B /* Fonts/Inter-Regular.ttf */,
@@ -162,11 +153,8 @@
 			buildActionMask = 2147483647;
 			files = (
 				504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */,
-				50B271D11FEDC1A000F3C39B /* public in Resources */,
 				504EC30F1FED79650016851F /* Assets.xcassets in Resources */,
-				50379B232058CBB4000EE86E /* capacitor.config.json in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
-				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
 				70A0B01D1FEDC1A000F3C39B /* Fonts/BarlowCondensed-Bold.ttf in Resources */,
 				70A0C01D1FEDC1A000F3C39B /* Fonts/BarlowCondensed-SemiBold.ttf in Resources */,
 				70A0D01D1FEDC1A000F3C39B /* Fonts/Inter-Regular.ttf in Resources */,
@@ -327,7 +315,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 78284Y84AX;
+				DEVELOPMENT_TEAM = ADAXDD3HP7;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";
@@ -348,7 +336,7 @@
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = 78284Y84AX;
+				DEVELOPMENT_TEAM = ADAXDD3HP7;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = "$(inherited) @executable_path/Frameworks";

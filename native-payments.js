@@ -14,6 +14,10 @@ const { nativeRequest, isDashboardTestOrder } = require("./native-orders");
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CHECKOUT_SESSION = /^cs_(test|live)_[A-Za-z0-9]{10,200}$/;
+const PAYMENT_METHOD = /^pm_[A-Za-z0-9]{1,200}$/;
+const PAYOUT_DESTINATION = /^(ba|card)_[A-Za-z0-9]{1,200}$/;
+const MIN_PAYOUT_CENTS = 100;
+const MAX_PAYOUT_CENTS = 1000000;
 const RELEASE_WINDOW_MS = 30 * 1000;
 const TEST_OFFER_TITLE = "Test delivery request";
 const APP_CALLBACK = "novadash://stripe";
@@ -91,6 +95,34 @@ async function stillExists(retrieve) {
 
 function payoutsReady(account) {
   return Boolean(account && account.capabilities?.transfers === "active" && account.payouts_enabled);
+}
+
+function cardSummary(method, defaultID) {
+  return {
+    id: method.id,
+    brand: method.card?.brand || "card",
+    last4: method.card?.last4 || "",
+    expMonth: method.card?.exp_month || null,
+    expYear: method.card?.exp_year || null,
+    wallet: method.card?.wallet?.type || null,
+    isDefault: method.id === defaultID
+  };
+}
+
+// A runner's bank account or debit card on their Stripe account.
+function destinationSummary(external) {
+  const card = external.object === "card";
+  return {
+    id: external.id,
+    type: card ? "card" : "bank",
+    name: card ? (external.brand || "Debit card") : (external.bank_name || "Bank account"),
+    last4: external.last4 || "",
+    isDefault: Boolean(external.default_for_currency)
+  };
+}
+
+function usdCents(entries) {
+  return (entries || []).filter((entry) => entry.currency === "usd").reduce((sum, entry) => sum + entry.amount, 0);
 }
 
 function baseURL(req) {
@@ -202,13 +234,175 @@ function createNativePaymentsRouter({ stripe = payments.client } = {}) {
       if (session.status !== "complete" || session.setup_intent?.status !== "succeeded" || !method?.id) {
         return res.status(400).json({ error: "Your card wasn't saved. Try adding it again." });
       }
+      // A newly added card becomes the one that's charged; older cards stay saved.
       await stripe.customers.update(customerID, { invoice_settings: { default_payment_method: method.id } });
-      if (account.payment_method_id && account.payment_method_id !== method.id) {
-        await stripe.paymentMethods.detach(account.payment_method_id).catch(() => {});
-      }
       const card = { brand: method.card?.brand || "card", last4: method.card?.last4 || "" };
       await savePaymentAccount(req.nativeUser.id, { payment_method_id: method.id, card_brand: card.brand, card_last4: card.last4 || null });
       res.json({ card });
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
+  // Apple Pay from the app's own payment sheet. The app sends the encrypted
+  // token from PassKit; Stripe decrypts it (with the Apple Pay certificate
+  // uploaded in the Stripe Dashboard) into a card, which is saved and made
+  // the default exactly like a card added on the Checkout page.
+  router.post("/payments/apple-pay", async (req, res) => {
+    if (!requireStripe(res)) return;
+    const { paymentData, network, displayName, transactionId } = req.body || {};
+    const text = (value, max) => typeof value === "string" && value.length > 0 && value.length <= max;
+    if (!text(paymentData, 20000) || !/^[A-Za-z0-9+/]+=*$/.test(paymentData) || !text(transactionId, 200)) {
+      return res.status(400).json({ error: "That Apple Pay payment isn't valid." });
+    }
+    try {
+      const customer = await ensureCustomer(req.nativeUser, await paymentAccount(req.nativeUser.id));
+      const token = await stripe.tokens.create({
+        pk_token: Buffer.from(paymentData, "base64").toString("utf8"),
+        pk_token_transaction_id: transactionId,
+        ...(text(network, 50) ? { pk_token_payment_network: network } : {}),
+        ...(text(displayName, 100) ? { pk_token_instrument_name: displayName } : {})
+      });
+      const method = await stripe.paymentMethods.create({ type: "card", card: { token: token.id } });
+      await stripe.paymentMethods.attach(method.id, { customer });
+      await makeDefault(req.nativeUser.id, customer, method);
+      res.json({ card: { brand: method.card?.brand || "card", last4: method.card?.last4 || "" } });
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
+  // The orderer's saved cards. The default one is charged for deliveries.
+  async function savedCards(account) {
+    if (!account?.stripe_customer_id) return [];
+    const list = await stripe.customers.listPaymentMethods(account.stripe_customer_id, { type: "card", limit: 20 });
+    return list.data.map((method) => cardSummary(method, account.payment_method_id));
+  }
+
+  // Loads a card only if it belongs to this user's Stripe customer.
+  async function ownedCard(req, res) {
+    if (!PAYMENT_METHOD.test(req.params.cardId || "")) {
+      res.status(400).json({ error: "Invalid card." });
+      return null;
+    }
+    const account = await paymentAccount(req.nativeUser.id);
+    const method = account?.stripe_customer_id
+      ? await stillExists(() => stripe.paymentMethods.retrieve(req.params.cardId))
+      : null;
+    if (!method || method.customer !== account.stripe_customer_id) {
+      res.status(404).json({ error: "That card isn't saved on your account." });
+      return null;
+    }
+    return { account, method };
+  }
+
+  async function makeDefault(userID, customerID, method) {
+    await stripe.customers.update(customerID, { invoice_settings: { default_payment_method: method ? method.id : "" } });
+    await savePaymentAccount(userID, method
+      ? { payment_method_id: method.id, card_brand: method.card?.brand || "card", card_last4: method.card?.last4 || null }
+      : { payment_method_id: null, card_brand: null, card_last4: null });
+  }
+
+  router.get("/payments/cards", async (req, res) => {
+    if (!requireStripe(res)) return;
+    try {
+      res.json({ cards: await savedCards(await paymentAccount(req.nativeUser.id)) });
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
+  router.post("/payments/cards/:cardId/default", async (req, res) => {
+    if (!requireStripe(res)) return;
+    try {
+      const owned = await ownedCard(req, res);
+      if (!owned) return;
+      await makeDefault(req.nativeUser.id, owned.account.stripe_customer_id, owned.method);
+      res.json({ cards: await savedCards(await paymentAccount(req.nativeUser.id)) });
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
+  // Removing the default card makes the next saved card the default.
+  router.delete("/payments/cards/:cardId", async (req, res) => {
+    if (!requireStripe(res)) return;
+    try {
+      const owned = await ownedCard(req, res);
+      if (!owned) return;
+      await stripe.paymentMethods.detach(owned.method.id);
+      if (owned.account.payment_method_id === owned.method.id) {
+        const rest = await stripe.customers.listPaymentMethods(owned.account.stripe_customer_id, { type: "card", limit: 1 });
+        await makeDefault(req.nativeUser.id, owned.account.stripe_customer_id, rest.data[0] || null);
+      }
+      res.json({ cards: await savedCards(await paymentAccount(req.nativeUser.id)) });
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
+  // Withdraw needs a finished payout account. Its schedule is set to manual
+  // so earnings stay put until the runner withdraws them.
+  async function readyPayoutAccount(req, res) {
+    const { ready, stripeAccount } = await refreshPayouts(req.nativeUser.id, await paymentAccount(req.nativeUser.id));
+    if (!ready) {
+      res.status(409).json({ error: "Finish setting up payouts first.", code: "payouts_required" });
+      return null;
+    }
+    if (stripeAccount.settings?.payouts?.schedule?.interval !== "manual") {
+      await stripe.accounts.update(stripeAccount.id, { settings: { payouts: { schedule: { interval: "manual" } } } })
+        .catch((error) => console.error(`Could not set manual payouts for ${stripeAccount.id}:`, error.message));
+    }
+    return stripeAccount;
+  }
+
+  async function payoutDestinations(accountID) {
+    const list = await stripe.accounts.listExternalAccounts(accountID, { limit: 20 });
+    return list.data.map(destinationSummary);
+  }
+
+  router.get("/payments/payouts/destinations", async (req, res) => {
+    if (!requireStripe(res)) return;
+    try {
+      const stripeAccount = await readyPayoutAccount(req, res);
+      if (!stripeAccount) return;
+      const [balance, destinations] = await Promise.all([
+        stripe.balance.retrieve({}, { stripeAccount: stripeAccount.id }),
+        payoutDestinations(stripeAccount.id)
+      ]);
+      res.json({ availableCents: usdCents(balance.available), pendingCents: usdCents(balance.pending), destinations });
+    } catch (error) {
+      sendError(res, error);
+    }
+  });
+
+  router.post("/payments/payouts/withdraw", async (req, res) => {
+    if (!requireStripe(res)) return;
+    const amountCents = req.body?.amountCents;
+    const destinationID = typeof req.body?.destinationId === "string" ? req.body.destinationId : "";
+    if (!Number.isInteger(amountCents) || amountCents < MIN_PAYOUT_CENTS || amountCents > MAX_PAYOUT_CENTS) {
+      return res.status(400).json({ error: "Withdraw at least $1.00." });
+    }
+    if (!PAYOUT_DESTINATION.test(destinationID)) return res.status(400).json({ error: "Choose where to send the money." });
+    if (!UUID.test(req.body?.requestId || "")) return res.status(400).json({ error: "Invalid request. Try again." });
+    try {
+      const stripeAccount = await readyPayoutAccount(req, res);
+      if (!stripeAccount) return;
+      const destination = (await payoutDestinations(stripeAccount.id)).find((entry) => entry.id === destinationID);
+      if (!destination) return res.status(404).json({ error: "That bank or card isn't on your payout account." });
+      const balance = await stripe.balance.retrieve({}, { stripeAccount: stripeAccount.id });
+      if (amountCents > usdCents(balance.available)) {
+        return res.status(400).json({ error: "That's more than your available balance. New earnings take a few days to become available." });
+      }
+      const payout = await stripe.payouts.create({
+        amount: amountCents,
+        currency: "usd",
+        destination: destinationID,
+        method: "standard",
+        description: "NovaDash withdrawal",
+        metadata: { native_user_id: req.nativeUser.id }
+      }, { stripeAccount: stripeAccount.id, idempotencyKey: `native-payout-${req.body.requestId}` });
+      res.json({ amountCents: payout.amount, arrivalDate: payout.arrival_date || null, destination });
     } catch (error) {
       sendError(res, error);
     }
@@ -231,6 +425,7 @@ function createNativePaymentsRouter({ stripe = payments.client } = {}) {
           country: "US",
           email: req.nativeUser.email || undefined,
           capabilities: { transfers: { requested: true } },
+          settings: { payouts: { schedule: { interval: "manual" } } },
           metadata: { native_user_id: req.nativeUser.id }
         });
         await savePaymentAccount(req.nativeUser.id, { stripe_account_id: stripeAccount.id, payouts_ready: false });

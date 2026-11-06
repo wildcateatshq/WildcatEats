@@ -48,13 +48,19 @@ function fakeSupabase(tables) {
 
 function fakeStripe({ declines = false } = {}) {
   const calls = [];
+  const cards = [
+    { id: "pm_visa", customer: "cus_orderer", card: { brand: "visa", last4: "4242", exp_month: 4, exp_year: 2030 } },
+    { id: "pm_amex", customer: "cus_orderer", card: { brand: "amex", last4: "0005", exp_month: 9, exp_year: 2029 } },
+    { id: "pm_someone", customer: "cus_other", card: { brand: "visa", last4: "1111", exp_month: 1, exp_year: 2031 } }
+  ];
   const record = (name, result) => (...args) => { calls.push([name, ...args]); return Promise.resolve(typeof result === "function" ? result(...args) : result); };
   const stripe = {
     calls,
     customers: {
       create: record("customers.create", { id: "cus_orderer" }),
       retrieve: record("customers.retrieve", (id) => ({ id })),
-      update: record("customers.update", {})
+      update: record("customers.update", {}),
+      listPaymentMethods: (_customer, { limit }) => Promise.resolve({ data: cards.slice(0, limit) })
     },
     checkout: { sessions: {
       create: record("checkout.create", { url: "https://checkout.stripe.com/c/pay/cs_test_abc" }),
@@ -63,12 +69,29 @@ function fakeStripe({ declines = false } = {}) {
         setup_intent: { status: "succeeded", payment_method: { id: "pm_visa", card: { brand: "visa", last4: "4242" } } }
       }))
     } },
-    paymentMethods: { detach: record("paymentMethods.detach", {}) },
+    tokens: { create: record("tokens.create", { id: "tok_applepay" }) },
+    paymentMethods: {
+      create: (params) => {
+        calls.push(["paymentMethods.create", params]);
+        const method = { id: "pm_applepay", customer: null, card: { brand: "visa", last4: "9999", exp_month: 2, exp_year: 2031, wallet: { type: "apple_pay" } } };
+        cards.push(method);
+        return Promise.resolve(method);
+      },
+      attach: (id, { customer }) => { calls.push(["paymentMethods.attach", id, customer]); cards.find((c) => c.id === id).customer = customer; return Promise.resolve({}); },
+      detach: (id) => { calls.push(["paymentMethods.detach", id]); cards.splice(cards.findIndex((c) => c.id === id), 1); return Promise.resolve({}); },
+      retrieve: (id) => { const card = cards.find((c) => c.id === id); return card ? Promise.resolve(card) : Promise.reject(new Error("No such payment method")); }
+    },
     accounts: {
       create: record("accounts.create", { id: "acct_runner" }),
       retrieve: record("accounts.retrieve", (id) => ({ id, payouts_enabled: true, capabilities: { transfers: "active" } })),
-      createLoginLink: record("accounts.createLoginLink", { url: "https://connect.stripe.com/express/login" })
+      createLoginLink: record("accounts.createLoginLink", { url: "https://connect.stripe.com/express/login" }),
+      update: record("accounts.update", {}),
+      listExternalAccounts: record("accounts.listExternalAccounts", { data: [
+        { id: "ba_chase", object: "bank_account", bank_name: "CHASE", last4: "6789", default_for_currency: true },
+        { id: "card_debit", object: "card", brand: "Visa", last4: "1881", default_for_currency: false }
+      ] })
     },
+    payouts: { create: (params) => { calls.push(["payouts.create", params]); return Promise.resolve({ id: "po_1", amount: params.amount, arrival_date: 1800000000 }); } },
     accountLinks: { create: record("accountLinks.create", { url: "https://connect.stripe.com/setup/e/abc" }) },
     balance: { retrieve: record("balance.retrieve", { available: [{ currency: "usd", amount: 375 }], pending: [{ currency: "usd", amount: 125 }] }) },
     paymentIntents: {
@@ -156,6 +179,42 @@ test("orderers save a card through Stripe Checkout", async () => {
     assert.equal(back.headers.get("location"), "novadash://stripe?kind=card&session_id=cs_test_abcdefghijkl");
     const odd = await call("/native/stripe/return?kind=javascript:alert(1)");
     assert.equal(odd.headers.get("location"), "novadash://stripe?kind=card-cancel");
+  } finally {
+    close();
+  }
+});
+
+test("orderers save Apple Pay from the app's payment sheet", async () => {
+  const tables = { native_profiles: [{ id: ordererID, name: "Ada", email: "ada@example.com" }] };
+  const stripe = fakeStripe();
+  const { call, close } = await harness(tables, stripe);
+  const token = "orderer-token-0123456789";
+  const paymentData = Buffer.from('{"version":"EC_v1","data":"abc"}').toString("base64");
+  try {
+    assert.equal((await call("/api/native/payments/apple-pay", { method: "POST", body: { paymentData, transactionId: "t1" } })).status, 401);
+    assert.equal((await call("/api/native/payments/apple-pay", { token, method: "POST", body: { paymentData: "not base64!", transactionId: "t1" } })).status, 400);
+    assert.equal((await call("/api/native/payments/apple-pay", { token, method: "POST", body: { paymentData } })).status, 400);
+
+    const saved = await call("/api/native/payments/apple-pay", {
+      token, method: "POST", body: { paymentData, network: "Visa", displayName: "Visa 9999", transactionId: "txn_123" }
+    });
+    assert.equal(saved.status, 200);
+    assert.deepEqual(saved.json.card, { brand: "visa", last4: "9999" });
+    const [, tokenParams] = stripe.calls.find(([name]) => name === "tokens.create");
+    assert.deepEqual(tokenParams, {
+      pk_token: '{"version":"EC_v1","data":"abc"}',
+      pk_token_transaction_id: "txn_123",
+      pk_token_payment_network: "Visa",
+      pk_token_instrument_name: "Visa 9999"
+    });
+    assert.deepEqual(stripe.calls.find(([name]) => name === "paymentMethods.create")[1], { type: "card", card: { token: "tok_applepay" } });
+    assert.deepEqual(stripe.calls.find(([name]) => name === "paymentMethods.attach"), ["paymentMethods.attach", "pm_applepay", "cus_orderer"]);
+    assert.equal(tables.native_payment_accounts[0].payment_method_id, "pm_applepay");
+
+    const list = await call("/api/native/payments/cards", { token });
+    const applePay = list.json.cards.find((card) => card.id === "pm_applepay");
+    assert.equal(applePay.wallet, "apple_pay");
+    assert.equal(applePay.isDefault, true);
   } finally {
     close();
   }
@@ -286,3 +345,83 @@ test("without Stripe keys, deliveries are accepted for test credits", async () =
     close();
   }
 });
+
+test("orderers see their saved cards, pick the default, and remove one", async () => {
+  const tables = { native_payment_accounts: [{ user_id: ordererID, stripe_customer_id: "cus_orderer", payment_method_id: "pm_visa", card_brand: "visa", card_last4: "4242" }] };
+  const stripe = fakeStripe();
+  // Only this customer's cards come back from Stripe's list.
+  stripe.customers.listPaymentMethods = async (_customer, { limit }) => ({ data: [
+    { id: "pm_visa", card: { brand: "visa", last4: "4242", exp_month: 4, exp_year: 2030 } },
+    { id: "pm_amex", card: { brand: "amex", last4: "0005", exp_month: 9, exp_year: 2029 } }
+  ].filter((card) => stripe.calls.every(([name, id]) => name !== "paymentMethods.detach" || id !== card.id)).slice(0, limit) });
+  const { call, close } = await harness(tables, stripe);
+  const token = "orderer-token-0123456789";
+  try {
+    const listed = await call("/api/native/payments/cards", { token });
+    assert.equal(listed.status, 200);
+    assert.deepEqual(listed.json.cards.map((c) => [c.id, c.last4, c.isDefault]), [["pm_visa", "4242", true], ["pm_amex", "0005", false]]);
+    assert.equal(listed.json.cards[0].expYear, 2030);
+
+    assert.equal((await call("/api/native/payments/cards/pm_someone/default", { token, method: "POST", body: {} })).status, 404);
+    assert.equal((await call("/api/native/payments/cards/not-a-card/default", { token, method: "POST", body: {} })).status, 400);
+
+    const switched = await call("/api/native/payments/cards/pm_amex/default", { token, method: "POST", body: {} });
+    assert.equal(switched.status, 200);
+    assert.equal(tables.native_payment_accounts[0].payment_method_id, "pm_amex");
+    assert.equal(tables.native_payment_accounts[0].card_last4, "0005");
+    assert.deepEqual(switched.json.cards.find((c) => c.isDefault).id, "pm_amex");
+
+    // Removing the default card falls back to the remaining one.
+    const removed = await call("/api/native/payments/cards/pm_amex", { token, method: "DELETE" });
+    assert.equal(removed.status, 200);
+    assert.deepEqual(removed.json.cards.map((c) => [c.id, c.isDefault]), [["pm_visa", true]]);
+    assert.equal(tables.native_payment_accounts[0].payment_method_id, "pm_visa");
+
+    await call("/api/native/payments/cards/pm_visa", { token, method: "DELETE" });
+    assert.equal(tables.native_payment_accounts[0].payment_method_id, null);
+    const [, , cleared] = stripe.calls.filter(([name]) => name === "customers.update").pop();
+    assert.equal(cleared.invoice_settings.default_payment_method, "");
+  } finally {
+    close();
+  }
+});
+
+test("runners withdraw their available balance to a bank or debit card", async () => {
+  const tables = { native_payment_accounts: [{ user_id: runnerID, stripe_account_id: "acct_runner", payouts_ready: true }] };
+  const stripe = fakeStripe();
+  const { call, close } = await harness(tables, stripe);
+  const token = "runner-token-01234567890";
+  const requestId = "44444444-4444-4444-8444-444444444444";
+  try {
+    const listed = await call("/api/native/payments/payouts/destinations", { token });
+    assert.equal(listed.status, 200);
+    assert.equal(listed.json.availableCents, 375);
+    assert.equal(listed.json.pendingCents, 125);
+    assert.deepEqual(listed.json.destinations.map((d) => [d.id, d.type, d.isDefault]), [["ba_chase", "bank", true], ["card_debit", "card", false]]);
+    // The account is switched to manual payouts so earnings wait for Withdraw.
+    const [, , schedule] = stripe.calls.find(([name]) => name === "accounts.update");
+    assert.equal(schedule.settings.payouts.schedule.interval, "manual");
+
+    const withdraw = (body) => call("/api/native/payments/payouts/withdraw", { token, method: "POST", body: { requestId, ...body } });
+    assert.equal((await withdraw({ amountCents: 50, destinationId: "card_debit" })).status, 400);
+    assert.equal((await withdraw({ amountCents: 1.5, destinationId: "card_debit" })).status, 400);
+    assert.equal((await withdraw({ amountCents: 300, destinationId: "ba_someoneelse" })).status, 404);
+    const tooMuch = await withdraw({ amountCents: 400, destinationId: "card_debit" });
+    assert.equal(tooMuch.status, 400);
+    assert.match(tooMuch.json.error, /available balance/);
+
+    const sent = await withdraw({ amountCents: 375, destinationId: "card_debit" });
+    assert.equal(sent.status, 200);
+    assert.equal(sent.json.amountCents, 375);
+    assert.equal(sent.json.destination.last4, "1881");
+    const [, payout] = stripe.calls.find(([name]) => name === "payouts.create");
+    assert.deepEqual([payout.amount, payout.destination, payout.method], [375, "card_debit", "standard"]);
+
+    const noAccount = await call("/api/native/payments/payouts/destinations", { token: "orderer-token-0123456789" });
+    assert.equal(noAccount.status, 409);
+    assert.equal(noAccount.json.code, "payouts_required");
+  } finally {
+    close();
+  }
+});
+

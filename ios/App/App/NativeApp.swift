@@ -5,6 +5,7 @@ import MapKit
 import CoreLocation
 import UserNotifications
 import AuthenticationServices
+import PassKit
 
 extension Notification.Name {
     static let novaDashSelectTab = Notification.Name("NovaDashSelectTab")
@@ -21,6 +22,42 @@ enum SupabaseConfig {
 // and accepting or releasing a delivery go through it.
 enum NovaDashServer {
     static let baseURL = "https://novadash.online"
+}
+
+// Apple Pay through the app's own payment sheet. The merchant ID must match
+// App.entitlements and the one the Stripe Apple Pay certificate was made for.
+enum ApplePay {
+    static let merchantID = "merchant.com.wildcateats.app"
+    static let merchantName = "NovaDash"
+    static let networks: [PKPaymentNetwork] = [.visa, .masterCard, .amex, .discover]
+
+    /// Needs com.apple.developer.in-app-payments with merchantID in
+    /// App.entitlements; set to false to grey out the Apple Pay buttons.
+    static let isEnabled = true
+
+    /// True when Apple Pay is turned on and this device has a supported card in Wallet.
+    static var isAvailable: Bool { isEnabled && PKPaymentAuthorizationController.canMakePayments(usingNetworks: networks) }
+
+    /// With a fee, the sheet shows it; without one (saving from Payment
+    /// Methods) it shows the amount as pending.
+    static func request(feeCents: Int?) -> PKPaymentRequest {
+        let request = PKPaymentRequest()
+        request.merchantIdentifier = merchantID
+        request.countryCode = "US"
+        request.currencyCode = "USD"
+        request.supportedNetworks = networks
+        request.merchantCapabilities = .capability3DS
+        if let feeCents {
+            let fee = NSDecimalNumber(value: feeCents).dividing(by: 100)
+            request.paymentSummaryItems = [
+                PKPaymentSummaryItem(label: "Delivery fee, charged when a student accepts", amount: fee),
+                PKPaymentSummaryItem(label: merchantName, amount: fee)
+            ]
+        } else {
+            request.paymentSummaryItems = [PKPaymentSummaryItem(label: merchantName, amount: .zero, type: .pending)]
+        }
+        return request
+    }
 }
 
 struct UserSession: Codable {
@@ -66,6 +103,201 @@ struct PaymentStatus: Decodable {
     let card: Card?
     let payouts: Payouts
     let balanceCents: Int64?
+}
+
+struct SavedCard: Decodable, Identifiable {
+    let id: String
+    let brand: String
+    let last4: String
+    let expMonth: Int?
+    let expYear: Int?
+    let wallet: String?
+    let isDefault: Bool
+
+    var isApplePay: Bool { wallet == "apple_pay" }
+
+    var brandName: String {
+        switch brand {
+        case "amex": return "American Express"
+        case "mastercard": return "Mastercard"
+        case "diners": return "Diners Club"
+        case "unionpay": return "UnionPay"
+        default: return brand.capitalized
+        }
+    }
+}
+
+struct PayoutDestination: Decodable, Identifiable {
+    let id: String
+    let type: String
+    let name: String
+    let last4: String
+    let isDefault: Bool
+
+    var isCard: Bool { type == "card" }
+    var displayName: String { isCard ? "\(name.capitalized) debit •••• \(last4)" : "\(name.capitalized) •••• \(last4)" }
+}
+
+struct PayoutOverview: Decodable {
+    let availableCents: Int64
+    let pendingCents: Int64
+    let destinations: [PayoutDestination]
+}
+
+struct WithdrawalReceipt: Decodable {
+    let amountCents: Int64
+    let arrivalDate: TimeInterval?
+    let destination: PayoutDestination
+}
+
+/// A delivery's price: walking time (18 minutes a mile) paid at $11 an hour,
+/// raised for late night and bad weather.
+struct DeliveryQuote: Equatable {
+    struct Adjustment: Equatable {
+        let label: String
+        let multiplier: Double
+
+        var percentText: String { "+\(Int(((multiplier - 1) * 100).rounded()))%" }
+    }
+
+    let feeCents: Int
+    let miles: Double
+    let walkMinutes: Int
+    let adjustments: [Adjustment]
+
+    var fee: Double { Double(feeCents) / 100 }
+    var feeText: String { String(format: "$%.2f", fee) }
+
+    var summary: String {
+        let extras = adjustments.map { "\($0.label.lowercased()) \($0.percentText)" }
+        let base = String(format: "%.2f mi, %d min walk at $11/hr", miles, walkMinutes)
+        return extras.isEmpty ? base : base + ", " + extras.joined(separator: ", ")
+    }
+}
+
+enum DeliveryPricing {
+    static let walkMinutesPerMile = 18.0
+    static let dollarsPerHour = 11.0
+    /// Campus paths are rarely straight, so straight-line miles are stretched.
+    static let walkRouteFactor = 1.25
+    /// Stripe's charge floor (MIN_FEE_DOLLARS in payments.js).
+    static let minimumFeeCents = 100
+    static let maximumFeeCents = 5000
+    static let maximumMultiplier = 2.5
+    /// TEMPORARY for testing: no delivery radius. Set back to 2.0 before launch.
+    static let maximumMiles: Double? = nil
+
+    /// Campus hours; `to` is exclusive and may wrap past midnight.
+    private static let lateNight: [(from: Int, to: Int, multiplier: Double)] = [(1, 6, 1.5), (22, 1, 1.25)]
+
+    struct Weather {
+        let code: Int
+        let temperatureF: Double?
+        let snowfallCm: Double
+    }
+
+    enum PricingError: LocalizedError {
+        case tooFar(String)
+        var errorDescription: String? {
+            switch self {
+            case .tooFar(let store): return "Deliveries must be within \(Int(maximumMiles ?? 0)) miles of \(store)."
+            }
+        }
+    }
+
+    static func quote(store: String, dropoff: CLLocationCoordinate2D, now: Date = Date(), weather: Weather?) throws -> DeliveryQuote {
+        let pickup = StoreLocations.coordinate(for: store)
+        let straightMiles = CLLocation(latitude: pickup.latitude, longitude: pickup.longitude)
+            .distance(from: CLLocation(latitude: dropoff.latitude, longitude: dropoff.longitude)) / 1609.344
+        if let maximumMiles, straightMiles > maximumMiles { throw PricingError.tooFar(store) }
+        let miles = straightMiles * walkRouteFactor
+        let baseCents = (miles * walkMinutesPerMile / 60 * dollarsPerHour * 100).rounded()
+        let adjustments = [timeAdjustment(now), weatherAdjustment(weather)].compactMap { $0 }
+        let multiplier = min(adjustments.reduce(1) { $0 * $1.multiplier }, maximumMultiplier)
+        // The minimum applies before the multipliers, so a short trip still pays
+        // more late at night or in a storm. Fees round to the nearest 5¢.
+        let cents = max(baseCents, Double(minimumFeeCents)) * multiplier
+        let feeCents = min(Int((cents / 5).rounded()) * 5, maximumFeeCents)
+        return DeliveryQuote(
+            feeCents: feeCents,
+            miles: (miles * 100).rounded() / 100,
+            walkMinutes: max(1, Int((miles * walkMinutesPerMile).rounded())),
+            adjustments: adjustments
+        )
+    }
+
+    static func timeAdjustment(_ now: Date) -> DeliveryQuote.Adjustment? {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/New_York") ?? .current
+        let hour = calendar.component(.hour, from: now)
+        let match = lateNight.first { $0.from < $0.to ? (hour >= $0.from && hour < $0.to) : (hour >= $0.from || hour < $0.to) }
+        return match.map { DeliveryQuote.Adjustment(label: "Late night", multiplier: $0.multiplier) }
+    }
+
+    /// Open-Meteo WMO weather codes. Only the strongest condition counts.
+    static func weatherAdjustment(_ weather: Weather?) -> DeliveryQuote.Adjustment? {
+        guard let weather else { return nil }
+        var matches: [DeliveryQuote.Adjustment] = []
+        let add = { (label: String, multiplier: Double) in matches.append(.init(label: label, multiplier: multiplier)) }
+        switch weather.code {
+        case 75, 86: add("Snowstorm", 1.75)
+        case 95, 96, 99: add("Thunderstorm", 1.5)
+        case 56, 57, 66, 67: add("Freezing rain", 1.5)
+        case 71, 73, 77, 85: add("Snow", 1.4)
+        case 65, 82: add("Heavy rain", 1.35)
+        case 51, 53, 55, 61, 63, 80, 81: add("Rain", 1.2)
+        default: break
+        }
+        if weather.snowfallCm >= 1 { add("Snowstorm", 1.75) }
+        if let temperature = weather.temperatureF, temperature <= 15 { add("Extreme cold", 1.15) }
+        if let temperature = weather.temperatureF, temperature >= 95 { add("Extreme heat", 1.15) }
+        return matches.max { $0.multiplier < $1.multiplier }
+    }
+}
+
+/// Current campus weather from Open-Meteo (free, no key), kept for 10 minutes.
+/// If it can't be reached, deliveries are priced without a weather adjustment.
+enum DeliveryWeather {
+    private struct Response: Decodable {
+        struct Current: Decodable {
+            let weatherCode: Int
+            let temperature2m: Double?
+            let snowfall: Double?
+        }
+        let current: Current
+    }
+
+    @MainActor private static var cached: (weather: DeliveryPricing.Weather, at: Date)?
+
+    @MainActor static func current(near coordinate: CLLocationCoordinate2D) async -> DeliveryPricing.Weather? {
+        if let cached, Date().timeIntervalSince(cached.at) < 600 { return cached.weather }
+        var components = URLComponents(string: "https://api.open-meteo.com/v1/forecast")!
+        components.queryItems = [
+            URLQueryItem(name: "latitude", value: String(format: "%.4f", coordinate.latitude)),
+            URLQueryItem(name: "longitude", value: String(format: "%.4f", coordinate.longitude)),
+            URLQueryItem(name: "current", value: "weather_code,temperature_2m,snowfall"),
+            URLQueryItem(name: "temperature_unit", value: "fahrenheit")
+        ]
+        guard let url = components.url else { return nil }
+        do {
+            var request = URLRequest(url: url)
+            request.timeoutInterval = 4
+            let (data, _) = try await URLSession.shared.data(for: request)
+            let decoder = JSONDecoder()
+            decoder.keyDecodingStrategy = .convertFromSnakeCase
+            let current = try decoder.decode(Response.self, from: data).current
+            let weather = DeliveryPricing.Weather(code: current.weatherCode, temperatureF: current.temperature2m, snowfallCm: current.snowfall ?? 0)
+            cached = (weather, Date())
+            return weather
+        } catch {
+            print("Weather lookup failed; pricing without it: \(error.localizedDescription)")
+            return nil
+        }
+    }
+}
+
+private struct SavedCardList: Decodable {
+    let cards: [SavedCard]
 }
 
 private struct HostedPageLink: Decodable {
@@ -626,6 +858,49 @@ final class SupabaseClient {
         )
     }
 
+    /// Sends Apple Pay's encrypted token to the server, which saves it with
+    /// Stripe as the card charged for deliveries.
+    func saveApplePay(_ payment: PKPayment) async throws {
+        let method = payment.token.paymentMethod
+        let _: EmptyResponse = try await serverSend(
+            "/api/native/payments/apple-pay",
+            method: "POST",
+            body: [
+                "paymentData": AnyEncodable(payment.token.paymentData.base64EncodedString()),
+                "network": AnyEncodable(method.network?.rawValue ?? ""),
+                "displayName": AnyEncodable(method.displayName ?? ""),
+                "transactionId": AnyEncodable(payment.token.transactionIdentifier)
+            ]
+        )
+    }
+
+    func savedCards() async throws -> [SavedCard] {
+        let list: SavedCardList = try await serverSend("/api/native/payments/cards")
+        return list.cards
+    }
+
+    func makeDefaultCard(_ cardID: String) async throws -> [SavedCard] {
+        let list: SavedCardList = try await serverSend("/api/native/payments/cards/\(cardID)/default", method: "POST")
+        return list.cards
+    }
+
+    func removeCard(_ cardID: String) async throws -> [SavedCard] {
+        let list: SavedCardList = try await serverSend("/api/native/payments/cards/\(cardID)", method: "DELETE")
+        return list.cards
+    }
+
+    func payoutOverview() async throws -> PayoutOverview {
+        try await serverSend("/api/native/payments/payouts/destinations")
+    }
+
+    func withdraw(amountCents: Int64, destinationID: String, requestID: UUID) async throws -> WithdrawalReceipt {
+        try await serverSend("/api/native/payments/payouts/withdraw", method: "POST", body: [
+            "amountCents": AnyEncodable(amountCents),
+            "destinationId": AnyEncodable(destinationID),
+            "requestId": AnyEncodable(requestID.uuidString.lowercased())
+        ])
+    }
+
     fileprivate func payoutsLink() async throws -> HostedPageLink {
         try await serverSend("/api/native/payments/payouts", method: "POST")
     }
@@ -929,6 +1204,88 @@ final class StripeHostedPage: NSObject, ASWebAuthenticationPresentationContextPr
     }
 }
 
+// Presents Apple Pay's sheet. `onAuthorize` runs while the sheet shows its
+// spinner; if it throws, the sheet shows a failure and the error is rethrown
+// once the sheet closes. Returns false if the person cancelled.
+// PassKit calls back on the main thread, so this is only ever touched there.
+final class ApplePaySheet: NSObject, PKPaymentAuthorizationControllerDelegate, @unchecked Sendable {
+    private var onAuthorize: ((PKPayment) async throws -> Void)?
+    private var continuation: CheckedContinuation<Bool, Error>?
+    private var outcome: Result<Bool, Error> = .success(false)
+    private var controller: PKPaymentAuthorizationController?
+    private var keepAlive: ApplePaySheet? // the controller's delegate is weak
+
+    @MainActor static func present(_ request: PKPaymentRequest, onAuthorize: @escaping (PKPayment) async throws -> Void) async throws -> Bool {
+        let sheet = ApplePaySheet()
+        sheet.onAuthorize = onAuthorize
+        return try await withCheckedThrowingContinuation { continuation in
+            sheet.continuation = continuation
+            sheet.keepAlive = sheet
+            let controller = PKPaymentAuthorizationController(paymentRequest: request)
+            controller.delegate = sheet
+            sheet.controller = controller
+            controller.present { presented in
+                if !presented { sheet.finish(.failure(SupabaseError.server("Apple Pay couldn't be opened."))) }
+            }
+        }
+    }
+
+    func paymentAuthorizationController(
+        _ controller: PKPaymentAuthorizationController,
+        didAuthorizePayment payment: PKPayment,
+        handler completion: @escaping (PKPaymentAuthorizationResult) -> Void
+    ) {
+        Task { @MainActor in
+            do {
+                try await onAuthorize?(payment)
+                outcome = .success(true)
+                completion(PKPaymentAuthorizationResult(status: .success, errors: nil))
+            } catch {
+                outcome = .failure(error)
+                completion(PKPaymentAuthorizationResult(status: .failure, errors: [error]))
+            }
+        }
+    }
+
+    func paymentAuthorizationControllerDidFinish(_ controller: PKPaymentAuthorizationController) {
+        controller.dismiss { self.finish(self.outcome) }
+    }
+
+    private func finish(_ result: Result<Bool, Error>) {
+        guard let continuation else { return }
+        self.continuation = nil
+        controller = nil
+        keepAlive = nil
+        continuation.resume(with: result)
+    }
+}
+
+// Apple's own Apple Pay button, for SwiftUI.
+private struct ApplePayButton: UIViewRepresentable {
+    var style: PKPaymentButtonStyle = .black
+    var cornerRadius: CGFloat = 4
+    let action: () -> Void
+
+    func makeCoordinator() -> Coordinator { Coordinator(action: action) }
+
+    func makeUIView(context: Context) -> PKPaymentButton {
+        let button = PKPaymentButton(paymentButtonType: .plain, paymentButtonStyle: style)
+        button.cornerRadius = cornerRadius
+        button.addTarget(context.coordinator, action: #selector(Coordinator.tapped), for: .touchUpInside)
+        return button
+    }
+
+    func updateUIView(_ button: PKPaymentButton, context: Context) {
+        context.coordinator.action = action
+    }
+
+    final class Coordinator: NSObject {
+        var action: () -> Void
+        init(action: @escaping () -> Void) { self.action = action }
+        @objc func tapped() { action() }
+    }
+}
+
 @MainActor
 final class AppModel: ObservableObject {
     @Published var session: UserSession?
@@ -990,16 +1347,23 @@ final class AppModel: ObservableObject {
         return true
     }
 
-    /// Payout setup on Stripe's page, or the runner's Stripe dashboard once set up.
+    /// Saves the card from Apple Pay's sheet. `feeCents` is shown on the sheet
+    /// when ordering. Returns false if the person cancelled.
+    func addApplePay(feeCents: Int? = nil) async throws -> Bool {
+        let saved = try await ApplePaySheet.present(ApplePay.request(feeCents: feeCents)) { payment in
+            try await self.client.saveApplePay(payment)
+        }
+        if saved { await loadPaymentStatus() }
+        return saved
+    }
+
+    /// Payout setup on Stripe's page, or the runner's Stripe dashboard (to add
+    /// or change a bank or card) once set up.
     func openPayouts() async throws {
         let link = try await client.payoutsLink()
         guard let url = URL(string: link.url) else { throw SupabaseError.invalidResponse("Stripe returned an invalid payouts page.") }
-        if link.kind == "dashboard" {
-            await UIApplication.shared.open(url)
-        } else {
-            _ = try await StripeHostedPage.open(url)
-            await loadPaymentStatus()
-        }
+        _ = try await StripeHostedPage.open(url)
+        await loadPaymentStatus()
     }
 
     func loadTestBalance() async {
@@ -1142,6 +1506,7 @@ private struct KeyboardAvoidance: ViewModifier {
 private extension Color {
     static let novaDashNavy = Color("NovaDashNavy")
     static let novaDashIvory = Color("NovaDashIvory")
+    static let novaDashPayNow = Color(red: 0.322, green: 0.698, blue: 0.894)
 }
 
 // Shared motion: side-by-side changes slide horizontally, stacked changes vertically.
@@ -1493,7 +1858,9 @@ private struct StartView: View {
     @Published var hall = ""
     @Published var details = ""
     @Published var items = ""
-    @Published var tip = "5"
+    @Published var quote: DeliveryQuote?
+    @Published var isQuoting = false
+    @Published var quoteError: String?
     @Published var notice: String?
     @Published var isPosting = false
     @Published var showPaymentUnavailable = false
@@ -1561,6 +1928,7 @@ final class OrderMapModel: ObservableObject {
 final class DeliveryLocation: NSObject, ObservableObject, CLLocationManagerDelegate {
     private let manager = CLLocationManager()
     @Published var coordinate: CLLocationCoordinate2D?
+    @Published var isDenied = false
 
     override init() {
         super.init()
@@ -1575,6 +1943,10 @@ final class DeliveryLocation: NSObject, ObservableObject, CLLocationManagerDeleg
 
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         coordinate = locations.last?.coordinate
+    }
+
+    func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
+        isDenied = [.denied, .restricted].contains(manager.authorizationStatus)
     }
 }
 
@@ -1880,6 +2252,22 @@ struct MainTabView: View {
     }
 }
 
+// The bottom menu is laid out on the 402×874 canvas (centred, 77 tall), then
+// shrunk around its bottom-centre so its bottom edge stays put.
+enum NovaDashMenuSize {
+    static let scale: CGFloat = 0.88
+    static let anchor = UnitPoint(x: 201.5 / 402, y: 849.0 / 874)
+    static let width: CGFloat = 330
+    static let left: CGFloat = 201.5 - width / 2
+    static let segment: CGFloat = width / 3
+    static let pillWidth: CGFloat = 107
+    // How far the highlighted pill moves per tab.
+    static let step: CGFloat = (width - pillWidth) / 2
+
+    /// A tab icon's centre, measured from the menu's left edge.
+    static func iconCenter(_ index: Int) -> CGFloat { pillWidth / 2 + CGFloat(index) * step }
+}
+
 private struct NovaDashTabBar: View {
     @Binding var selection: Int
 
@@ -1888,27 +2276,27 @@ private struct NovaDashTabBar: View {
             ZStack(alignment: .topLeading) {
                 Capsule()
                     .fill(Color.novaDashNavy)
-                    .frame(width: 305, height: 77)
-                    .offset(x: 49, y: 772)
+                    .frame(width: NovaDashMenuSize.width, height: 77)
+                    .offset(x: NovaDashMenuSize.left, y: 772)
 
                 Capsule()
                     .fill(Color.novaDashIvory)
                     .overlay(Capsule().stroke(Color.novaDashNavy, lineWidth: 2))
-                    .frame(width: 107, height: 77)
-                    .offset(x: 49 + CGFloat(selection) * 99, y: 772)
+                    .frame(width: NovaDashMenuSize.pillWidth, height: 77)
+                    .offset(x: NovaDashMenuSize.left + CGFloat(selection) * NovaDashMenuSize.step, y: 772)
 
                 tabButton(index: 0, accessibilityLabel: "Order")
-                    .offset(x: 49, y: 772)
+                    .offset(x: NovaDashMenuSize.left, y: 772)
                 tabButton(index: 1, accessibilityLabel: "Deliver")
-                    .offset(x: 150.667, y: 772)
+                    .offset(x: NovaDashMenuSize.left + NovaDashMenuSize.segment, y: 772)
                 tabButton(index: 2, accessibilityLabel: "Account")
-                    .offset(x: 252.333, y: 772)
+                    .offset(x: NovaDashMenuSize.left + 2 * NovaDashMenuSize.segment, y: 772)
 
                 Image(systemName: "cart")
                     .font(.system(size: 28, weight: .light))
                     .foregroundColor(selection == 0 ? .novaDashNavy : .novaDashIvory)
                     .frame(width: 30, height: 30)
-                    .offset(x: 87, y: 796)
+                    .offset(x: NovaDashMenuSize.left + NovaDashMenuSize.iconCenter(0) - 15, y: 796)
                     .allowsHitTesting(false)
 
                 Image("NovaDashScooterInner")
@@ -1916,7 +2304,7 @@ private struct NovaDashTabBar: View {
                     .resizable()
                     .foregroundColor(selection == 1 ? .novaDashNavy : .novaDashIvory)
                     .frame(width: 44.95, height: 35.187)
-                    .offset(x: 179.7, y: 792.8)
+                    .offset(x: NovaDashMenuSize.left + NovaDashMenuSize.iconCenter(1) - 22.475, y: 792.8)
                     .allowsHitTesting(false)
 
                 if selection == 2 {
@@ -1924,16 +2312,18 @@ private struct NovaDashTabBar: View {
                         .font(.system(size: 27, weight: .light))
                         .foregroundColor(.novaDashNavy)
                         .frame(width: 30, height: 30)
-                        .offset(x: 286, y: 795)
+                        .offset(x: NovaDashMenuSize.left + NovaDashMenuSize.iconCenter(2) - 15, y: 795)
                         .allowsHitTesting(false)
                 } else {
                     Image("NovaDashAccount")
                         .resizable()
                         .frame(width: 23, height: 28)
-                        .offset(x: 289, y: 797)
+                        .offset(x: NovaDashMenuSize.left + NovaDashMenuSize.iconCenter(2) - 11.5, y: 797)
                         .allowsHitTesting(false)
                 }
             }
+            .frame(width: 402, height: 874, alignment: .topLeading)
+            .scaleEffect(NovaDashMenuSize.scale, anchor: NovaDashMenuSize.anchor)
         }
     }
 
@@ -1943,7 +2333,7 @@ private struct NovaDashTabBar: View {
         } label: {
             Rectangle()
                 .fill(Color.white.opacity(0.001))
-                .frame(width: 101.667, height: 77)
+                .frame(width: NovaDashMenuSize.segment, height: 77)
                 .contentShape(Rectangle())
         }
         .buttonStyle(PlainButtonStyle())
@@ -2106,7 +2496,11 @@ private struct DiningOptionButtonStyle: ButtonStyle {
 struct OrderDetailsView: View {
     @EnvironmentObject private var model: AppModel
     @StateObject private var form: OrderForm
+    @StateObject private var location = DeliveryLocation()
+    @State private var quotedAt: CLLocation?
     @State private var activeOrder: Order?
+    @State private var payingWithApplePay = false
+    @FocusState private var extraNotesFocused: Bool
     let onBack: () -> Void
 
     init(store: String, onBack: @escaping () -> Void) {
@@ -2138,13 +2532,21 @@ struct OrderDetailsView: View {
             }
         }
         .novaDashEdgeSwipeBack(onBack)
+        .onAppear { location.start() }
+        .onReceive(location.$coordinate.compactMap { $0 }) { coordinate in
+            // Re-price only when the orderer has moved a block or so.
+            let here = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+            guard quotedAt.map({ $0.distance(from: here) > 75 }) ?? true else { return }
+            quotedAt = here
+            Task { await refreshQuote() }
+        }
         .fullScreenCover(item: $activeOrder) { order in
             CustomerOrderFlowView(initialOrder: order) {
                 activeOrder = nil
                 onBack()
             }
         }
-        .preferredColorScheme(.light)
+        .preferredColorScheme(.dark)
     }
 
     private var orderTicket: some View {
@@ -2152,11 +2554,11 @@ struct OrderDetailsView: View {
             ticketBox(width: 230, height: 146, x: 24, y: 156.72)
             ticketBox(width: 354, height: 70, x: 24, y: 232.72)
             ticketBox(width: 354, height: 70, x: 24, y: 300.72)
-            ticketBox(width: 354, height: 165, x: 24, y: 368.72)
-            ticketBox(width: 235, height: 49, x: 24, y: 531.72)
-            ticketBox(width: 121, height: 49, x: 257, y: 531.72)
-            ticketBox(width: 235, height: 50, x: 24, y: 578.72)
-            ticketBox(width: 121, height: 50, x: 257, y: 578.72)
+            ticketBox(width: 354, height: 141, x: 24, y: 368.72)
+            ticketBox(width: 235, height: 49, x: 24, y: 507.72)
+            ticketBox(width: 121, height: 49, x: 257, y: 507.72)
+            ticketBox(width: 235, height: 50, x: 24, y: 554.72)
+            ticketBox(width: 121, height: 50, x: 257, y: 554.72)
 
             Text(form.store)
                 .font(.custom("Georgia", size: 34.61))
@@ -2200,9 +2602,16 @@ struct OrderDetailsView: View {
                 .foregroundColor(.novaDashNavy)
                 .multilineTextAlignment(.leading)
                 .environment(\.layoutDirection, .leftToRight)
+                .focused($extraNotesFocused)
+                .submitLabel(.done)
+                .onChange(of: form.details) { value in
+                    guard value.last == "\n" else { return }
+                    form.details.removeLast()
+                    extraNotesFocused = false
+                }
                 .padding(.horizontal, 20)
                 .padding(.vertical, 7)
-                .frame(width: 354, height: 165)
+                .frame(width: 354, height: 141)
                 .background(Color.clear)
                 .offset(x: 24, y: 368.72)
                 .accessibilityLabel("Extra notes")
@@ -2210,63 +2619,102 @@ struct OrderDetailsView: View {
             if form.details.isEmpty {
                 ticketPrompt("EXTRA NOTES\n(EG. WHERE TO MEET)")
                     .multilineTextAlignment(.leading)
-                    .frame(width: 304, height: 135, alignment: .topLeading)
+                    .frame(width: 304, height: 111, alignment: .topLeading)
                     .offset(x: 50, y: 384.72)
                     .allowsHitTesting(false)
             }
 
             ticketLabel("DELIVERY FEE:")
                 .frame(width: 235, height: 49, alignment: .center)
-                .offset(x: 24, y: 531.72)
-            ticketLabel("$5.00")
+                .offset(x: 24, y: 507.72)
+            ticketLabel(form.quote?.feeText ?? "—")
                 .frame(width: 121, height: 49, alignment: .center)
-                .offset(x: 257, y: 531.72)
+                .offset(x: 257, y: 507.72)
+                .accessibilityLabel(form.quote.map { "Delivery fee \($0.feeText)" } ?? "Delivery fee not priced yet")
             ticketLabel("ESTIMATED TIME")
                 .frame(width: 235, height: 50, alignment: .center)
-                .offset(x: 24, y: 578.72)
-            ticketLabel("20 mins")
+                .offset(x: 24, y: 554.72)
+            ticketLabel(form.quote.map { "\($0.walkMinutes) min\($0.walkMinutes == 1 ? "" : "s")" } ?? "—")
                 .frame(width: 121, height: 50, alignment: .center)
-                .offset(x: 257, y: 578.72)
+                .offset(x: 257, y: 554.72)
 
-            Text("*You will only be charged when a student accepts delivery. No fees for canceling anytime before.")
-                .font(.custom("Inter-Regular", size: 14.095))
-                .foregroundColor(Color(red: 0.632, green: 0.632, blue: 0.632))
-                .fixedSize(horizontal: false, vertical: true)
-                .frame(width: 332, alignment: .leading)
-                .offset(x: 27, y: 637.72)
+            // The pricing note runs two to four lines, so the notice follows it.
+            VStack(alignment: .leading, spacing: 8) {
+                Text("*\(pricingNote) You will only be charged when a student accepts delivery. No fees for canceling anytime before.")
+                    .font(.custom("Inter-Regular", size: 14.095))
+                    .foregroundColor(Color(red: 0.632, green: 0.632, blue: 0.632))
+                    .fixedSize(horizontal: false, vertical: true)
 
-            if let notice = form.notice {
-                Text(notice)
-                    .font(.custom("Inter-Regular", size: 14))
-                    .foregroundColor(notice == "Order posted" ? .green : .red)
-                    .frame(width: 332, alignment: .leading)
-                    .offset(x: 27, y: 685)
+                if let notice = form.notice {
+                    Text(notice)
+                        .font(.custom("Inter-Regular", size: 14))
+                        .foregroundColor(notice == "Order posted" ? .green : .red)
+                        .lineLimit(2)
+                        .minimumScaleFactor(0.85)
+                }
             }
+            .frame(width: 332, alignment: .leading)
+            .offset(x: 27, y: 613.72)
 
             Button {
-                Task { await placeOrder() }
+                Task { await placeOrder(withApplePay: false) }
             } label: {
                 Group {
-                    if form.isPosting {
-                        ProgressView().tint(.novaDashIvory)
+                    if form.isPosting && !payingWithApplePay {
+                        ProgressView().tint(.white)
                     } else {
-                        Text("place order")
+                        Text("Pay Now")
                             .font(.custom("Inter-Medium", size: 23.442))
-                            .foregroundColor(.novaDashIvory)
+                            .foregroundColor(.white)
                     }
                 }
-                .frame(width: 305, height: 77)
-                .background(Color.novaDashNavy)
+                .frame(width: 354, height: 58)
+                .background(Color.novaDashPayNow)
                 .clipShape(Capsule())
             }
             .buttonStyle(.plain)
-            .disabled(form.isPosting)
-            .offset(x: 48.5, y: 742)
-            .accessibilityLabel("Place order")
+            .disabled(form.isPosting || form.quote == nil)
+            .opacity(form.quote == nil && !form.isPosting ? 0.5 : 1)
+            .offset(x: 24, y: 708)
+            .accessibilityLabel("Pay now")
+
+            // Greyed out until Apple Pay is turned on (ApplePay.isEnabled) and
+            // this phone has a card in Wallet.
+            ApplePayButton(style: .whiteOutline, cornerRadius: 29) {
+                Task { await placeOrder(withApplePay: true) }
+            }
+            .frame(width: 354, height: 58)
+            .disabled(!ApplePay.isAvailable || form.isPosting || form.quote == nil)
+            .opacity(!ApplePay.isAvailable || form.quote == nil ? 0.4 : 1)
+            .offset(x: 24, y: 778)
+            .accessibilityLabel(ApplePay.isEnabled ? "Pay with Apple Pay" : "Apple Pay, coming soon")
         }
     }
 
-    private func placeOrder() async {
+    private var pricingNote: String {
+        if let quote = form.quote { return "Fee: \(quote.summary)." }
+        if location.isDenied { return "Turn on location for NovaDash in Settings to see your delivery fee." }
+        if let error = form.quoteError, !form.isQuoting { return error }
+        return "Finding your location to price the delivery."
+    }
+
+    private func refreshQuote() async {
+        guard let dropoff = location.coordinate else { return }
+        form.isQuoting = true
+        do {
+            let weather = await DeliveryWeather.current(near: StoreLocations.coordinate(for: form.store))
+            form.quote = try DeliveryPricing.quote(store: form.store, dropoff: dropoff, weather: weather)
+            form.quoteError = nil
+        } catch {
+            form.quote = nil
+            form.quoteError = error.localizedDescription
+        }
+        form.isQuoting = false
+    }
+
+    /// Pay Now uses the saved card (or Stripe's card page if there isn't one);
+    /// Apple Pay saves the Wallet card from Apple's sheet first.
+    private func placeOrder(withApplePay: Bool) async {
         let orderNumber = form.orderNumber.trimmingCharacters(in: .whitespacesAndNewlines)
         let items = form.items.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !orderNumber.isEmpty, !items.isEmpty else {
@@ -2274,18 +2722,44 @@ struct OrderDetailsView: View {
             return
         }
 
+        guard form.quote != nil else {
+            form.notice = "Wait for the delivery fee before placing your order."
+            return
+        }
+
         form.isPosting = true
+        payingWithApplePay = withApplePay
         form.notice = nil
         do {
-            // With card payments on, an order needs a saved card to charge
-            // when a student accepts it.
-            let payments = try await model.client.paymentStatus()
-            if payments.enabled && payments.card == nil {
-                guard try await model.addCard() else {
-                    form.notice = "Add a card to place your order."
+            // The card saved here is the one charged when a student accepts.
+            if withApplePay {
+                guard try await model.addApplePay(feeCents: form.quote?.feeCents) else {
                     form.isPosting = false
                     return
                 }
+            } else {
+                let payments = try await model.client.paymentStatus()
+                if payments.enabled && payments.card == nil {
+                    guard try await model.addCard() else {
+                        form.notice = "Add a card to place your order."
+                        form.isPosting = false
+                        return
+                    }
+                }
+            }
+            // Price again at the moment of ordering, in case the hour or the
+            // weather changed while the form was open.
+            let shownFee = form.quote?.feeCents
+            await refreshQuote()
+            guard let quote = form.quote else {
+                form.notice = form.quoteError ?? "The delivery fee couldn't be priced."
+                form.isPosting = false
+                return
+            }
+            guard quote.feeCents == shownFee else {
+                form.notice = "The delivery fee just changed to \(quote.feeText). Tap pay again to confirm."
+                form.isPosting = false
+                return
             }
             let order = try await model.client.createOrder(
                 store: form.store,
@@ -2293,7 +2767,7 @@ struct OrderDetailsView: View {
                 hall: form.hall,
                 details: form.details.trimmingCharacters(in: .whitespacesAndNewlines),
                 items: items,
-                tip: Double(form.tip) ?? 5
+                tip: quote.fee
             )
             activeOrder = order
         } catch {
@@ -2820,7 +3294,7 @@ private struct DeliveryRequestDetailsView: View {
                 .transition(liftsIntoHandoff ? .novaDashSlide(.top) : .identity)
             }
         }
-        .preferredColorScheme(.light)
+        .preferredColorScheme(!state.isAccepted && swipeOffset > 625 ? .dark : .light)
     }
 
     private var deliveryTicket: some View {
@@ -3093,12 +3567,9 @@ struct AccountView: View {
                         }
                         .offset(y: 379)
 
-                        Button {
-                            Task { await addCard() }
-                        } label: {
-                            AccountMenuRow(title: paymentMethodTitle, height: 64)
+                        NavigationLink(destination: PaymentMethodsView()) {
+                            AccountMenuRow(title: "Add/Edit Payment Method", height: 64)
                         }
-                        .disabled(state.isWorking)
                         .offset(y: 443)
 
                         NavigationLink(destination: AccountInfoView()) {
@@ -3106,12 +3577,9 @@ struct AccountView: View {
                         }
                         .offset(y: 507)
 
-                        Button {
-                            Task { await openPayouts() }
-                        } label: {
-                            AccountMenuRow(title: model.paymentStatus?.payouts.ready == true ? "Withdraw" : "Set Up Payouts", height: 64)
+                        NavigationLink(destination: WithdrawView()) {
+                            AccountMenuRow(title: "Withdraw", height: 64)
                         }
-                        .disabled(state.isWorking)
                         .offset(y: 571)
 
                         Button {
@@ -3149,41 +3617,6 @@ struct AccountView: View {
         return cents.map { String(format: "$%.2f", Double($0) / 100) } ?? "$0.00"
     }
 
-    private var paymentMethodTitle: String {
-        guard let card = model.paymentStatus?.card else { return "Add/Edit Payment Method" }
-        return "\(card.brand.capitalized) •••• \(card.last4)"
-    }
-
-    private func addCard() async {
-        if model.paymentStatus == nil { await model.loadPaymentStatus() }
-        guard model.paymentStatus?.enabled == true else {
-            state.show("Not available yet", "Card payments aren't turned on yet.")
-            return
-        }
-        state.isWorking = true
-        do {
-            if try await model.addCard() { state.show("Card saved", "You'll be charged the delivery fee when a student accepts your order.") }
-        } catch {
-            state.show("Card not saved", error.localizedDescription)
-        }
-        state.isWorking = false
-    }
-
-    private func openPayouts() async {
-        if model.paymentStatus == nil { await model.loadPaymentStatus() }
-        guard model.paymentStatus?.enabled == true else {
-            state.show("Not available yet", "Test credits can't be withdrawn, and payouts aren't turned on yet.")
-            return
-        }
-        state.isWorking = true
-        do {
-            try await model.openPayouts()
-        } catch {
-            state.show("Payouts", error.localizedDescription)
-        }
-        state.isWorking = false
-    }
-
     private func profileDivider(y: CGFloat) -> some View {
         Rectangle()
             .fill(Color.novaDashNavy)
@@ -3219,6 +3652,523 @@ private struct LeadingRoundedRectangle: Shape {
             byRoundingCorners: [.topLeft, .bottomLeft],
             cornerRadii: CGSize(width: radius, height: radius)
         ).cgPath)
+    }
+}
+
+@MainActor private final class WithdrawState: ObservableObject {
+    enum Stage { case loading, unavailable, setup, amount, destination, done }
+
+    @Published var stage: Stage = .loading
+    @Published var entry = ""
+    @Published var overview: PayoutOverview?
+    @Published var selectedID: String?
+    @Published var receipt: WithdrawalReceipt?
+    @Published var message: String?
+    @Published var isWorking = false
+    // One ID per withdrawal, so a retried tap can't send the money twice.
+    var requestID = UUID()
+
+    var amountCents: Int64 {
+        let parts = entry.split(separator: ".", omittingEmptySubsequences: false)
+        let dollars = Int64(parts.first ?? "") ?? 0
+        let fraction = parts.count > 1 ? String(parts[1]).padding(toLength: 2, withPad: "0", startingAt: 0) : "00"
+        return dollars * 100 + (Int64(fraction) ?? 0)
+    }
+
+    var availableCents: Int64 { overview?.availableCents ?? 0 }
+    var isOverBalance: Bool { amountCents > availableCents }
+
+    // Typed like a calculator: up to 5 dollar digits and 2 cent digits.
+    func press(_ key: String) {
+        switch key {
+        case "⌫":
+            if !entry.isEmpty { entry.removeLast() }
+        case ".":
+            if !entry.contains(".") { entry = (entry.isEmpty ? "0" : entry) + "." }
+        default:
+            if let dot = entry.firstIndex(of: ".") {
+                if entry[entry.index(after: dot)...].count < 2 { entry += key }
+            } else if entry == "0" {
+                entry = key
+            } else if entry.count < 5 {
+                entry += key
+            }
+        }
+    }
+
+    func fillAvailable() {
+        let cents = availableCents
+        entry = cents % 100 == 0 ? "\(cents / 100)" : String(format: "%d.%02d", cents / 100, cents % 100)
+    }
+}
+
+private func dollarText(_ cents: Int64) -> String {
+    String(format: "$%.2f", Double(cents) / 100)
+}
+
+private struct WithdrawView: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.dismiss) private var dismiss
+    @StateObject private var state = WithdrawState()
+    // The app's bottom menu floats over this page; keep buttons above it.
+    private static let tabBarClearance: CGFloat = 88
+
+    var body: some View {
+        ZStack {
+            Color.novaDashIvory.ignoresSafeArea()
+            switch state.stage {
+            case .loading:
+                ProgressView().tint(.novaDashNavy)
+            case .unavailable:
+                notice(title: "Not available yet", body: state.message ?? "Payouts aren't turned on yet.", button: "Try again") { Task { await load() } }
+            case .setup:
+                notice(
+                    title: "Set up payouts",
+                    body: "Before we can send you money, Stripe needs to confirm who you are and where to send it. It takes a few minutes, and you only do it once.",
+                    button: state.isWorking ? "Opening…" : "Continue to Stripe"
+                ) { Task { await openStripe() } }
+            case .amount:
+                amountStage
+            case .destination:
+                destinationStage
+            case .done:
+                doneStage
+            }
+        }
+        .navigationTitle(state.stage == .done ? "" : "Withdraw")
+        .navigationBarTitleDisplayMode(.inline)
+        .animation(.easeInOut(duration: 0.2), value: state.stage)
+        .task { await load() }
+    }
+
+    // MARK: Amount
+
+    private var amountStage: some View {
+        VStack(spacing: 0) {
+            Spacer(minLength: 12)
+            Text(state.entry.isEmpty ? "$0" : "$" + state.entry)
+                .font(.custom("Inter-SemiBold", size: 72))
+                .foregroundColor(state.isOverBalance ? .red : .novaDashNavy)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+                .padding(.horizontal, 24)
+                .accessibilityLabel("Amount \(dollarText(state.amountCents))")
+
+            Button(action: state.fillAvailable) {
+                Text("\(dollarText(state.availableCents)) available")
+                    .font(.custom("Inter-Medium", size: 16))
+                    .foregroundColor(.novaDashNavy)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .overlay(Capsule().stroke(Color.novaDashNavy, lineWidth: 1.5))
+            }
+            .buttonStyle(.plain)
+            .padding(.top, 14)
+            .accessibilityHint("Fills in your whole available balance")
+
+            if let pending = state.overview?.pendingCents, pending > 0 {
+                Text("\(dollarText(pending)) more becomes available in a few days")
+                    .font(.custom("Inter-Regular", size: 13))
+                    .foregroundColor(.secondary)
+                    .padding(.top, 10)
+            }
+
+            Spacer(minLength: 12)
+            keypad
+            Button {
+                state.message = nil
+                if state.selectedID == nil {
+                    state.selectedID = state.overview?.destinations.first(where: \.isDefault)?.id ?? state.overview?.destinations.first?.id
+                }
+                state.stage = .destination
+            } label: {
+                pillLabel("next")
+            }
+            .buttonStyle(.plain)
+            .disabled(state.amountCents < 100 || state.isOverBalance)
+            .opacity(state.amountCents < 100 || state.isOverBalance ? 0.4 : 1)
+            .padding(.top, 8)
+            .padding(.bottom, Self.tabBarClearance)
+        }
+    }
+
+    private var keypad: some View {
+        let keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", ".", "0", "⌫"]
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 3), spacing: 6) {
+            ForEach(keys, id: \.self) { key in
+                Button { state.press(key) } label: {
+                    Group {
+                        if key == "⌫" {
+                            Image(systemName: "delete.left").font(.system(size: 24, weight: .medium))
+                        } else {
+                            Text(key).font(.custom("Inter-Medium", size: 32))
+                        }
+                    }
+                    .foregroundColor(.novaDashNavy)
+                    .frame(maxWidth: .infinity, minHeight: 64)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(KeypadButtonStyle())
+                .accessibilityLabel(key == "⌫" ? "Delete" : (key == "." ? "Decimal point" : key))
+            }
+        }
+        .padding(.horizontal, 28)
+    }
+
+    // MARK: Destination
+
+    private var destinationStage: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Button("edit amount") { state.stage = .amount }
+                .font(.custom("Inter-Medium", size: 17))
+                .foregroundColor(.novaDashNavy)
+                .padding(.top, 8)
+
+            Text("Send \(dollarText(state.amountCents)) to")
+                .font(.custom("Georgia-BoldItalic", size: 32))
+                .foregroundColor(.novaDashNavy)
+                .padding(.top, 18)
+                .padding(.bottom, 18)
+
+            ForEach(state.overview?.destinations ?? []) { destination in
+                Button { state.selectedID = destination.id } label: {
+                    destinationRow(destination, selected: destination.id == state.selectedID)
+                }
+                .buttonStyle(.plain)
+                Rectangle().fill(Color.novaDashNavy.opacity(0.15)).frame(height: 1)
+            }
+
+            Button { Task { await openStripe() } } label: {
+                HStack(spacing: 14) {
+                    Image(systemName: "plus.circle").font(.system(size: 22))
+                    Text("Add or change a bank or card").font(.custom("Inter-Regular", size: 17))
+                }
+                .foregroundColor(.novaDashNavy)
+                .padding(.vertical, 16)
+            }
+            .buttonStyle(.plain)
+            .disabled(state.isWorking)
+
+            Spacer()
+
+            if let message = state.message {
+                Text(message)
+                    .font(.custom("Inter-Regular", size: 14))
+                    .foregroundColor(.red)
+                    .padding(.bottom, 12)
+            }
+            Text("Standard transfer, usually 1–3 business days. No fee.")
+                .font(.custom("Inter-Regular", size: 13))
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity)
+                .padding(.bottom, 12)
+            Button { Task { await send() } } label: {
+                Group {
+                    if state.isWorking { ProgressView().tint(.novaDashIvory) } else { pillLabel("withdraw \(dollarText(state.amountCents))", framed: false) }
+                }
+                .frame(maxWidth: .infinity, minHeight: 68)
+                .background(Color.novaDashNavy)
+                .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(state.isWorking || state.selectedID == nil)
+            .opacity(state.selectedID == nil ? 0.4 : 1)
+            .padding(.bottom, Self.tabBarClearance)
+        }
+        .padding(.horizontal, 24)
+    }
+
+    private func destinationRow(_ destination: PayoutDestination, selected: Bool) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: destination.isCard ? "creditcard" : "building.columns")
+                .font(.system(size: 20))
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(destination.displayName).font(.custom("Inter-Medium", size: 17))
+                Text(destination.isCard ? "Debit card" : "Bank account")
+                    .font(.custom("Inter-Regular", size: 13))
+                    .foregroundColor(.secondary)
+            }
+            Spacer()
+            Image(systemName: selected ? "largecircle.fill.circle" : "circle")
+                .font(.system(size: 22))
+        }
+        .foregroundColor(.novaDashNavy)
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    // MARK: Done
+
+    private var doneStage: some View {
+        VStack(spacing: 14) {
+            Spacer()
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 76))
+                .foregroundColor(.novaDashNavy)
+            Text("\(dollarText(state.receipt?.amountCents ?? 0)) is on its way")
+                .font(.custom("Georgia-BoldItalic", size: 30))
+                .foregroundColor(.novaDashNavy)
+                .multilineTextAlignment(.center)
+            if let receipt = state.receipt {
+                Text("To \(receipt.destination.displayName)")
+                    .font(.custom("Inter-Regular", size: 17))
+                    .foregroundColor(.novaDashNavy)
+                if let arrival = receipt.arrivalDate {
+                    Text("Expected by \(Date(timeIntervalSince1970: arrival).formatted(.dateTime.weekday(.wide).month(.abbreviated).day()))")
+                        .font(.custom("Inter-Regular", size: 15))
+                        .foregroundColor(.secondary)
+                }
+            }
+            Spacer()
+            Button { dismiss() } label: { pillLabel("done") }
+                .buttonStyle(.plain)
+                .padding(.bottom, Self.tabBarClearance)
+        }
+        .padding(.horizontal, 24)
+    }
+
+    // MARK: Shared
+
+    private func pillLabel(_ title: String, framed: Bool = true, compact: Bool = false) -> some View {
+        Text(title)
+            .font(.custom("Inter-Medium", size: compact ? 18 : 23.442))
+            .foregroundColor(.novaDashIvory)
+            .padding(.horizontal, compact ? 28 : 0)
+            .frame(maxWidth: framed && !compact ? 305 : nil, minHeight: framed ? (compact ? 50 : 68) : nil)
+            .background(framed ? Color.novaDashNavy : Color.clear)
+            .clipShape(Capsule())
+    }
+
+    private func notice(title: String, body: String, button: String, action: @escaping () -> Void) -> some View {
+        VStack(spacing: 16) {
+            Spacer()
+            Text(title)
+                .font(.custom("Georgia-BoldItalic", size: 32))
+                .foregroundColor(.novaDashNavy)
+            Text(body)
+                .font(.custom("Inter-Regular", size: 17))
+                .foregroundColor(.novaDashNavy)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer()
+            Button(action: action) { pillLabel(button, compact: true) }
+                .buttonStyle(.plain)
+                .disabled(state.isWorking)
+                .padding(.bottom, Self.tabBarClearance)
+        }
+        .padding(.horizontal, 28)
+    }
+
+    private func load() async {
+        do {
+            let status = try await model.client.paymentStatus()
+            model.paymentStatus = status
+            guard status.enabled else {
+                state.message = "Payouts aren't turned on yet, and test credits can't be withdrawn."
+                state.stage = .unavailable
+                return
+            }
+            guard status.payouts.ready else {
+                state.stage = .setup
+                return
+            }
+            let overview = try await model.client.payoutOverview()
+            state.overview = overview
+            if let selected = state.selectedID, !overview.destinations.contains(where: { $0.id == selected }) {
+                state.selectedID = nil
+            }
+            if state.stage != .destination { state.stage = .amount }
+        } catch {
+            state.message = error.localizedDescription
+            state.stage = .unavailable
+        }
+    }
+
+    // First-time setup, or adding a bank or card later, happens on Stripe's page.
+    private func openStripe() async {
+        state.isWorking = true
+        do {
+            try await model.openPayouts()
+            await load()
+        } catch {
+            state.message = error.localizedDescription
+        }
+        state.isWorking = false
+    }
+
+    private func send() async {
+        guard let destinationID = state.selectedID else { return }
+        state.isWorking = true
+        state.message = nil
+        let haptics = UINotificationFeedbackGenerator()
+        do {
+            state.receipt = try await model.client.withdraw(amountCents: state.amountCents, destinationID: destinationID, requestID: state.requestID)
+            state.requestID = UUID()
+            haptics.notificationOccurred(.success)
+            state.stage = .done
+            await model.loadPaymentStatus()
+        } catch {
+            haptics.notificationOccurred(.error)
+            state.message = error.localizedDescription
+        }
+        state.isWorking = false
+    }
+}
+
+private struct KeypadButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .background(Circle().fill(Color.novaDashNavy.opacity(configuration.isPressed ? 0.08 : 0)).frame(width: 72, height: 72))
+            .scaleEffect(configuration.isPressed ? 0.94 : 1)
+            .animation(.easeOut(duration: 0.12), value: configuration.isPressed)
+    }
+}
+
+@MainActor private final class PaymentMethodsState: ObservableObject {
+    @Published var cards: [SavedCard] = []
+    @Published var error: String?
+    @Published var isLoaded = false
+    @Published var isWorking = false
+}
+
+private struct PaymentMethodsView: View {
+    @EnvironmentObject private var model: AppModel
+    @StateObject private var state = PaymentMethodsState()
+
+    var body: some View {
+        List {
+            Section {
+                if state.cards.isEmpty {
+                    Text(state.isLoaded ? "No cards saved yet" : "Loading…")
+                        .foregroundColor(.secondary)
+                }
+                ForEach(state.cards) { card in
+                    Button { Task { await makeDefault(card) } } label: { cardRow(card) }
+                        .disabled(state.isWorking)
+                }
+                .onDelete { offsets in
+                    let removing = offsets.map { state.cards[$0] }
+                    Task { for card in removing { await remove(card) } }
+                }
+            } header: {
+                Text("Saved cards").font(.custom("Inter-Medium", size: 13))
+            } footer: {
+                if !state.cards.isEmpty {
+                    Text("The checked card is charged the delivery fee when a student accepts your order. Tap another card to use it instead, or swipe left to remove one.")
+                        .font(.custom("Inter-Regular", size: 13))
+                }
+            }
+
+            Section {
+                // Shown greyed out while Apple Pay is turned off (see ApplePay.isEnabled).
+                if ApplePay.isAvailable || !ApplePay.isEnabled {
+                    ApplePayButton { Task { await addApplePay() } }
+                        .frame(height: 44)
+                        .disabled(state.isWorking || !ApplePay.isEnabled)
+                        .opacity(state.isWorking || !ApplePay.isEnabled ? 0.4 : 1)
+                        .accessibilityLabel(ApplePay.isEnabled ? "Add Apple Pay" : "Apple Pay, coming soon")
+                }
+                Button { Task { await addCard() } } label: {
+                    HStack {
+                        Image(systemName: "plus.circle.fill")
+                        Text(state.isWorking ? "Opening…" : "Add a card")
+                    }
+                    .foregroundColor(.novaDashNavy)
+                }
+                .disabled(state.isWorking)
+                if let error = state.error {
+                    Text(error)
+                        .font(.custom("Inter-Regular", size: 13))
+                        .foregroundColor(.red)
+                }
+            }
+        }
+        .font(.custom("Inter-Regular", size: 17))
+        .navigationTitle("Payment Methods")
+        .task { await load() }
+        .refreshable { await load() }
+    }
+
+    private func cardRow(_ card: SavedCard) -> some View {
+        HStack(spacing: 14) {
+            Image(systemName: card.isApplePay ? "applelogo" : "creditcard")
+                .foregroundColor(.novaDashNavy)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(card.isApplePay ? "Apple Pay · \(card.brandName) •••• \(card.last4)" : "\(card.brandName) •••• \(card.last4)")
+                    .font(.custom("Inter-Medium", size: 17))
+                    .foregroundColor(.novaDashNavy)
+                if let month = card.expMonth, let year = card.expYear {
+                    Text(String(format: "Expires %02d/%02d", month, year % 100))
+                        .font(.custom("Inter-Regular", size: 13))
+                        .foregroundColor(.secondary)
+                }
+            }
+            Spacer()
+            if card.isDefault {
+                Image(systemName: "checkmark")
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.novaDashNavy)
+                    .accessibilityLabel("Charged for deliveries")
+            }
+        }
+        .padding(.vertical, 4)
+        .contentShape(Rectangle())
+    }
+
+    private func load() async {
+        do {
+            state.cards = try await model.client.savedCards()
+            state.error = nil
+        } catch {
+            state.error = error.localizedDescription
+        }
+        state.isLoaded = true
+    }
+
+    private func addCard() async {
+        state.isWorking = true
+        state.error = nil
+        do {
+            if try await model.addCard() { await load() }
+        } catch {
+            state.error = error.localizedDescription
+        }
+        state.isWorking = false
+    }
+
+    private func addApplePay() async {
+        state.isWorking = true
+        state.error = nil
+        do {
+            if try await model.addApplePay() { await load() }
+        } catch {
+            state.error = error.localizedDescription
+        }
+        state.isWorking = false
+    }
+
+    private func makeDefault(_ card: SavedCard) async {
+        guard !card.isDefault else { return }
+        await change { try await model.client.makeDefaultCard(card.id) }
+    }
+
+    private func remove(_ card: SavedCard) async {
+        await change { try await model.client.removeCard(card.id) }
+    }
+
+    private func change(_ operation: () async throws -> [SavedCard]) async {
+        state.isWorking = true
+        state.error = nil
+        do {
+            state.cards = try await operation()
+            await model.loadPaymentStatus()
+        } catch {
+            state.error = error.localizedDescription
+            await load()
+        }
+        state.isWorking = false
     }
 }
 
