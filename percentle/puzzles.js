@@ -4,8 +4,11 @@ const crypto = require("node:crypto");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 
-// Puzzle #1 is this Eastern-time date; later numbers count calendar days from it.
+// The game launched on this Eastern-time date; endless banks still count their periods from it.
 const LAUNCH_DATE = "2026-10-06";
+// Puzzle #1 is this date and later numbers count calendar days from it. The numbering was restarted
+// here (Nov 9 was #35, now #9) so the game looks newer; earlier puzzles have no number.
+const NUMBER_ONE_DATE = "2026-11-01";
 const QUESTIONS_PER_PUZZLE = 5;
 // Any mix is allowed on a given day; the category only labels the question.
 const CATEGORIES = ["U.S. life", "Sports", "Music", "Movies", "World"];
@@ -44,7 +47,7 @@ function addDays(date, days) {
 
 function puzzleNumber(date) {
   if (!isCalendarDate(date)) throw new RangeError("Date must be a YYYY-MM-DD calendar date.");
-  return daysBetween(LAUNCH_DATE, date) + 1;
+  return daysBetween(NUMBER_ONE_DATE, date) + 1;
 }
 
 function text(value, field, min, max, problems) {

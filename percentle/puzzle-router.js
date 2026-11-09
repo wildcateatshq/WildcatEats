@@ -96,7 +96,8 @@ function createPuzzleRouter(store, options = {}) {
       const date = today();
       const dates = await store.dates(addDays(date, -ARCHIVE_DAYS), addDays(date, -1));
       cacheUntilMidnight(res);
-      res.json({ puzzles: dates.map(day => ({ date: day, number: puzzleNumber(day) })) });
+      // Puzzles from before the numbering restarted would show as #0 or below, so they're left out.
+      res.json({ puzzles: dates.map(day => ({ date: day, number: puzzleNumber(day) })).filter(puzzle => puzzle.number >= 1) });
     } catch (error) {
       next(error);
     }

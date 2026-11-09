@@ -25,8 +25,8 @@ const validPuzzle = (seed = 0) => ["Sports", "Music", "Movies", "U.S. life", "Sp
 );
 
 test("puzzle numbers count Eastern calendar days from launch", () => {
-  assert.equal(puzzleNumber("2026-10-06"), 1);
-  assert.equal(puzzleNumber("2026-11-05"), 31);
+  assert.equal(puzzleNumber("2026-11-01"), 1);
+  assert.equal(puzzleNumber("2026-11-09"), 9);
   assert.equal(easternDate(new Date("2026-10-07T03:59:00Z")), "2026-10-06");
 });
 
@@ -138,7 +138,7 @@ test("puzzle API publishes with a token and never leaks future puzzles", async t
 
   assert.equal((await publish("2026-10-06")).status, 201);
   const today = await fetch(`${url}/today`).then(response => response.json());
-  assert.equal(today.number, 1);
+  assert.equal(today.number, puzzleNumber("2026-10-06"));
   assert.equal(today.questions.length, 5);
   assert.equal((await publish("2026-10-06")).status, 409);
   assert.equal((await publish("2026-10-05")).status, 400);
