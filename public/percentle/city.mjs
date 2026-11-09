@@ -915,7 +915,8 @@ export function createCity(root) {
       const half = Math.round(Math.sqrt(1 - (row / 6) ** 2) * 26);
       body += `<rect x="${(30 - half) * s}" y="${(row + 7) * s}" width="${half * 2 * s}" height="${s}"/>`;
     }
-    body += `<rect x="${54 * s}" y="${1 * s}" width="${4 * s}" height="${4 * s}"/><rect x="${54 * s}" y="${9 * s}" width="${4 * s}" height="${4 * s}"/><rect x="${24 * s}" y="${13 * s}" width="${12 * s}" height="${3 * s}"/>`;
+    // Tail fins at the back (left), since drifting art faces right and is mirrored to fly left.
+    body += `<rect x="${2 * s}" y="${1 * s}" width="${4 * s}" height="${4 * s}"/><rect x="${2 * s}" y="${9 * s}" width="${4 * s}" height="${4 * s}"/><rect x="${24 * s}" y="${13 * s}" width="${12 * s}" height="${3 * s}"/>`;
     const html = `<svg width="${60 * s}" height="${17 * s}" viewBox="0 0 ${60 * s} ${17 * s}"><g class="blimp-body">${body}</g>
         <rect class="blimp-banner" x="${12 * s}" y="${5 * s}" width="${36 * s}" height="${5 * s}"/>
         <text class="blimp-text" x="${30 * s}" y="${8.8 * s}" font-size="${3.4 * s}">CHARGLE.IO</text>
