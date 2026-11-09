@@ -21,6 +21,8 @@ button{color:inherit}
 .account-tabs button[aria-selected="true"]{border-color:var(--charge);color:var(--ink)}
 .account-form{display:grid;gap:12px}
 .account-form label{display:grid;gap:5px;font:500 10px var(--mono);letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
+.account-form label.account-agree{display:flex;align-items:flex-start;gap:8px;font:400 12px/1.5 var(--sans);letter-spacing:0;text-transform:none;color:var(--muted)}
+.account-agree input{margin:2px 0 0;accent-color:var(--charge);flex:none}
 .account-form input{padding:11px 12px;border:1px solid var(--line);border-radius:6px;background:var(--paper);color:var(--ink);font:500 15px var(--display);letter-spacing:0;text-transform:none;outline:none}
 .account-form input:focus{border-color:var(--charge)}
 .account-error{min-height:1em;margin:0;color:#ff8f7a!important}

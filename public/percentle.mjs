@@ -501,14 +501,18 @@ function showLogin(mode = "login") {
       <label>Email<input type="email" name="email" autocomplete="email" required></label>
       ${signup ? `<label>Username<input name="username" autocomplete="username" minlength="3" maxlength="20" pattern="[A-Za-z0-9_]{3,20}" required></label>` : ""}
       <label>Password<input type="password" name="password" autocomplete="${signup ? "new-password" : "current-password"}" minlength="${signup ? 8 : 1}" required></label>
+      ${signup ? `<label class="account-agree"><input type="checkbox" name="agreed" required> <span>I'm 13 or older and agree to the <button type="button" class="link-button" id="termsLink">Terms</button> and <button type="button" class="link-button" id="privacyAgreeLink">Privacy note</button>.</span></label>` : ""}
       <p class="account-error" role="alert"></p>
       <button class="share-button" type="submit">${signup ? "Create account" : "Log in"}</button>
       ${signup ? "" : `<button type="button" class="link-button account-forgot" id="forgotButton">Forgot password?</button>`}
-      <p class="account-note">${signup ? "Usernames are 3 to 20 letters, numbers, or underscores. Passwords need at least 8 characters. " : ""}Your stats and daily games follow you to any device you log in on. <button type="button" class="link-button" id="privacyLink">Privacy</button></p>
+      <p class="account-note">${signup ? "Usernames are 3 to 20 letters, numbers, or underscores. Passwords need at least 8 characters. " : ""}Your stats and daily games follow you to any device you log in on. <button type="button" class="link-button" id="privacyLink">Privacy</button> · <button type="button" class="link-button" id="termsNoteLink">Terms</button></p>
     </form>`);
   dialog.querySelectorAll("[data-mode]").forEach(tab => tab.addEventListener("click", () => showLogin(tab.dataset.mode)));
   dialog.querySelector("#forgotButton")?.addEventListener("click", () => showForgot(dialog.querySelector('input[name="email"]').value));
-  dialog.querySelector("#privacyLink").addEventListener("click", () => showPrivacy({ back: () => showLogin(mode) }));
+  // The Terms and Privacy links come back to this form (the fields start over).
+  const back = () => showLogin(mode);
+  for (const id of ["#privacyLink", "#privacyAgreeLink"]) dialog.querySelector(id)?.addEventListener("click", () => showPrivacy({ back }));
+  for (const id of ["#termsLink", "#termsNoteLink"]) dialog.querySelector(id)?.addEventListener("click", () => showTerms({ back }));
   const form = dialog.querySelector("#accountForm");
   form.querySelector("input").focus();
   form.addEventListener("submit", async event => {
@@ -516,6 +520,13 @@ function showLogin(mode = "login") {
     const error = form.querySelector(".account-error");
     const button = form.querySelector("button[type=submit]");
     const fields = Object.fromEntries(new FormData(form));
+    if (signup) {
+      fields.agreed = form.elements.agreed.checked;
+      if (!fields.agreed) {
+        error.textContent = "Please confirm you're 13 or older and agree to the Terms.";
+        return;
+      }
+    }
     button.disabled = true;
     error.textContent = "";
     try {
@@ -557,10 +568,26 @@ const PRIVACY_HTML = `<ul class="rules">
     <li><strong>Without an account</strong>, your stats stay in your browser. Chargle still collects some usage data: a random ID for your device (not linked to your name), your daily visits, which site or link brought you here, and your finished games' results, which are used for the "how you stack up" comparisons and to see how the game is doing.</li>
     <li><strong>How your email is used.</strong> Only to log you in and to send a password reset link when you ask for one. No newsletters, no ads, and your data is never sold.</li>
     <li><strong>AI.</strong> Chargle's questions are written and fact-checked by an AI (Anthropic's Claude), with a person reviewing them. The AI never sees your account or your game data.</li>
-    <li><strong>Other companies involved.</strong> Render hosts the site and its database, where the data above is stored, and keeps standard server logs such as IP addresses. Google Fonts supplies the game's fonts, so Google sees your IP address when the page loads. An email delivery service sends password reset emails, so it receives your email address when you ask for one. There are no ad or tracking networks.</li>
+    <li><strong>Other companies involved.</strong> Render hosts the site and its database, where the data above is stored, and keeps standard server logs such as IP addresses. An email delivery service sends password reset emails, so it receives your email address when you ask for one. There are no ad or tracking networks.</li>
     <li><strong>Deleting your data.</strong> Delete your account any time from <strong>Your stats → Delete account</strong>. That removes your email, username, and saved game data from Chargle's server. Usage counts that were never linked to you stay.</li>
     <li><strong>Questions?</strong> Email <a href="mailto:playchargle@gmail.com">playchargle@gmail.com</a> about your data or this note.</li>
   </ul>`;
+
+// The rules for using Chargle. Linked from the log-in box (where signing up means agreeing to
+// them) and the stats dialog.
+const TERMS_HTML = `<ul class="rules">
+    <li><strong>Who can play.</strong> Anyone can play. To create an account you must be <strong>13 or older</strong>.</li>
+    <li><strong>As is.</strong> Chargle is a free game provided as is, with no promise that it will always be available, error-free, or unchanged. As far as the law allows, Chargle isn't responsible for any loss or damage from using it.</li>
+    <li><strong>The questions.</strong> Questions are written by an AI and checked against the sources named with them, but they can still contain mistakes. They're for fun, not advice.</li>
+    <li><strong>Coins and the Market.</strong> Coins and Market items are only part of the game: they have no cash value and can't be bought, sold, or transferred. They may change or be reset if the game changes.</li>
+    <li><strong>Play fair.</strong> Don't cheat, use scripts or bots, interfere with the site, or pick an offensive username. Accounts that do may be removed.</li>
+    <li><strong>Changes.</strong> These terms may be updated; playing after an update means you accept it. Questions: <a href="mailto:playchargle@gmail.com">playchargle@gmail.com</a>.</li>
+  </ul>`;
+
+function showTerms({ back = null } = {}) {
+  openDialog("Terms of use", `${TERMS_HTML}<button class="share-button" id="termsDone">${back ? "Back" : "Got it"}</button>`);
+  dialog.querySelector("#termsDone").addEventListener("click", () => (back ? back() : dialog.close()));
+}
 
 function showPrivacy({ back = null, onDone = null } = {}) {
   openDialog("Your privacy", `${PRIVACY_HTML}<button class="share-button" id="privacyDone">${back ? "Back" : "Got it"}</button>`);
@@ -816,7 +843,7 @@ function countUpCoins(animate) {
 // The account line at the top of the stats dialog: who's logged in, or an invitation to.
 function accountLine() {
   return account
-    ? `<p class="account-line">Logged in as <strong>${escapeHtml(account.username)}</strong> · <button type="button" class="link-button" id="logoutButton">Log out</button> · <button type="button" class="link-button" id="privacyStatsLink">Privacy</button> · <button type="button" class="link-button" id="deleteAccountButton">Delete account</button></p>`
+    ? `<p class="account-line">Logged in as <strong>${escapeHtml(account.username)}</strong> · <button type="button" class="link-button" id="logoutButton">Log out</button> · <button type="button" class="link-button" id="privacyStatsLink">Privacy</button> · <button type="button" class="link-button" id="termsStatsLink">Terms</button> · <button type="button" class="link-button" id="deleteAccountButton">Delete account</button></p>`
     : `<p class="account-line">Keep your stats on every device: <button type="button" class="link-button" id="statsLoginButton">Log in or create an account</button></p>`;
 }
 
@@ -1757,6 +1784,7 @@ function showStats() {
   bindLastTenGames();
   dialog.querySelector("#logoutButton")?.addEventListener("click", logOut);
   dialog.querySelector("#privacyStatsLink")?.addEventListener("click", () => showPrivacy({ back: showStats }));
+  dialog.querySelector("#termsStatsLink")?.addEventListener("click", () => showTerms({ back: showStats }));
   dialog.querySelector("#deleteAccountButton")?.addEventListener("click", showDeleteAccount);
   dialog.querySelector("#statsLoginButton")?.addEventListener("click", () => showLogin());
   if (isTodayFinished()) loadArchive();

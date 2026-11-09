@@ -72,17 +72,20 @@ test("players sign up, log in on another device, sync their save, and log out", 
   const cookieOf = response => response.headers.get("set-cookie").split(";")[0];
 
   assert.equal((await (await send("GET", "/me")).json()).account, null, "nobody is logged in");
-  const bad = await send("POST", "/signup", { email: "nope", username: "x", password: "short" });
+  const bad = await send("POST", "/signup", { email: "nope", username: "x", password: "short", agreed: true });
   assert.equal(bad.status, 400);
+  const unagreed = await send("POST", "/signup", { email: "kid@example.com", username: "kid_1", password: "battery-power" });
+  assert.equal(unagreed.status, 400, "signing up needs the 13+ and Terms box ticked");
+  assert.match((await unagreed.json()).error, /13 or older/);
   assert.match((await bad.json()).error, /valid email[\s\S]*3 to 20[\s\S]*8 characters/);
 
-  const signup = await send("POST", "/signup", { email: " Jamie@Example.com ", username: "jamie_w", password: "battery-power" });
+  const signup = await send("POST", "/signup", { email: " Jamie@Example.com ", username: "jamie_w", password: "battery-power", agreed: true });
   assert.equal(signup.status, 201);
   assert.deepEqual((await signup.json()).account, { username: "jamie_w", email: "jamie@example.com" });
   assert.match(signup.headers.get("set-cookie"), /chargle_session=.+; Path=\/; HttpOnly; SameSite=Lax; Max-Age=\d+/);
   const phone = cookieOf(signup);
-  assert.equal((await send("POST", "/signup", { email: "jamie@example.com", username: "other", password: "battery-power" })).status, 409, "one account per email");
-  assert.equal((await send("POST", "/signup", { email: "b@example.com", username: "JAMIE_W", password: "battery-power" })).status, 409, "usernames are unique, ignoring case");
+  assert.equal((await send("POST", "/signup", { email: "jamie@example.com", username: "other", password: "battery-power", agreed: true })).status, 409, "one account per email");
+  assert.equal((await send("POST", "/signup", { email: "b@example.com", username: "JAMIE_W", password: "battery-power", agreed: true })).status, 409, "usernames are unique, ignoring case");
 
   const saved = await (await send("PUT", "/state", { state: { games: [{ date: "2026-11-01", score: 30, charge: 70 }] } }, phone)).json();
   assert.equal(saved.state.games.length, 1);
@@ -126,7 +129,7 @@ test("a forgotten password is reset by a one-time emailed link, and an account c
   });
   const cookieOf = response => response.headers.get("set-cookie").split(";")[0];
 
-  const phone = cookieOf(await send("/signup", { email: "sam@example.com", username: "sam", password: "old-password" }));
+  const phone = cookieOf(await send("/signup", { email: "sam@example.com", username: "sam", password: "old-password", agreed: true }));
   assert.deepEqual(await (await send("/forgot", { email: "nobody@example.com" })).json(), { ok: true }, "the same answer for an email with no account");
   assert.equal(sent.length, 0);
   assert.equal((await send("/forgot", { email: "SAM@example.com" })).status, 200);
@@ -151,7 +154,7 @@ test("a forgotten password is reset by a one-time emailed link, and an account c
   assert.equal((await send("/delete", { password: "new-password" }, laptop)).status, 204);
   assert.equal(await store.findByEmail("sam@example.com"), null, "the account is gone");
   assert.equal((await send("/login", { email: "sam@example.com", password: "new-password" })).status, 401);
-  assert.equal((await send("/signup", { email: "sam@example.com", username: "sam", password: "fresh-start" })).status, 201, "the email and username are free again");
+  assert.equal((await send("/signup", { email: "sam@example.com", username: "sam", password: "fresh-start", agreed: true })).status, 201, "the email and username are free again");
 });
 
 test("without email set up, a live server says reset emails aren't available", async t => {

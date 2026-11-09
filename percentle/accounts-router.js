@@ -70,6 +70,9 @@ function createAccountsRouter(store, options = {}) {
   router.post("/signup", async (req, res, next) => {
     if (!allow(clientAddress(req))) return res.status(429).json({ error: "Too many tries. Wait a minute and try again." });
     try {
+      // Creating an account means confirming you're 13 or older and agreeing to the Terms (the
+      // page's sign-up checkbox).
+      if (req.body?.agreed !== true) return res.status(400).json({ error: "Please confirm you're 13 or older and agree to the Terms." });
       const { email, username, password } = validateSignup(req.body);
       const account = await store.createAccount({ email, username, passwordHash: await hashPassword(password) });
       await startSession(req, res, account);
