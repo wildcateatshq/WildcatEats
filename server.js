@@ -441,7 +441,7 @@ app.use("/api/percentle/puzzles", createPuzzleRouter(percentlePuzzles, { endless
 app.use("/api/percentle/endless", createEndlessRouter(percentleEndless, { puzzles: percentlePuzzles }));
 // Daily player stats (anonymous visits, sources, shares) and the editor's spreadsheet feed.
 app.use("/api/percentle/stats", createStatsRouter(percentleStats, percentleCrowd, { accounts: percentleAccounts }));
-app.use("/api/percentle/accounts", createAccountsRouter(percentleAccounts));
+app.use("/api/percentle/accounts", createAccountsRouter(percentleAccounts, { puzzles: percentlePuzzles, endless: percentleEndless }));
 
 // "Late Night" is a pickup spot that only exists 9 PM – midnight, Eastern,
 // every day — computed off the server clock (not the client's) so it's

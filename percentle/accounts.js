@@ -78,7 +78,8 @@ function hashToken(token) {
 const isObject = value => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 // A save sent by a browser: the game's state ({ games, progress, achievements, endless }). Only its
-// overall shape and size are checked; it's the player's own data.
+// overall shape and size are checked here; its coins, games, and purchases are never trusted, but
+// worked out again from its guesses (verify.js).
 function validateState(state) {
   if (!isObject(state)) throw new RangeError("state must be an object.");
   if (Buffer.byteLength(JSON.stringify(state)) > MAX_STATE_BYTES) throw new RangeError("That save is too large.");
@@ -291,15 +292,21 @@ function createAccountStore(options = {}) {
   // Merges a browser's save into the account's and returns the result, one change at a time per
   // account so two devices saving together can't undo each other.
   async function mergeState(accountId, incoming) {
+    return updateState(accountId, saved => mergeStates(saved, incoming));
+  }
+
+  // Replaces an account's save with `change(saved)` (which may be async) and returns the new save.
+  // One change runs at a time per account, so two devices saving together can't undo each other.
+  async function updateState(accountId, change) {
     if (pool) {
       const client = await pool.connect();
       try {
         await client.query("begin");
         const { rows } = await client.query("select state from percentle_accounts where id = $1 for update", [accountId]);
-        const merged = mergeStates(rows[0]?.state, incoming);
-        await client.query("update percentle_accounts set state = $2 where id = $1", [accountId, JSON.stringify(merged)]);
+        const next = await change(rows[0]?.state ?? null);
+        await client.query("update percentle_accounts set state = $2 where id = $1", [accountId, JSON.stringify(next)]);
         await client.query("commit");
-        return merged;
+        return next;
       } catch (error) {
         await client.query("rollback");
         throw error;
@@ -307,11 +314,19 @@ function createAccountStore(options = {}) {
         client.release();
       }
     }
-    return queued(() => {
+    // File storage: the change is worked out before the write queue, then applied only if nothing
+    // else changed this save in the meantime (otherwise it's worked out again).
+    for (;;) {
       const account = data.accounts.find(item => item.id === accountId);
-      account.state = mergeStates(account.state, incoming);
-      return account.state;
-    });
+      const before = account.state;
+      const next = await change(before ?? null);
+      const applied = await queued(() => {
+        if (account.state !== before) return false;
+        account.state = next;
+        return true;
+      });
+      if (applied) return next;
+    }
   }
 
   // A password-reset link for an account. Returns false (and makes none) if one was made in the
@@ -423,12 +438,12 @@ function createAccountStore(options = {}) {
   }
 
   return {
-    init, createAccount, findByEmail, createSession, accountForSession, deleteSession, mergeState, dailySignups,
+    init, createAccount, findByEmail, createSession, accountForSession, deleteSession, mergeState, updateState, dailySignups,
     createReset, resetPassword, deleteAccount, passwordHashFor, clearState
   };
 }
 
 module.exports = {
-  AccountTaken, RESET_MINUTES, createAccountStore, hashPassword, hashToken, mergeStates, newReset, newSession, publicAccount,
+  AccountTaken, RESET_MINUTES, createAccountStore, hashPassword, hashToken, isOwner, mergeStates, newReset, newSession, publicAccount,
   validatePassword, validateSignup, validateState, verifyPassword
 };

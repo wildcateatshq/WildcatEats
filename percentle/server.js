@@ -54,7 +54,7 @@ app.use("/api/percentle/crowd", createCrowdRouter(crowd));
 app.use("/api/percentle/puzzles", createPuzzleRouter(puzzles, { endless }));
 app.use("/api/percentle/endless", createEndlessRouter(endless, { puzzles }));
 app.use("/api/percentle/stats", createStatsRouter(stats, crowd, { accounts }));
-app.use("/api/percentle/accounts", createAccountsRouter(accounts));
+app.use("/api/percentle/accounts", createAccountsRouter(accounts, { puzzles, endless }));
 app.use((req, res) => res.redirect("/"));
 app.use((err, req, res, next) => {
   console.error(err);

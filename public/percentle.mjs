@@ -355,7 +355,7 @@ function normalizeState(stored) {
   if (!stored.endless || typeof stored.endless !== "object") stored.endless = { best: {}, allTime: 0, runs: 0 };
   stored.endless.best ??= {};
   if (!stored.wallet || typeof stored.wallet !== "object") stored.wallet = emptyWallet();
-  for (const key of ["endless", "owned", "equipped"]) if (!stored.wallet[key] || typeof stored.wallet[key] !== "object") stored.wallet[key] = {};
+  for (const key of ["endless", "owned", "equipped", "pending"]) if (!stored.wallet[key] || typeof stored.wallet[key] !== "object") stored.wallet[key] = {};
   stored.endless.hardBest ??= {};
   stored.endless.hardAllTime ??= 0;
   for (const progress of Object.values(stored.progress)) {
@@ -387,6 +387,8 @@ const ACCOUNTS_URL = "/api/percentle/accounts";
 // a cookie the page can't read.
 const ACCOUNT_KEY = "percentle.account"; // also read where `account` is declared, at the top
 const ACCOUNT_SYNC_DELAY_MS = 1500;
+// Finished endless runs kept for the server to check (as many as it will look at).
+const MAX_PENDING_RUNS = 30;
 
 const isEndlessKey = key => key.startsWith("endless");
 
@@ -401,16 +403,23 @@ function rememberAccount(next) {
   // Log in until the player is logged in; then the market instead. Never both.
   document.querySelector("#loginButton").hidden = Boolean(next);
   document.querySelector("#marketButton").hidden = !next;
-  if (next?.owner) grantOwnerItems();
 }
 
-// The game's owner (marked by the server; see CHARGLE_OWNER_EMAILS) has every market item, paid
-// for at 0 so their coin balance stays as earned. It syncs to the account like any purchase.
-function grantOwnerItems() {
-  const missing = MARKET_ITEMS.filter(item => item.price > 0 && !state.wallet.owned[item.id]);
-  if (!missing.length) return;
-  for (const item of missing) state.wallet.owned[item.id] = { date: easternDate(), price: 0 };
-  save();
+// Takes the account's checked numbers from the server (percentle/verify.js): its games, endless
+// runs, and owned items. Games and runs the server hasn't seen yet (still on their way) stay, so
+// nothing flickers; the server never counts them until it has checked them.
+function takeVerified(verified) {
+  const games = new Map(state.games.map(game => [game.date, game]));
+  for (const game of verified.games || []) games.set(game.date, game);
+  state.games = [...games.values()].sort((a, b) => a.date.localeCompare(b.date));
+  const checked = verified.wallet?.endless || {};
+  state.wallet.endless = { ...Object.fromEntries(Object.entries(state.wallet.endless).filter(([id]) => state.wallet.pending[id])), ...checked };
+  for (const id of Object.keys(checked)) delete state.wallet.pending[id];
+  state.wallet.owned = verified.wallet?.owned || {};
+  if (verified.endless) Object.assign(state.endless, verified.endless);
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  } catch {}
 }
 
 function scheduleAccountSync() {
@@ -446,7 +455,7 @@ async function syncAccount({ apply = false, keepalive = false } = {}) {
       } catch (error) {
         console.error("Could not save Percentle progress.", error);
       }
-    }
+    } else takeVerified(body.state);
     return body.state;
   } catch (error) {
     console.error("Could not sync with the Chargle account.", error);
@@ -725,14 +734,31 @@ function showMarket(category = MARKET_CATEGORIES[0].id) {
     use(button.dataset.use);
     showMarket(category);
   }));
-  dialog.querySelectorAll("[data-buy]").forEach(button => button.addEventListener("click", () => {
+  // Purchases go through the server, which pays for them from the account's checked coins.
+  dialog.querySelectorAll("[data-buy]").forEach(button => button.addEventListener("click", async () => {
     const item = marketItem(button.dataset.buy);
     if (!item || coinBalance(state).balance < item.price) return;
-    wallet.owned[item.id] = { date: easternDate(), price: item.price };
-    use(item.id);
-    showMarket(category);
+    button.disabled = true;
+    try {
+      await syncAccount();
+      const response = await fetch(`${ACCOUNTS_URL}/buy`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id })
+      });
+      const body = await response.json().catch(() => ({}));
+      if (response.status === 401) rememberAccount(null);
+      if (!response.ok) throw new Error(body.error || "That didn't go through. Try again.");
+      takeVerified(body.state);
+      state.wallet.equipped = body.state.wallet?.equipped || state.wallet.equipped;
+      applyCosmetics();
+      save();
+      showToast(`${item.name} is yours!`);
+    } catch (error) {
+      showToast(error.message === "Failed to fetch" ? "Couldn't reach Chargle. Check your connection and try again." : error.message);
+    }
+    if (dialog.open && account) showMarket(category);
     refreshCoinTotal();
-    showToast(`${item.name} is yours!`);
   }));
 }
 
@@ -1834,7 +1860,17 @@ function renderEndlessResults() {
     // The run's coins: 1 for round 1, 2 for round 2... up to the day's endless limit.
     const date = easternDate();
     const coins = endlessCoins(rounds, endlessCoinsOn(state.wallet, date));
-    state.wallet.endless[crypto.randomUUID()] = { date, coins };
+    const runId = crypto.randomUUID();
+    state.wallet.endless[runId] = { date, coins };
+    // For an account, the server checks the run itself (percentle/verify.js): the questions asked,
+    // in order, and the guesses. It's kept here until the server has it.
+    state.wallet.pending[runId] = {
+      date, startsOn: period, hard: endlessHard,
+      questions: currentQuestions.slice(0, progress.guesses.length).map(question => questionKey(question.text)),
+      guesses: [...progress.guesses]
+    };
+    const waiting = Object.keys(state.wallet.pending);
+    for (const old of waiting.slice(0, Math.max(0, waiting.length - MAX_PENDING_RUNS))) delete state.wallet.pending[old];
     progress.recorded = { rounds, newBest: rounds > previousBest, coins };
     freshRun = true;
     state.endless.runs++;

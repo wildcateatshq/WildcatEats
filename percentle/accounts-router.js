@@ -3,7 +3,8 @@
 const crypto = require("node:crypto");
 const express = require("express");
 const { createRateLimit } = require("./crowd-router");
-const { AccountTaken, RESET_MINUTES, hashPassword, hashToken, newReset, newSession, publicAccount, validatePassword, validateSignup, validateState, verifyPassword } = require("./accounts");
+const { AccountTaken, RESET_MINUTES, hashPassword, hashToken, isOwner, mergeStates, newReset, newSession, publicAccount, validatePassword, validateSignup, validateState, verifyPassword } = require("./accounts");
+const { buyItem, forBrowser, verifyState } = require("./verify");
 const { createMailer } = require("./mailer");
 
 // Sign-ups and log-ins per address per minute: plenty for a person (or a campus sharing one
@@ -192,10 +193,23 @@ function createAccountsRouter(store, options = {}) {
     }));
   }
 
-  // A signed-in browser's save: merged into the account's, and the combined save sent back.
+  // A signed-in browser's save: merged into the account's, with new games and endless runs checked
+  // against the real answers (verify.js), and the combined save sent back.
   router.put("/state", signedIn(async (req, res, account) => {
-    const state = await store.mergeState(account.id, validateState(req.body?.state));
-    res.json({ account: publicAccount(account), state });
+    const incoming = validateState(req.body?.state);
+    delete incoming.verified;
+    const state = !options.puzzles ? await store.mergeState(account.id, incoming)
+      : await store.updateState(account.id, saved => verifyState(saved, mergeStates(saved, incoming), {
+        puzzles: options.puzzles, endless: options.endless, owner: isOwner(account.email), today: options.today?.()
+      }));
+    res.json({ account: publicAccount(account), state: forBrowser(state) });
+  }));
+
+  // Buys a Market item with the account's verified coins.
+  router.post("/buy", signedIn(async (req, res, account) => {
+    const id = typeof req.body?.id === "string" ? req.body.id : "";
+    const state = await store.updateState(account.id, saved => buyItem(saved, id, { owner: isOwner(account.email), today: options.today?.() }));
+    res.json({ account: publicAccount(account), state: forBrowser(state) });
   }));
 
   return router;
