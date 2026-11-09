@@ -559,6 +559,7 @@ const PRIVACY_HTML = `<ul class="rules">
     <li><strong>AI.</strong> Chargle's questions are written and fact-checked by an AI (Anthropic's Claude), with a person reviewing them. The AI never sees your account or your game data.</li>
     <li><strong>Other companies involved.</strong> Render hosts the site and its database, where the data above is stored, and keeps standard server logs such as IP addresses. Google Fonts supplies the game's fonts, so Google sees your IP address when the page loads. An email delivery service sends password reset emails, so it receives your email address when you ask for one. There are no ad or tracking networks.</li>
     <li><strong>Deleting your data.</strong> Delete your account any time from <strong>Your stats → Delete account</strong>. That removes your email, username, and saved game data from Chargle's server. Usage counts that were never linked to you stay.</li>
+    <li><strong>Questions?</strong> Email <a href="mailto:playchargle@gmail.com">playchargle@gmail.com</a> about your data or this note.</li>
   </ul>`;
 
 function showPrivacy({ back = null, onDone = null } = {}) {
