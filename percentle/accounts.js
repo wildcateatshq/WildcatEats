@@ -129,6 +129,8 @@ function mergeStates(saved, incoming) {
     wallet: {
       endless: { ...(walletB.endless || {}), ...(walletA.endless || {}) },
       owned: { ...(walletB.owned || {}), ...(walletA.owned || {}) },
+      // Finished endless runs waiting for the server to check them (percentle/verify.js).
+      pending: { ...(walletB.pending || {}), ...(walletA.pending || {}) },
       equipped
     },
     games: [...games.values()].sort((x, y) => x.date.localeCompare(y.date)),

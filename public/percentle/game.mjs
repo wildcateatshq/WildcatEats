@@ -449,7 +449,9 @@ export function endlessCoinsOn(wallet, date) {
 // Coins earned, spent, and left.
 export function coinBalance(state) {
   const wallet = state.wallet || emptyWallet();
-  const earned = (state.games || []).reduce((sum, game) => sum + dailyCoins(game), 0) +
+  // A game the server marks unpaid (played on an earlier day than it reached the server) counts in
+  // stats but pays nothing.
+  const earned = (state.games || []).reduce((sum, game) => sum + (game.unpaid ? 0 : dailyCoins(game)), 0) +
     Object.values(wallet.endless || {}).reduce((sum, run) => sum + run.coins, 0);
   // What each item cost when it was bought, so a later price change doesn't touch it.
   const spent = Object.entries(wallet.owned || {}).reduce((sum, [id, bought]) => sum + (Number.isFinite(bought?.price) ? bought.price : marketItem(id)?.price || 0), 0);

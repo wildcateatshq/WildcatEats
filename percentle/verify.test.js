@@ -81,3 +81,22 @@ test("items are bought with checked coins only", async () => {
   const owner = await verifyState(fresh(), {}, { ...deps, owner: true });
   assert.equal(owner.wallet.owned["visitor-ufo"].price, 0, "the game's owner has everything, free");
 });
+
+test("only today's and yesterday's games and runs pay; older ones count in stats for nothing", async () => {
+  const guesses = [20, 40, 60, 80, 50];
+  const result = await verifyState(fresh(), { progress: { [TODAY]: { guesses }, "2026-11-08": { guesses }, "2026-11-01": { guesses } } }, deps);
+  assert.deepEqual(result.games.map(game => [game.date, Boolean(game.unpaid)]), [["2026-11-01", true], ["2026-11-08", false], [TODAY, false]]);
+  await assert.rejects(buyItem(result, "visitor-balloon", { today: TODAY }), /enough coins/, "200 coins from two paying days isn't 250");
+
+  const keys = bankQuestions.slice(0, 4).map(question => questionKey(question.text));
+  const old = { date: "2026-11-05", startsOn: "2026-11-03", hard: false, questions: keys, guesses: [50, 0, 0, 0] };
+  const runs = await verifyState(fresh(), { wallet: { pending: { old } } }, deps);
+  assert.deepEqual(runs.wallet.endless.old, { date: "2026-11-05", coins: 0 });
+  assert.equal(runs.endless.best["2026-11-03"], 3, "an old run still counts toward bests");
+});
+
+test("finished endless runs survive the merge of two saves, so the server can check them", () => {
+  const { mergeStates } = require("./accounts");
+  const merged = mergeStates({ wallet: { pending: {} } }, { wallet: { pending: { r1: { date: TODAY } } } });
+  assert.deepEqual(Object.keys(merged.wallet.pending), ["r1"]);
+});

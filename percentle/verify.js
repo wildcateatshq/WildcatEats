@@ -6,11 +6,15 @@
 // numbers a browser sends.
 //
 // Each account's save holds a `verified` record that browsers can't write:
-//   verified.daily        { date: { score, charge, hard? } }   daily games re-scored from their guesses
-//   verified.endless      { runId: { date, coins, rounds } }   endless runs re-scored against their bank
+//   verified.daily        { date: { score, charge, hard?, unpaid? } }  daily games re-scored from their guesses
+//   verified.endless      { runId: { date, coins, rounds } }           endless runs re-scored against their bank
 //   verified.owned        { itemId: { date, price } }          Market items, bought only through the server
 //   verified.endlessStats { best, hardBest, allTime, hardAllTime, runs }
 // What a save had before this was added is kept as it was (seedVerified), so nobody loses anything.
+//
+// Only games and runs from today or yesterday (for play that syncs after midnight) pay coins, as the
+// page itself only pays for today's puzzle. Older ones, such as days played before logging in,
+// still count in stats but pay nothing, so nobody can collect coins for every past puzzle.
 
 const { pathToFileURL } = require("node:url");
 const path = require("node:path");
@@ -25,6 +29,9 @@ const loadGame = () => (gameModule ??= import(pathToFileURL(path.join(__dirname,
 // run longer than this many rounds isn't believable, and a save holds at most this many waiting.
 const MAX_RUN_ROUNDS = 600;
 const MAX_PENDING_RUNS = 30;
+
+// The earliest day whose games and runs still pay coins when they reach the server.
+const payingFrom = today => addDays(today, -1);
 
 const isObject = value => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const finiteOr = (value, fallback) => (Number.isFinite(value) ? value : fallback);
@@ -114,7 +121,7 @@ async function scoreRun(game, run, { endless, today }) {
 
 // What the verified record pays and has spent.
 function balanceOf(game, verified) {
-  const earned = Object.values(verified.daily).reduce((sum, played) => sum + game.dailyCoins(played), 0) +
+  const earned = Object.values(verified.daily).reduce((sum, played) => sum + (played.unpaid ? 0 : game.dailyCoins(played)), 0) +
     Object.values(verified.endless).reduce((sum, run) => sum + run.coins, 0);
   const spent = Object.values(verified.owned).reduce((sum, bought) => sum + finiteOr(bought.price, 0), 0);
   return earned - spent;
@@ -132,7 +139,7 @@ async function verifyState(saved, merged, { puzzles, endless, owner = false, tod
     const questions = await puzzles.get(date);
     if (!questions) continue;
     const played = scoreDaily(game, progress, asPlayed(game, questions));
-    if (played) verified.daily[date] = played;
+    if (played) verified.daily[date] = date >= payingFrom(today) ? played : { ...played, unpaid: true };
   }
 
   const pending = isObject(merged.wallet?.pending) ? Object.entries(merged.wallet.pending).slice(-MAX_PENDING_RUNS) : [];
@@ -141,7 +148,8 @@ async function verifyState(saved, merged, { puzzles, endless, owner = false, tod
     const scored = await scoreRun(game, run, { endless, today });
     if (!scored) continue;
     const paidToday = Object.values(verified.endless).filter(other => other.date === run.date).reduce((sum, other) => sum + other.coins, 0);
-    verified.endless[id] = { date: run.date, coins: game.endlessCoins(scored.rounds, paidToday), rounds: scored.rounds };
+    const coins = run.date >= payingFrom(today) ? game.endlessCoins(scored.rounds, paidToday) : 0;
+    verified.endless[id] = { date: run.date, coins, rounds: scored.rounds };
     const stats = verified.endlessStats;
     const bests = scored.hard ? stats.hardBest : stats.best;
     bests[scored.startsOn] = Math.max(bests[scored.startsOn] ?? 0, scored.rounds);
