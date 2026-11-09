@@ -112,7 +112,8 @@ try {
   console.error("Could not load today's Percentle puzzle.", error);
   document.body.classList.remove("starting");
   if (!stage.innerHTML.trim()) {
-    stage.innerHTML = `<p role="alert">Today's puzzle couldn't load. Check your connection and <button id="retryLoad">try again</button>.</p>`;
+    // data-nosnippet keeps this message out of Google's description of the site.
+    stage.innerHTML = `<div data-nosnippet><p role="alert">Today's puzzle couldn't load. Check your connection and <button id="retryLoad">try again</button>.</p></div>`;
     document.querySelector("#retryLoad").addEventListener("click", () => location.reload());
   }
   throw error;
