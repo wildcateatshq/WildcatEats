@@ -28,6 +28,10 @@ button{color:inherit}
 .account-error{min-height:1em;margin:0;color:#ff8f7a!important}
 .account-note{margin:0;font-size:12px!important}
 .account-line{margin:0 0 4px}
+.account-line p{margin:0}
+/* Log out, Privacy, Terms, Delete account: a row that wraps whole links, never a stray separator. */
+.account-links{display:flex;flex-wrap:wrap;gap:4px 16px;margin-top:6px!important;font-size:13px}
+.link-button.danger-link{color:var(--red)}
 .link-button{border:0;padding:0;background:none;color:var(--charge);font:inherit;text-decoration:underline;cursor:pointer}
 .rules a{color:var(--charge);text-underline-offset:2px}
 .account-forgot{justify-self:center;font-size:13px}

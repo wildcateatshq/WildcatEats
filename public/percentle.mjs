@@ -843,7 +843,8 @@ function countUpCoins(animate) {
 // The account line at the top of the stats dialog: who's logged in, or an invitation to.
 function accountLine() {
   return account
-    ? `<p class="account-line">Logged in as <strong>${escapeHtml(account.username)}</strong> · <button type="button" class="link-button" id="logoutButton">Log out</button> · <button type="button" class="link-button" id="privacyStatsLink">Privacy</button> · <button type="button" class="link-button" id="termsStatsLink">Terms</button> · <button type="button" class="link-button" id="deleteAccountButton">Delete account</button></p>`
+    ? `<div class="account-line"><p>Logged in as <strong>${escapeHtml(account.username)}</strong></p>
+        <p class="account-links"><button type="button" class="link-button" id="logoutButton">Log out</button><button type="button" class="link-button" id="privacyStatsLink">Privacy</button><button type="button" class="link-button" id="termsStatsLink">Terms</button><button type="button" class="link-button danger-link" id="deleteAccountButton">Delete account</button></p></div>`
     : `<p class="account-line">Keep your stats on every device: <button type="button" class="link-button" id="statsLoginButton">Log in or create an account</button></p>`;
 }
 
