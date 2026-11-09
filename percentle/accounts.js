@@ -134,6 +134,11 @@ function mergeStates(saved, incoming) {
     games: [...games.values()].sort((x, y) => x.date.localeCompare(y.date)),
     progress,
     achievements: { ...(b.achievements || {}), ...(a.achievements || {}) },
+    // When the privacy note was last read: the later of the two, so a newer note read on one device
+    // isn't shown again on the next.
+    ...([a.privacyNoticeSeen, b.privacyNoticeSeen].some(seen => typeof seen === "string")
+      ? { privacyNoticeSeen: [a.privacyNoticeSeen, b.privacyNoticeSeen].filter(seen => typeof seen === "string").sort().at(-1) }
+      : {}),
     endless: {
       ...endlessB,
       ...endlessA,

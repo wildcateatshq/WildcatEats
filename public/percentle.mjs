@@ -485,7 +485,11 @@ async function loadAccount() {
     rememberAccount(account);
     return;
   }
-  if (await syncAccount({ apply: true }) && document.body.classList.contains("starting")) render();
+  if (await syncAccount({ apply: true }) && document.body.classList.contains("starting")) {
+    render();
+    // Players already logged in see a changed privacy note once, on the start screen.
+    if (!dialog.open) showPrivacyOnce();
+  }
 }
 
 function showLogin(mode = "login") {
@@ -546,11 +550,15 @@ async function logOut() {
 // What Chargle keeps and why. Shown once to everyone who logs in or creates an account (the
 // "seen" mark is saved with their stats, so it's once across all their devices), and from the
 // Privacy links in the log-in box and the stats dialog.
+// Kept in step with what the game actually collects and who it goes to: if a new service or a new
+// kind of data is added, say so here.
 const PRIVACY_HTML = `<ul class="rules">
-    <li>If you create an account, Chargle keeps your <strong>email</strong>, your <strong>username</strong>, and your <strong>game stats</strong> (scores, achievements, and progress). Your password is stored scrambled, so no one can read it, including us.</li>
-    <li>Your email is only used to log you in and to send a password reset link when you ask for one. No newsletters, no ads, and it's never sold or shared.</li>
-    <li>Without an account, your stats stay in your browser. Chargle counts visits and finished games anonymously to see how the game is doing.</li>
-    <li>You can delete your account any time from <strong>Your stats → Delete account</strong>. That removes your email, username, and saved stats from Chargle's server.</li>
+    <li><strong>What we collect.</strong> If you create an account, Chargle keeps your <strong>email</strong>, your <strong>username</strong>, and your <strong>game data</strong>: your guesses, scores, achievements, coins, and Market items. Your password is stored scrambled, so no one can read it, including us.</li>
+    <li><strong>Without an account</strong>, your stats stay in your browser. Chargle still collects some usage data: a random ID for your device (not linked to your name), your daily visits, which site or link brought you here, and your finished games' results, which are used for the "how you stack up" comparisons and to see how the game is doing.</li>
+    <li><strong>How your email is used.</strong> Only to log you in and to send a password reset link when you ask for one. No newsletters, no ads, and your data is never sold.</li>
+    <li><strong>AI.</strong> Chargle's questions are written and fact-checked by an AI (Anthropic's Claude), with a person reviewing them. The AI never sees your account or your game data.</li>
+    <li><strong>Other companies involved.</strong> Render hosts the site and its database, where the data above is stored, and keeps standard server logs such as IP addresses. Google Fonts supplies the game's fonts, so Google sees your IP address when the page loads. An email delivery service sends password reset emails, so it receives your email address when you ask for one. There are no ad or tracking networks.</li>
+    <li><strong>Deleting your data.</strong> Delete your account any time from <strong>Your stats → Delete account</strong>. That removes your email, username, and saved game data from Chargle's server. Usage counts that were never linked to you stay.</li>
   </ul>`;
 
 function showPrivacy({ back = null, onDone = null } = {}) {
@@ -562,8 +570,11 @@ function showPrivacy({ back = null, onDone = null } = {}) {
   });
 }
 
+// When the privacy note last changed: anyone who saw an older version is shown it once more.
+const PRIVACY_UPDATED = "2026-11-09";
+
 function showPrivacyOnce() {
-  if (state.privacyNoticeSeen) return;
+  if (state.privacyNoticeSeen >= PRIVACY_UPDATED) return;
   showPrivacy({ onDone: () => {
     state.privacyNoticeSeen = easternDate();
     save();
