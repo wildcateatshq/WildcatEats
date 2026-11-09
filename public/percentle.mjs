@@ -721,6 +721,7 @@ function showMarket(category = MARKET_CATEGORIES[0].id) {
     wallet.owned[item.id] = { date: easternDate(), price: item.price };
     use(item.id);
     showMarket(category);
+    refreshCoinTotal();
     showToast(`${item.name} is yours!`);
   }));
 }
@@ -730,6 +731,17 @@ function coinTotalMarkup(earned) {
   const { balance } = coinBalance(state);
   return `<button type="button" class="coin-total" id="coinTotal" data-from="${balance - earned}" data-to="${balance}" aria-label="${balance} coins${earned ? `, ${earned} from this game` : ""}">
       <span class="coin" aria-hidden="true"></span><span class="coin-count">${balance}</span>${earned ? `<small>+${earned}</small>` : ""}</button>`;
+}
+
+// After a purchase, the results' coin total drops to the new balance.
+function refreshCoinTotal() {
+  const total = document.querySelector("#coinTotal");
+  if (!total) return;
+  const { balance } = coinBalance(state);
+  total.dataset.to = balance;
+  total.querySelector(".coin-count").textContent = balance;
+  total.setAttribute("aria-label", `${balance} coins`);
+  total.querySelector("small")?.remove();
 }
 
 function countUpCoins(animate) {
