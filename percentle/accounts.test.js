@@ -6,7 +6,7 @@ const express = require("express");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
-const { createAccountStore, hashPassword, mergeStates, verifyPassword } = require("./accounts");
+const { createAccountStore, hashPassword, mergeStates, publicAccount, verifyPassword } = require("./accounts");
 const { createAccountsRouter } = require("./accounts-router");
 const { buildReport } = require("./stats");
 
@@ -225,4 +225,14 @@ test("the stats spreadsheet counts new and total accounts per day", () => {
   const { columns, rows } = buildReport({ signups: [{ date: "2026-11-01", accounts: 2 }, { date: "2026-11-03", accounts: 1 }] }, "2026-11-03");
   assert.deepEqual(columns.slice(-2), ["New accounts", "Total accounts"]);
   assert.deepEqual(rows.map(row => row.slice(-2)), [[2, 2], [0, 2], [1, 3]]);
+});
+
+test("only accounts named in CHARGLE_OWNER_EMAILS are marked as the owner", t => {
+  const previous = process.env.CHARGLE_OWNER_EMAILS;
+  t.after(() => (previous === undefined ? delete process.env.CHARGLE_OWNER_EMAILS : (process.env.CHARGLE_OWNER_EMAILS = previous)));
+  process.env.CHARGLE_OWNER_EMAILS = " Boss@Example.com , other@example.com";
+  assert.equal(publicAccount({ username: "boss", email: "boss@example.com" }).owner, true);
+  assert.equal("owner" in publicAccount({ username: "player", email: "player@example.com" }), false);
+  delete process.env.CHARGLE_OWNER_EMAILS;
+  assert.equal("owner" in publicAccount({ username: "boss", email: "boss@example.com" }), false);
 });

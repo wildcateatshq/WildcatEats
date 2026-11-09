@@ -145,7 +145,11 @@ function mergeStates(saved, incoming) {
   };
 }
 
-const publicAccount = account => ({ username: account.username, email: account.email });
+// Accounts whose email is in CHARGLE_OWNER_EMAILS (comma-separated, set on Render) belong to the
+// game's owner: the page gives them every market item for free.
+const isOwner = email => (process.env.CHARGLE_OWNER_EMAILS || "").split(",")
+  .map(owner => owner.trim().toLowerCase()).filter(Boolean).includes(String(email).toLowerCase());
+const publicAccount = account => ({ username: account.username, email: account.email, ...(isOwner(account.email) ? { owner: true } : {}) });
 
 function createAccountStore(options = {}) {
   const filePath = options.filePath || process.env.PERCENTLE_ACCOUNTS_FILE || path.join(__dirname, "..", "data", "percentle-accounts.json");

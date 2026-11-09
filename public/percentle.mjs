@@ -401,6 +401,16 @@ function rememberAccount(next) {
   // Log in until the player is logged in; then the market instead. Never both.
   document.querySelector("#loginButton").hidden = Boolean(next);
   document.querySelector("#marketButton").hidden = !next;
+  if (next?.owner) grantOwnerItems();
+}
+
+// The game's owner (marked by the server; see CHARGLE_OWNER_EMAILS) has every market item, paid
+// for at 0 so their coin balance stays as earned. It syncs to the account like any purchase.
+function grantOwnerItems() {
+  const missing = MARKET_ITEMS.filter(item => item.price > 0 && !state.wallet.owned[item.id]);
+  if (!missing.length) return;
+  for (const item of missing) state.wallet.owned[item.id] = { date: easternDate(), price: 0 };
+  save();
 }
 
 function scheduleAccountSync() {
