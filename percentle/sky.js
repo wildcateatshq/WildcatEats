@@ -15,6 +15,9 @@ const RETRY_MS = 10 * 60 * 1000;
 // Snow only on a day that stays this cold or colder; a warmer "snow" day shows as rain.
 const SNOW_MAX_F = 40;
 
+// Days already shown before the real forecast took over (Nov 11, 2026), kept as players saw them.
+const SHOWN_BEFORE = { "2026-11-10": "snow" };
+
 const SNOW = new Set([71, 73, 75, 77, 85, 86]);
 const ICE = new Set([56, 57, 66, 67]);
 const RAIN = new Set([51, 53, 55, 61, 63, 65, 80, 81, 82, 95, 96, 99]);
@@ -55,6 +58,7 @@ function createSkyRouter(options = {}) {
   router.get("/", async (req, res, next) => {
     try {
       const date = today();
+      if (date in SHOWN_BEFORE) return res.json({ date, weather: SHOWN_BEFORE[date], high: null });
       if (!cached || cached.date !== date || now() >= cached.until) {
         pending ??= lookUp(date).finally(() => { pending = null; });
         cached = await pending;
