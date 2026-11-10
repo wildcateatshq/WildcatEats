@@ -946,13 +946,29 @@ export function createCity(root) {
     setTimeout(() => svg.remove(), 1400 + delay * 1000);
   }
 
-  // The Market's meteor shower: a dozen shooting stars streaking the same way across the sky over a
-  // few seconds, around height y (screen pixels).
+  // The Market's meteor shower: sixteen big, colorful meteors with glowing heads, streaking the same
+  // way most of the way across the screen over a few seconds, around height y (screen pixels).
+  const METEOR_COLORS = ["#7ad7ff", "#ff7ad9", "#ffd24d", "#7affb0", "#b48cff", "#ff8a5c"];
   function meteorShower(y) {
-    const angle = (18 + Math.random() * 12) * Math.PI / 180;
-    for (let k = 0; k < 12; k++) {
-      shootingStar(Math.max(16, y - 90 + Math.random() * 150), { x: W * (Math.random() * 0.8 - 0.05), angle, delay: k * 0.3 + Math.random() * 0.25 });
+    if (!lively()) return;
+    const angle = (14 + Math.random() * 12) * Math.PI / 180;
+    const goingRight = Math.random() < 0.5;
+    const tall = window.innerHeight;
+    let streaks = "";
+    for (let k = 0; k < 16; k++) {
+      const color = METEOR_COLORS[k % METEOR_COLORS.length];
+      const length = W * (0.45 + Math.random() * 0.4);
+      const startY = Math.max(10, y - 140 + Math.random() * 220);
+      const x = goingRight ? W * (Math.random() * 0.75 - 0.25) : W * (0.5 + Math.random() * 0.75);
+      const x2 = x + Math.cos(angle) * length * (goingRight ? 1 : -1), y2 = startY + Math.sin(angle) * length;
+      const delay = (k * 0.22 + Math.random() * 0.2).toFixed(2);
+      const id = `showerTail${++meteorCount}`;
+      streaks += `<defs><linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${x.toFixed(0)}" y1="${startY.toFixed(0)}" x2="${x2.toFixed(0)}" y2="${y2.toFixed(0)}"><stop offset="0" stop-color="${color}" stop-opacity="0"/><stop offset=".75" stop-color="${color}" stop-opacity=".85"/><stop offset="1" stop-color="#fff"/></linearGradient></defs>
+        <line x1="${x.toFixed(0)}" y1="${startY.toFixed(0)}" x2="${x2.toFixed(0)}" y2="${y2.toFixed(0)}" stroke="url(#${id})" stroke-width="${(3 + Math.random() * 2).toFixed(1)}" stroke-linecap="round" pathLength="100" style="animation-delay:${delay}s;--glow:${color}"/>`;
     }
+    scene().insertAdjacentHTML("beforeend", `<svg class="city-meteor meteor-shower" width="${W}" height="${tall}">${streaks}</svg>`);
+    const svg = scene().lastElementChild;
+    setTimeout(() => svg.remove(), 6500);
   }
 
   // The Market's giant robot: a huge pixel mech walking slowly behind the skyline, its head above the

@@ -668,6 +668,9 @@ body.hard .city-plane .plane-windows{fill:#d9a8ff}
 /* The shooting star: drawn from tail to head in a blink, then fades. */
 .city-meteor{position:absolute;left:0;top:0;pointer-events:none}
 .city-meteor line{stroke-dasharray:100;stroke-dashoffset:100;animation:meteor 1.1s ease-out both}
+/* The Market's meteor shower: long, thick, colored streaks with a glow, crossing most of the screen. */
+.meteor-shower line{animation:meteor-long 2.1s cubic-bezier(.3,.6,.4,1) both;filter:drop-shadow(0 0 5px var(--glow)) drop-shadow(0 0 12px var(--glow))}
+@keyframes meteor-long{0%{stroke-dashoffset:100;opacity:1}55%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:-75;opacity:0}}
 /* The Market's aurora (Extras): soft green and violet curtains rippling over the night sky. It fades
    with daylight, dims under cloud, and is gone while the city is dark. */
 .city-aurora{display:none;position:absolute;left:-15%;right:-15%;top:2%;height:46%;pointer-events:none;mix-blend-mode:screen;filter:blur(9px);opacity:calc(.6 - var(--daylight,0) * 1.2);transition:opacity 1.5s ease;-webkit-mask-image:repeating-linear-gradient(90deg,#000 0 6px,rgba(0,0,0,.82) 6px 9px);mask-image:repeating-linear-gradient(90deg,#000 0 6px,rgba(0,0,0,.82) 6px 9px)}
