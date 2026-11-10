@@ -438,9 +438,10 @@ function rememberAccount(next) {
   // Log in until the player is logged in; then the market instead. Never both.
   document.querySelector("#loginButton").hidden = Boolean(next);
   document.querySelector("#marketButton").hidden = !next;
-  // Logging in from the results swaps the note for the coin total.
-  const nudge = document.querySelector("#loginNudge");
-  if (nudge && next) nudge.outerHTML = coinTotalMarkup(0);
+  // Logging in from the results puts the coin total where the note pointed from.
+  const score = stage.querySelector(".final-score");
+  if (next && score && !score.querySelector("#coinTotal")) score.insertAdjacentHTML("afterbegin", coinTotalMarkup(0));
+  if (typeof updateLoginNudge === "function") updateLoginNudge();
 }
 
 // Takes the account's checked numbers from the server (percentle/verify.js): its games, endless
@@ -855,30 +856,24 @@ function showMarket(category = MARKET_CATEGORIES[0].id) {
 }
 
 // The coin total for the corner of the results: what it was before this game, counting up to now.
-// Without an account there are no coins: a note instead, swaying gently, with an arrow aimed at the
-// Log in button.
+// Without an account there are no coins; the results show a note under Log in instead (updateLoginNudge).
 function coinTotalMarkup(earned) {
-  if (!account) {
-    requestAnimationFrame(aimLoginNudge);
-    return `<button type="button" class="login-nudge" id="loginNudge"><svg class="nudge-arrow" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h15M12 5l7 7-7 7"/></svg><span>Log in to unlock the market with cool cosmetics!</span></button>`;
-  }
+  if (!account) return "";
   const { balance } = coinBalance(state);
   return `<button type="button" class="coin-total" id="coinTotal" data-from="${balance - earned}" data-to="${balance}" aria-label="${balance} coins${earned ? `, ${earned} from this game` : ""}">
       <span class="coin" aria-hidden="true"></span><span class="coin-count">${balance}</span>${earned ? `<small>+${earned}</small>` : ""}</button>`;
 }
 
-// Points the note's arrow at the Log in button, wherever the two are on screen.
-function aimLoginNudge() {
-  const arrow = document.querySelector("#loginNudge .nudge-arrow");
-  const login = document.querySelector("#loginButton");
-  if (!arrow || !login || login.hidden) return;
-  const from = arrow.getBoundingClientRect(), to = login.getBoundingClientRect();
-  const angle = Math.atan2(to.top + to.height / 2 - (from.top + from.height / 2), to.left + to.width / 2 - (from.left + from.width / 2));
-  arrow.style.setProperty("--aim", `${angle.toFixed(3)}rad`);
+// On the results, a player without an account sees a note hanging under Log in, swaying gently, its
+// arrow pointing up at the button: "Log in to unlock the market with cool cosmetics!"
+function updateLoginNudge() {
+  const show = !account && Boolean(stage.querySelector(".final-score")) && !document.body.classList.contains("starting");
+  document.querySelector("#loginNudge").hidden = !show;
+  document.body.classList.toggle("login-nudging", show);
 }
-window.addEventListener("resize", aimLoginNudge);
-window.addEventListener("scroll", aimLoginNudge, { passive: true });
-document.addEventListener("click", event => { if (event.target.closest("#loginNudge")) showLogin(); });
+new MutationObserver(updateLoginNudge).observe(stage, { childList: true });
+new MutationObserver(updateLoginNudge).observe(document.body, { attributes: true, attributeFilter: ["class"] });
+document.querySelector("#loginNudge").addEventListener("click", () => showLogin());
 
 // After a purchase, the results' coin total drops to the new balance.
 function refreshCoinTotal() {
