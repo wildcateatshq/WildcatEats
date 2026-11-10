@@ -592,6 +592,12 @@ body[data-lightning="rainbow"] .city-bolt:not(.outage){--bolt-glow:#ffffff}body[
 .final-score{position:relative}
 .coin-total{position:absolute;top:0;right:0;display:flex;align-items:center;gap:6px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:var(--card);font:700 14px var(--mono);color:var(--ink)}
 .coin-total small{font:500 10px var(--mono);color:var(--charge)}
+/* Without an account: a note in the same corner, swaying gently, its arrow aimed at Log in. */
+.login-nudge{position:absolute;top:-4px;right:0;z-index:1;display:flex;flex-direction:column;align-items:flex-end;gap:4px;max-width:150px;padding:0;border:0;background:none;color:var(--charge);font:600 11px/1.35 var(--mono);text-align:right;cursor:pointer;text-shadow:0 0 4px rgba(4,8,14,.9),0 0 10px var(--charge-glow);transform-origin:80% 0;animation:nudge-sway 2.8s ease-in-out infinite}
+.login-nudge:hover span{text-decoration:underline}
+.nudge-arrow{width:22px;height:22px;flex:none;fill:none;stroke:currentColor;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round;transform:rotate(var(--aim,-1.2rad));filter:drop-shadow(0 0 4px var(--charge-glow))}
+@keyframes nudge-sway{0%,100%{transform:rotate(-2.5deg)}50%{transform:rotate(2.5deg)}}
+@media(prefers-reduced-motion:reduce){.login-nudge{animation:none}}
 .coin-total.counting{border-color:var(--charge);box-shadow:0 0 16px -4px var(--charge-glow)}
 
 /* An endless run that runs out in daylight ends in a storm (city.mjs outOfCharge): a front of heavy
