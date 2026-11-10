@@ -799,7 +799,7 @@ function showMarket(category = MARKET_CATEGORIES[0].id) {
         <span class="market-name">${escapeHtml(item.name)}</span>${button}</article>`;
   }).join("");
   openDialog("Market", `<p class="market-balance"><span class="coin" aria-hidden="true"></span>${balance} coins</p>
-    <p class="account-note">Earn coins by playing: a daily puzzle pays the charge you finish with (60% pays 60), and an endless run pays 1 coin for round 1, 2 for round 2, and so on, up to 150 a day. Going far pays more on top, with no limit: rounds 11 to 20 pay double, 21 to 30 triple, and so on.</p>
+    <p class="account-note">Earn coins by playing: a daily puzzle pays the charge you finish with (60% pays 60), and an endless run pays more the farther you get: 10 rounds pay 40, 20 pay 100, 30 pay 180. Endless pays up to 150 a day, but rounds past 20 always pay, with no limit.</p>
     <div class="market-tabs" role="tablist">${MARKET_CATEGORIES.map(group => `<button type="button" role="tab" data-tab="${group.id}" aria-selected="${group.id === category}">${group.name}</button>`).join("")}</div>
     <p class="market-blurb">${escapeHtml(about.blurb)}</p>
     <div class="market-grid">${cards}</div>`);
@@ -1944,8 +1944,8 @@ function renderEndlessResults() {
   const bests = endlessHard ? state.endless.hardBest : state.endless.best;
   const previousBest = bests[period] ?? 0;
   if (!progress.recorded) {
-    // The run's coins: 1 for round 1, 2 for round 2... up to the day's endless limit, plus the
-    // multiplier bonus for rounds past 10 (game.mjs endlessPay).
+    // The run's coins: more the farther it got, up to the day's endless limit, plus whatever rounds
+    // past 20 pay, which is never limited (game.mjs endlessPay).
     const date = easternDate();
     const { coins, base } = endlessPay(rounds, endlessCoinsOn(state.wallet, date));
     const runId = crypto.randomUUID();

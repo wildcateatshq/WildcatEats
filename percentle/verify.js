@@ -147,7 +147,7 @@ async function verifyState(saved, merged, { puzzles, endless, owner = false, tod
     if (verified.endless[id]) continue;
     const scored = await scoreRun(game, run, { endless, today });
     if (!scored) continue;
-    // The day's limit counts base pay only; the multiplier bonus for going far is on top.
+    // The day's limit counts base pay only; what rounds past 20 pay is on top.
     const baseToday = game.endlessCoinsOn({ endless: verified.endless }, run.date);
     const pay = run.date >= payingFrom(today) ? game.endlessPay(scored.rounds, baseToday) : { coins: 0, base: 0 };
     verified.endless[id] = { date: run.date, coins: pay.coins, base: pay.base, rounds: scored.rounds };

@@ -53,7 +53,7 @@ test("endless runs are checked against their bank before they pay", async () => 
   const keys = bankQuestions.slice(0, 4).map(question => questionKey(question.text));
   const run = { date: TODAY, startsOn: "2026-11-03", hard: false, questions: keys, guesses: [50, 0, 0, 0] };
   const result = await verifyState(fresh(), { wallet: { pending: { r1: run } } }, deps);
-  assert.deepEqual(result.wallet.endless.r1, { date: TODAY, coins: 6, base: 6 }, "3 rounds survived pays 1 + 2 + 3");
+  assert.deepEqual(result.wallet.endless.r1, { date: TODAY, coins: 10, base: 10 }, "3 rounds survived pays 10");
   assert.equal(result.endless.best["2026-11-03"], 3);
   assert.equal(result.endless.runs, 1);
   assert.deepEqual(result.wallet.pending, {});

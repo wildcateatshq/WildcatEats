@@ -364,9 +364,9 @@ export function endlessClock(round) {
 // game's colors, and the color of the supercharge lightning. Coins come from playing:
 //   - a daily puzzle pays its final charge in coins (finish on 60% and get 60; running out pays 0),
 //     with hard games counted at their regular-mode equivalent (statsCharge);
-//   - an endless run pays 1 coin for round 1, 2 for round 2, and so on (10 rounds pay 55), up to
-//     ENDLESS_COINS_PER_DAY a day from endless runs; going far pays a multiplier on top of that,
-//     uncapped: each round past 10 pays extra (round 11 to 20 pays double, 21 to 30 triple...).
+//   - an endless run pays a little more each round it survives (10 rounds pay 40, 20 pay 100, 30
+//     pay 180: endlessRunTotal). The first 20 rounds' pay counts toward ENDLESS_COINS_PER_DAY a day
+//     from endless runs; rounds past 20 always pay, with no limit.
 // What's been earned and bought lives in the save (state.wallet), so it syncs with the account:
 //   wallet.endless  { runId: { date, coins, base } }  coins each endless run paid, and how many of
 //                                                them were the base pay the daily limit counts
@@ -416,17 +416,20 @@ export function dailyCoins(game) {
   return Math.max(0, Math.round(statsCharge(game.charge ?? chargeLeft(game.score), game.hard)));
 }
 
-// The multiplier on an endless round: x1 for rounds 1 to 10, x2 for 11 to 20, x3 for 21 to 30...
-export const endlessMultiplier = round => 1 + Math.floor((Math.max(1, round) - 1) / 10);
+// What an endless run pays in all for surviving `rounds`: a little more each round, so going far
+// pays best. 10 rounds pay 40, 20 pay 100, 30 pay 180 (3 a round plus a tenth of the rounds squared).
+export const endlessRunTotal = rounds => Math.round(3 * rounds + (rounds * rounds) / 10);
+// Rounds up to this one count toward the day's endless limit; every round past it always pays.
+export const ENDLESS_LIMITED_ROUNDS = 20;
 
 // What an endless run of `rounds` pays, given the base pay endless runs have already had today:
-//   base  = 1 + 2 + ... + rounds, up to what's left of the day's endless limit;
-//   bonus = what the multiplier adds on rounds past 10 (never limited, so a long run always pays);
+//   base  = the pay for its first 20 rounds, up to what's left of the day's endless limit;
+//   bonus = the pay for rounds past 20, never limited, so a long run always pays;
 //   coins = both.
 export function endlessPay(rounds, baseToday = 0) {
-  const base = Math.max(0, Math.min((rounds * (rounds + 1)) / 2, ENDLESS_COINS_PER_DAY - baseToday));
-  let bonus = 0;
-  for (let round = 11; round <= rounds; round++) bonus += round * (endlessMultiplier(round) - 1);
+  const limited = endlessRunTotal(Math.min(rounds, ENDLESS_LIMITED_ROUNDS));
+  const base = Math.max(0, Math.min(limited, ENDLESS_COINS_PER_DAY - baseToday));
+  const bonus = endlessRunTotal(rounds) - limited;
   return { base, bonus, coins: base + bonus };
 }
 export const endlessCoins = (rounds, baseToday = 0) => endlessPay(rounds, baseToday).coins;

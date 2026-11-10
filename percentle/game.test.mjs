@@ -105,18 +105,20 @@ test("typing a guess follows the scale's digits and decimals", () => {
   assert.equal(type(70000, { min: 20000, max: 120000 }, "6.5"), "65", "no decimals on a scale that steps by 100");
 });
 
-test("coins: a daily game pays its charge, an endless run pays 1 + 2 + ... per round, up to a daily limit", () => {
+test("coins: a daily game pays its charge, an endless run pays more the farther it gets, up to a daily limit", () => {
   assert.equal(dailyCoins({ charge: 60 }), 60, "finish on 60% and get 60");
   assert.equal(dailyCoins({ charge: 59.6 }), 60);
   assert.equal(dailyCoins({ charge: 40, hard: true }), 70, "hard games pay their regular-mode equivalent");
   assert.equal(dailyCoins({ charge: -12 }), 0, "running out pays nothing");
-  assert.equal(endlessCoins(1), 1);
-  assert.equal(endlessCoins(10), 55);
+  assert.equal(endlessCoins(1), 3);
+  assert.equal(endlessCoins(10), 40);
   assert.equal(endlessCoins(9, 120), ENDLESS_COINS_PER_DAY - 120, "no more than the day's endless limit");
   assert.equal(endlessCoins(5, ENDLESS_COINS_PER_DAY), 0);
-  assert.deepEqual(endlessPay(20), { base: 150, bonus: 155, coins: 305 }, "rounds 11-20 pay double, past the day's limit");
-  assert.deepEqual(endlessPay(30), { base: 150, bonus: 665, coins: 815 }, "rounds 21-30 pay triple");
-  assert.deepEqual(endlessPay(20, ENDLESS_COINS_PER_DAY), { base: 0, bonus: 155, coins: 155 }, "the bonus isn't limited");
+  assert.deepEqual(endlessPay(20), { base: 100, bonus: 0, coins: 100 });
+  assert.deepEqual(endlessPay(30), { base: 100, bonus: 80, coins: 180 });
+  assert.deepEqual(endlessPay(20, 100), { base: 50, bonus: 0, coins: 50 }, "the first 20 rounds count toward the day's limit");
+  assert.deepEqual(endlessPay(30, ENDLESS_COINS_PER_DAY), { base: 0, bonus: 80, coins: 80 }, "rounds past 20 always pay");
+  for (let rounds = 1; rounds < 40; rounds++) assert.ok(endlessCoins(rounds + 1) > endlessCoins(rounds), "every round pays something");
   assert.equal(endlessCoinsOn({ endless: { a: { date: "2026-11-02", coins: 305, base: 150 } } }, "2026-11-02"), 150, "the limit counts base pay");
   const wallet = { endless: { a: { date: "2026-11-02", coins: 55 }, b: { date: "2026-11-01", coins: 30 } }, owned: { "color-ice": "2026-11-02" }, equipped: { colors: { id: "color-ice", at: 1 }, lightning: { id: "lightning-pink", at: 2 } } };
   assert.equal(endlessCoinsOn(wallet, "2026-11-02"), 55);
