@@ -342,8 +342,8 @@ questions in 10: a paper plane, hot-air balloon, rocket, sky whale, dragon, or U
 or Silver; hard mode stays purple), and **Lightning** (the supercharge bolt in blue, pink, green, red,
 or rainbow). Items and prices are `MARKET_ITEMS` in `game.mjs`. Coins: a daily puzzle pays its final
 charge (60% pays 60; hard games at their regular-mode equivalent; running out pays 0), and an
-endless run pays more the farther it gets (10 rounds pay 40, 20 pay 100, 30 pay 180), up to 150 a
-day from endless, except that rounds past 20 always pay. Every game played
+endless run pays more the farther it gets (10 rounds pay 40, 20 pay 100, 30 pay 180, 50 pay 400),
+up to 150 a day from endless, or the day's best run if that pays more. Every game played
 counts, including ones from before the market. The wallet (`state.wallet`: endless payouts, items
 owned, and what's in use) is part of the save, so it syncs with the account; `mergeStates` keeps
 every payout and purchase from both devices and the most recent pick in each tab. The results show

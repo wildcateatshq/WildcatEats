@@ -1,6 +1,6 @@
 import { achievementsForGame, ACHIEVEMENTS, formatValue, fromPosition, roundToScale, scaleDecimals, scaleOf, scaleStep, toPosition, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, statsCharge, easternDate, endlessClock, finalCharge, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
 import { createCity, visitorSvg } from "/percentle/city.mjs";
-import { MARKET_CATEGORIES, MARKET_ITEMS, coinBalance, dailyCoins, emptyWallet, endlessPay, endlessCoinsOn, equippedItem, marketItem, activeVisitors } from "/percentle/game.mjs";
+import { MARKET_CATEGORIES, MARKET_ITEMS, coinBalance, dailyCoins, emptyWallet, endlessCoins, endlessDay, equippedItem, marketItem, activeVisitors } from "/percentle/game.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
 const GAME_NAME = "Chargle";
@@ -799,7 +799,7 @@ function showMarket(category = MARKET_CATEGORIES[0].id) {
         <span class="market-name">${escapeHtml(item.name)}</span>${button}</article>`;
   }).join("");
   openDialog("Market", `<p class="market-balance"><span class="coin" aria-hidden="true"></span>${balance} coins</p>
-    <p class="account-note">Earn coins by playing: a daily puzzle pays the charge you finish with (60% pays 60), and an endless run pays more the farther you get: 10 rounds pay 40, 20 pay 100, 30 pay 180. Endless pays up to 150 a day, but rounds past 20 always pay, with no limit.</p>
+    <p class="account-note">Earn coins by playing: a daily puzzle pays the charge you finish with (60% pays 60), and an endless run pays more the farther you get: 10 rounds pay 40, 20 pay 100, 30 pay 180. Endless pays up to 150 a day, or your best run that day if it pays more.</p>
     <div class="market-tabs" role="tablist">${MARKET_CATEGORIES.map(group => `<button type="button" role="tab" data-tab="${group.id}" aria-selected="${group.id === category}">${group.name}</button>`).join("")}</div>
     <p class="market-blurb">${escapeHtml(about.blurb)}</p>
     <div class="market-grid">${cards}</div>`);
@@ -1944,12 +1944,12 @@ function renderEndlessResults() {
   const bests = endlessHard ? state.endless.hardBest : state.endless.best;
   const previousBest = bests[period] ?? 0;
   if (!progress.recorded) {
-    // The run's coins: more the farther it got, up to the day's endless limit, plus whatever rounds
-    // past 20 pay, which is never limited (game.mjs endlessPay).
+    // The run's coins: more the farther it got, up to the day's endless limit (150, or the day's
+    // best run if that's more: game.mjs endlessCoins).
     const date = easternDate();
-    const { coins, base } = endlessPay(rounds, endlessCoinsOn(state.wallet, date));
+    const coins = endlessCoins(rounds, endlessDay(state.wallet, date));
     const runId = crypto.randomUUID();
-    state.wallet.endless[runId] = { date, coins, base };
+    state.wallet.endless[runId] = { date, coins, rounds };
     // For an account, the server checks the run itself (percentle/verify.js): the questions asked,
     // in order, and the guesses. It's kept here until the server has it.
     state.wallet.pending[runId] = {

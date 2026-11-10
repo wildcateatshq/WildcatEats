@@ -53,7 +53,7 @@ test("endless runs are checked against their bank before they pay", async () => 
   const keys = bankQuestions.slice(0, 4).map(question => questionKey(question.text));
   const run = { date: TODAY, startsOn: "2026-11-03", hard: false, questions: keys, guesses: [50, 0, 0, 0] };
   const result = await verifyState(fresh(), { wallet: { pending: { r1: run } } }, deps);
-  assert.deepEqual(result.wallet.endless.r1, { date: TODAY, coins: 10, base: 10 }, "3 rounds survived pays 10");
+  assert.deepEqual(result.wallet.endless.r1, { date: TODAY, coins: 4, rounds: 3 }, "3 rounds survived pays 4");
   assert.equal(result.endless.best["2026-11-03"], 3);
   assert.equal(result.endless.runs, 1);
   assert.deepEqual(result.wallet.pending, {});
@@ -91,7 +91,7 @@ test("only today's and yesterday's games and runs pay; older ones count in stats
   const keys = bankQuestions.slice(0, 4).map(question => questionKey(question.text));
   const old = { date: "2026-11-05", startsOn: "2026-11-03", hard: false, questions: keys, guesses: [50, 0, 0, 0] };
   const runs = await verifyState(fresh(), { wallet: { pending: { old } } }, deps);
-  assert.deepEqual(runs.wallet.endless.old, { date: "2026-11-05", coins: 0, base: 0 });
+  assert.deepEqual(runs.wallet.endless.old, { date: "2026-11-05", coins: 0, rounds: 3 });
   assert.equal(runs.endless.best["2026-11-03"], 3, "an old run still counts toward bests");
 });
 

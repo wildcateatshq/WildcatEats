@@ -10,8 +10,7 @@ import {
   coinBalance,
   dailyCoins,
   endlessCoins,
-  endlessPay,
-  endlessCoinsOn,
+  endlessDay,
   equippedItem,
   ENDLESS_COINS_PER_DAY,
   MARKET_ITEMS,
@@ -110,18 +109,20 @@ test("coins: a daily game pays its charge, an endless run pays more the farther 
   assert.equal(dailyCoins({ charge: 59.6 }), 60);
   assert.equal(dailyCoins({ charge: 40, hard: true }), 70, "hard games pay their regular-mode equivalent");
   assert.equal(dailyCoins({ charge: -12 }), 0, "running out pays nothing");
-  assert.equal(endlessCoins(1), 3);
+  assert.equal(endlessCoins(1), 1);
+  assert.equal(endlessCoins(3), 4, "a run lost early pays little");
   assert.equal(endlessCoins(10), 40);
-  assert.equal(endlessCoins(9, 120), ENDLESS_COINS_PER_DAY - 120, "no more than the day's endless limit");
-  assert.equal(endlessCoins(5, ENDLESS_COINS_PER_DAY), 0);
-  assert.deepEqual(endlessPay(20), { base: 100, bonus: 0, coins: 100 });
-  assert.deepEqual(endlessPay(30), { base: 100, bonus: 80, coins: 180 });
-  assert.deepEqual(endlessPay(20, 100), { base: 50, bonus: 0, coins: 50 }, "the first 20 rounds count toward the day's limit");
-  assert.deepEqual(endlessPay(30, ENDLESS_COINS_PER_DAY), { base: 0, bonus: 80, coins: 80 }, "rounds past 20 always pay");
+  const day = (paid, best) => ({ paid, best });
+  assert.equal(endlessCoins(9, day(120, 34)), ENDLESS_COINS_PER_DAY - 120, "no more than the day's endless limit");
+  assert.equal(endlessCoins(5, day(ENDLESS_COINS_PER_DAY, 40)), 0);
+  assert.equal(endlessCoins(50), 400, "a long run pays in full");
+  assert.equal(endlessCoins(10, day(400, 400)), 0, "nothing more after it that day");
+  assert.equal(endlessCoins(50, day(150, 100)), 250, "a long run tops the day up to its own pay");
+  assert.equal(endlessCoins(30, day(400, 400)), 0);
+  assert.deepEqual(endlessDay({ endless: { a: { date: "2026-11-02", coins: 100, rounds: 20 }, b: { date: "2026-11-02", coins: 50 }, c: { date: "2026-11-01", coins: 7, rounds: 4 } } }, "2026-11-02"), { paid: 150, best: 100 });
   for (let rounds = 1; rounds < 40; rounds++) assert.ok(endlessCoins(rounds + 1) > endlessCoins(rounds), "every round pays something");
-  assert.equal(endlessCoinsOn({ endless: { a: { date: "2026-11-02", coins: 305, base: 150 } } }, "2026-11-02"), 150, "the limit counts base pay");
   const wallet = { endless: { a: { date: "2026-11-02", coins: 55 }, b: { date: "2026-11-01", coins: 30 } }, owned: { "color-ice": "2026-11-02" }, equipped: { colors: { id: "color-ice", at: 1 }, lightning: { id: "lightning-pink", at: 2 } } };
-  assert.equal(endlessCoinsOn(wallet, "2026-11-02"), 55);
+  assert.equal(endlessDay(wallet, "2026-11-02").paid, 55);
   assert.deepEqual(coinBalance({ games: [{ charge: 60 }, { charge: 90 }], wallet: { ...wallet, owned: { "color-ice": { date: "2026-11-02", price: 150 } } } }),
     { earned: 235, spent: 150, balance: 85 }, "an item costs what was paid for it, even if its price goes up later");
   assert.equal(equippedItem(wallet, "colors").id, "color-ice");

@@ -365,11 +365,10 @@ export function endlessClock(round) {
 //   - a daily puzzle pays its final charge in coins (finish on 60% and get 60; running out pays 0),
 //     with hard games counted at their regular-mode equivalent (statsCharge);
 //   - an endless run pays a little more each round it survives (10 rounds pay 40, 20 pay 100, 30
-//     pay 180: endlessRunTotal). The first 20 rounds' pay counts toward ENDLESS_COINS_PER_DAY a day
-//     from endless runs; rounds past 20 always pay, with no limit.
+//     pay 180: endlessRunTotal), and endless runs pay up to ENDLESS_COINS_PER_DAY a day, or the
+//     day's best run if that's more (endlessCoins).
 // What's been earned and bought lives in the save (state.wallet), so it syncs with the account:
-//   wallet.endless  { runId: { date, coins, base } }  coins each endless run paid, and how many of
-//                                                them were the base pay the daily limit counts
+//   wallet.endless  { runId: { date, coins, rounds } }  coins each endless run paid, and its rounds
 //   wallet.owned    { itemId: { date, price } }  items bought, and what they cost then (older
 //                                                saves have just the date)
 //   wallet.equipped { category: { id, at } }     what's in use, and when it was picked; visitors
@@ -416,27 +415,33 @@ export function dailyCoins(game) {
   return Math.max(0, Math.round(statsCharge(game.charge ?? chargeLeft(game.score), game.hard)));
 }
 
-// What an endless run pays in all for surviving `rounds`: a little more each round, so going far
-// pays best. 10 rounds pay 40, 20 pay 100, 30 pay 180 (3 a round plus a tenth of the rounds squared).
-export const endlessRunTotal = rounds => Math.round(3 * rounds + (rounds * rounds) / 10);
-// Rounds up to this one count toward the day's endless limit; every round past it always pays.
-export const ENDLESS_LIMITED_ROUNDS = 20;
-
-// What an endless run of `rounds` pays, given the base pay endless runs have already had today:
-//   base  = the pay for its first 20 rounds, up to what's left of the day's endless limit;
-//   bonus = the pay for rounds past 20, never limited, so a long run always pays;
-//   coins = both.
-export function endlessPay(rounds, baseToday = 0) {
-  const limited = endlessRunTotal(Math.min(rounds, ENDLESS_LIMITED_ROUNDS));
-  const base = Math.max(0, Math.min(limited, ENDLESS_COINS_PER_DAY - baseToday));
-  const bonus = endlessRunTotal(rounds) - limited;
-  return { base, bonus, coins: base + bonus };
+// What an endless run pays in all for surviving `rounds`: each round pays at least as much as the one
+// before, so going far pays best and a run lost early pays little. The first 10 rounds pay
+// 1, 1, 2, 3, 4, 5, 6, 6, 6, 6 (40 in all), rounds 11 to 20 pay 6 each (100 in all), and after
+// that 3 a round plus a tenth of the rounds squared (30 rounds pay 180).
+const ENDLESS_FIRST_ROUNDS = [1, 1, 2, 3, 4, 5, 6, 6, 6, 6];
+export function endlessRunTotal(rounds) {
+  if (rounds <= 10) return ENDLESS_FIRST_ROUNDS.slice(0, Math.max(0, rounds)).reduce((sum, pay) => sum + pay, 0);
+  if (rounds <= 20) return 40 + 6 * (rounds - 10);
+  return Math.round(3 * rounds + (rounds * rounds) / 10);
 }
-export const endlessCoins = (rounds, baseToday = 0) => endlessPay(rounds, baseToday).coins;
+// Endless runs on one day pay, in all, ENDLESS_COINS_PER_DAY or the day's best run, whichever is
+// more: a 50-round run pays its full 400, but nothing more is paid that day after it.
+//   today: what endless runs have already had on the day (endlessDay).
+export function endlessCoins(rounds, today = { paid: 0, best: 0 }) {
+  const total = endlessRunTotal(rounds);
+  const limit = Math.max(ENDLESS_COINS_PER_DAY, today.best, total);
+  return Math.max(0, Math.min(total, limit - today.paid));
+}
 
-// The base pay endless runs have had on a date (older runs, saved before the bonus, are all base).
-export function endlessCoinsOn(wallet, date) {
-  return Object.values(wallet?.endless || {}).filter(run => run.date === date).reduce((sum, run) => sum + (Number.isFinite(run.base) ? run.base : run.coins), 0);
+// What endless runs have had on a date: coins paid, and the best single run's full pay (a run saved
+// without its rounds counts what it paid).
+export function endlessDay(wallet, date) {
+  const runs = Object.values(wallet?.endless || {}).filter(run => run?.date === date);
+  return {
+    paid: runs.reduce((sum, run) => sum + run.coins, 0),
+    best: Math.max(0, ...runs.map(run => (Number.isFinite(run.rounds) ? endlessRunTotal(run.rounds) : run.coins)))
+  };
 }
 
 // Coins earned, spent, and left.
