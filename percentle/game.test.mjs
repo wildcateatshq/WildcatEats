@@ -41,7 +41,8 @@ import {
   questionKey,
   scoreColor,
   viewForProgress,
-  activeVisitors
+  activeVisitors,
+  hasExtra
 } from "../public/percentle/game.mjs";
 
 test("points off is absolute percentage point difference", () => {
@@ -332,4 +333,12 @@ test("every visitor you own flies, unless you turn it off", () => {
   wallet.equipped["visitor-ufo"] = { id: "visitor-ufo", at: 2, off: true };
   assert.deepEqual(activeVisitors(wallet).map(item => item.id), ["visitor-paper-plane"]);
   assert.deepEqual(activeVisitors({ owned: {}, equipped: {} }), [], "the usual ones aren't market visitors");
+});
+
+test("extras are on once bought, until turned off", () => {
+  const wallet = { owned: { "extra-aurora": { date: "2026-11-10", price: 1200 } }, equipped: {} };
+  assert.equal(hasExtra(wallet, "aurora"), true);
+  assert.equal(hasExtra(wallet, "finale"), false);
+  wallet.equipped["extra-aurora"] = { id: "extra-aurora", at: 1, off: true };
+  assert.equal(hasExtra(wallet, "aurora"), false);
 });

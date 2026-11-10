@@ -1,6 +1,6 @@
 import { achievementsForGame, ACHIEVEMENTS, formatValue, fromPosition, roundToScale, scaleDecimals, scaleOf, scaleStep, toPosition, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, statsCharge, easternDate, endlessClock, finalCharge, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
 import { createCity, visitorSvg } from "/percentle/city.mjs";
-import { MARKET_CATEGORIES, MARKET_ITEMS, coinBalance, dailyCoins, emptyWallet, endlessCoins, endlessDay, equippedItem, marketItem, activeVisitors } from "/percentle/game.mjs";
+import { MARKET_CATEGORIES, MARKET_ITEMS, coinBalance, dailyCoins, emptyWallet, endlessCoins, endlessDay, equippedItem, marketItem, activeVisitors, hasExtra, TOGGLE_CATEGORIES } from "/percentle/game.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
 const GAME_NAME = "Chargle";
@@ -767,6 +767,7 @@ function applyCosmetics() {
   else document.body.dataset.color = color;
   if (lightning === "gold") delete document.body.dataset.lightning;
   else document.body.dataset.lightning = lightning;
+  city.setAurora(hasExtra(state.wallet, "aurora"));
 }
 
 function marketPreview(item) {
@@ -774,6 +775,7 @@ function marketPreview(item) {
     const kind = item.id.replace("visitor-", "");
     return kind === "none" ? '<span class="market-none">Planes, birds and blimps as usual</span>' : visitorSvg(kind, 2);
   }
+  if (item.category === "extras") return visitorSvg(item.id.replace("extra-", ""), 2);
   if (item.category === "lightning") return `<span class="market-bolt" style="background:${item.swatch}"></span>`;
   return `<span class="market-swatch" style="background:${item.swatch};color:${item.swatch}"></span>`;
 }
@@ -781,16 +783,17 @@ function marketPreview(item) {
 function showMarket(category = MARKET_CATEGORIES[0].id) {
   const { balance } = coinBalance(state);
   const wallet = state.wallet;
-  const inUse = equippedItem(wallet, category);
+  // Visitors and extras are each on or off (the usual visitors always come); colors and lightning
+  // are one at a time.
+  const toggles = TOGGLE_CATEGORIES.includes(category);
+  const inUse = toggles ? null : equippedItem(wallet, category);
   const about = MARKET_CATEGORIES.find(group => group.id === category);
   const cards = MARKET_ITEMS.filter(item => item.category === category).map(item => {
     const owned = item.price === 0 || Boolean(wallet.owned[item.id]);
-    // Visitors are each on or off (the usual ones always come); colors and lightning are one at a time.
-    const visitor = category === "visitors";
-    const on = visitor && (item.price === 0 || (owned && !wallet.equipped[item.id]?.off));
-    const using = visitor ? on : inUse.id === item.id;
-    const button = visitor && item.price === 0 ? '<button type="button" disabled>Always on</button>'
-      : visitor && owned ? `<button type="button" class="${on ? "toggle-on" : ""}" data-toggle="${item.id}" aria-pressed="${on}">${on ? "On" : "Off"}</button>`
+    const on = toggles && (item.price === 0 || (owned && !wallet.equipped[item.id]?.off));
+    const using = toggles ? on : inUse.id === item.id;
+    const button = toggles && item.price === 0 ? '<button type="button" disabled>Always on</button>'
+      : toggles && owned ? `<button type="button" class="${on ? "toggle-on" : ""}" data-toggle="${item.id}" aria-pressed="${on}">${on ? "On" : "Off"}</button>`
       : using ? '<button type="button" disabled>In use</button>'
       : owned ? `<button type="button" data-use="${item.id}">Use</button>`
       : item.price <= balance ? `<button type="button" class="buy" data-buy="${item.id}">Buy · ${item.price}</button>`
@@ -816,6 +819,7 @@ function showMarket(category = MARKET_CATEGORIES[0].id) {
   dialog.querySelectorAll("[data-toggle]").forEach(button => button.addEventListener("click", () => {
     const id = button.dataset.toggle;
     wallet.equipped[id] = { id, at: Date.now(), off: !wallet.equipped[id]?.off };
+    applyCosmetics();
     save();
     showMarket(category);
   }));
@@ -1273,6 +1277,8 @@ function playReveal(animate) {
     const last = progress.guesses.length - 1;
     const perfect = progress.guesses[last] === currentQuestions[last].answer;
     setTimeout(() => city.strike({ perfect }), matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 1300);
+    // The Market's fireworks finale (Extras): a full show after the strike.
+    if (hasExtra(state.wallet, "finale")) setTimeout(city.finale, 1900);
   } else if (animate) {
     // A very close guess sets off one small firework.
     const progress = progressFor();

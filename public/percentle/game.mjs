@@ -378,8 +378,11 @@ export const ENDLESS_COINS_PER_DAY = 150;
 export const MARKET_CATEGORIES = [
   { id: "visitors", name: "Visitors", blurb: "Yours fly over the city now and then, along with the usual planes and birds. Turn each one on or off." },
   { id: "colors", name: "Colors", blurb: "The color of the battery, the buttons, and the city's lights. Hard mode stays purple." },
-  { id: "lightning", name: "Lightning", blurb: "The color of the bolt that strikes the city when you supercharge." }
+  { id: "lightning", name: "Lightning", blurb: "The color of the bolt that strikes the city when you supercharge." },
+  { id: "extras", name: "Extras", blurb: "Big effects for the city. Turn each one on or off." }
 ];
+// Categories where every item owned can be on at once (each turned on or off), rather than one in use.
+export const TOGGLE_CATEGORIES = ["visitors", "extras"];
 
 // Free items are what everyone starts with.
 export const MARKET_ITEMS = [
@@ -390,6 +393,8 @@ export const MARKET_ITEMS = [
   { id: "visitor-whale", category: "visitors", name: "Sky whale", price: 400 },
   { id: "visitor-dragon", category: "visitors", name: "Dragon", price: 500 },
   { id: "visitor-ufo", category: "visitors", name: "UFO", price: 600 },
+  { id: "visitor-meteors", category: "visitors", name: "Meteor shower", price: 1500 },
+  { id: "visitor-robot", category: "visitors", name: "Giant robot", price: 3000 },
   { id: "color-gold", category: "colors", name: "Gold", price: 0, swatch: "#ffd86b" },
   { id: "color-ice", category: "colors", name: "Ice", price: 250, swatch: "#7fdcff" },
   { id: "color-rose", category: "colors", name: "Rose", price: 250, swatch: "#ff8fc8" },
@@ -401,7 +406,9 @@ export const MARKET_ITEMS = [
   { id: "lightning-pink", category: "lightning", name: "Pink", price: 150, swatch: "#ff6ad5" },
   { id: "lightning-green", category: "lightning", name: "Toxic green", price: 250, swatch: "#6aff7c" },
   { id: "lightning-red", category: "lightning", name: "Red", price: 250, swatch: "#ff5a4c" },
-  { id: "lightning-rainbow", category: "lightning", name: "Rainbow", price: 400, swatch: "linear-gradient(90deg,#ff5a4c,#ffd84d,#6aff7c,#6ab8ff,#c46aff)" }
+  { id: "lightning-rainbow", category: "lightning", name: "Rainbow", price: 1000, swatch: "linear-gradient(90deg,#ff5a4c,#ffd84d,#6aff7c,#6ab8ff,#c46aff)" },
+  { id: "extra-aurora", category: "extras", name: "Aurora", price: 1200 },
+  { id: "extra-finale", category: "extras", name: "Fireworks finale", price: 1200 },
 ];
 
 export const marketItem = id => MARKET_ITEMS.find(item => item.id === id) || null;
@@ -456,10 +463,12 @@ export function coinBalance(state) {
   return { earned, spent, balance: earned - spent };
 }
 
-// The visitors a player owns and has on (every one, unless turned off).
-export function activeVisitors(wallet) {
-  return MARKET_ITEMS.filter(item => item.category === "visitors" && item.price > 0 && wallet?.owned?.[item.id] && !wallet?.equipped?.[item.id]?.off);
+// The items a player owns and has on in a toggle category (every one, unless turned off).
+export function activeItems(wallet, category) {
+  return MARKET_ITEMS.filter(item => item.category === category && item.price > 0 && wallet?.owned?.[item.id] && !wallet?.equipped?.[item.id]?.off);
 }
+export const activeVisitors = wallet => activeItems(wallet, "visitors");
+export const hasExtra = (wallet, id) => activeItems(wallet, "extras").some(item => item.id === `extra-${id}`);
 
 // The item in use for a category (the free one if nothing else is).
 export function equippedItem(wallet, category) {

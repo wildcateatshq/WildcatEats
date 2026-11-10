@@ -429,7 +429,7 @@ body.hard .city .rain{animation:city-rain .9s linear infinite}
 .city-flash{position:absolute;inset:0;background:radial-gradient(ellipse 80% 60% at var(--x,50%) 10%,rgba(255,238,200,.34),transparent 70%);animation:city-flash .9s ease-out forwards}
 .city-flash.perfect{background:radial-gradient(ellipse 110% 80% at var(--x,50%) 15%,rgba(255,244,214,.55),transparent 75%);animation:city-flash-perfect 1.4s ease-out forwards}
 .burst{fill:#ffe9a6;transform-box:fill-box;transform-origin:center;opacity:0;animation:city-burst 1.8s ease-out 2 both}
-.burst-1{fill:#ffb43a}.burst-2{fill:#fffaf0}.burst-core{fill:#fff}
+.burst-1{fill:#ffb43a}.burst-2{fill:#fffaf0}.burst-3{fill:#ff7ad9}.burst-4{fill:#7ad7ff}.burst-core{fill:#fff}
 body.hard .city .storm{display:inline}
 body.hard .city .moon{fill:#e9d6ff}
 body.hard .city .w0{fill:#d9a8ff}body.hard .city .w1{fill:#b77bff}body.hard .city .w2{fill:#ff8ad8}body.hard .city .wn{fill:#c45cff}
@@ -550,6 +550,10 @@ body[data-lightning="rainbow"] .city-bolt:not(.outage){--bolt-glow:#ffffff}body[
 .visitor-art .rk-body{fill:#eef2f6}.visitor-art .rk-fin{fill:#e8473b}.visitor-art .rk-window{fill:#59b8ff}.visitor-art .rk-flame{fill:#ffb02e}
 .visitor-art .wh-body{fill:#3d6fa8}.visitor-art .wh-belly{fill:#a9c8e8}.visitor-art .wh-eye{fill:#0d1a2a}.visitor-art .wh-spout{fill:#cfeaff}
 .visitor-art .dg-body{fill:#3fae5a}.visitor-art .dg-belly{fill:#c8e86a}.visitor-art .dg-eye{fill:#ffd24d}.visitor-art .dg-wing-up,.visitor-art .dg-wing-down{fill:#2b7a40}
+.visitor-art .mt-tail{fill:#cfe3ff;opacity:.55}.visitor-art .mt-head{fill:#fff}
+.visitor-art .rb-body{fill:#5d6b7c}.visitor-art .rb-leg-a,.visitor-art .rb-leg-b{fill:#4a5768}.visitor-art .rb-eye{fill:#ff5a4c}.visitor-art .rb-light{fill:#7ad7ff}
+.visitor-art .au-curtain{fill:#7affc4;opacity:.35}.visitor-art .au-green{fill:#46ffa0}.visitor-art .au-purple{fill:#a06eff}
+.visitor-art .fw-gold{fill:#ffd24d}.visitor-art .fw-pink{fill:#ff7ad9}.visitor-art .fw-blue{fill:#7ad7ff}
 .visitor-art .uf-hull{fill:#8a94a3}.visitor-art .uf-dome{fill:#a8f0dc;opacity:.85}.visitor-art .uf-glow{fill:#6dffa8;opacity:.35}.visitor-art .uf-light{fill:#7dffb0}
 .market-visitor .rk-flame{animation:plane-blink .2s steps(1) infinite}
 .market-visitor .dg-wing-up{animation:bird-up .45s steps(1) infinite}.market-visitor .dg-wing-down{animation:bird-down .45s steps(1) infinite}
@@ -562,8 +566,8 @@ body[data-lightning="rainbow"] .city-bolt:not(.outage){--bolt-glow:#ffffff}body[
 /* Flying the other way the picture is mirrored, so the moves are too. */
 .market-visitor.visitor-fly-paper-plane.flip svg{animation-name:paper-glide-back}
 @keyframes paper-glide-back{0%{translate:0px 0px;rotate:0deg}10%{translate:0px 7px;rotate:-9deg}20%{translate:0px 10px;rotate:-4deg}30%{translate:0px -3px;rotate:10deg}38%{translate:0px -5px;rotate:4deg}42%{translate:0px 0px;rotate:0deg}43.83%{translate:-11.0px -2.9px;rotate:30deg}45.67%{translate:-19.1px -11.0px;rotate:60deg}47.5%{translate:-22.0px -22.0px;rotate:90deg}49.33%{translate:-19.1px -33.0px;rotate:120deg}51.17%{translate:-11.0px -41.1px;rotate:150deg}53.0%{translate:0px -44.0px;rotate:180deg}54.83%{translate:11.0px -41.1px;rotate:210deg}56.67%{translate:19.1px -33.0px;rotate:240deg}58.5%{translate:22.0px -22.0px;rotate:270deg}60.33%{translate:19.1px -11.0px;rotate:300deg}62.17%{translate:11.0px -2.9px;rotate:330deg}64.0%{translate:0.0px -0.0px;rotate:360deg}74%{translate:0px 6px;rotate:352deg}84%{translate:0px 9px;rotate:366deg}92%{translate:0px 3px;rotate:356deg}100%{translate:0px 0px;rotate:360deg}}
-.market-tabs{position:sticky;top:-25px;z-index:2;display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin:0 -2px 14px;padding:8px 2px;background:var(--card)}
-.market-tabs button{padding:9px 4px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--muted);font:700 11px var(--mono);letter-spacing:1px;text-transform:uppercase;cursor:pointer}
+.market-tabs{position:sticky;top:-25px;z-index:2;display:grid;grid-template-columns:repeat(4,1fr);gap:5px;margin:0 -2px 14px;padding:8px 2px;background:var(--card)}
+.market-tabs button{min-width:0;overflow:hidden;text-overflow:ellipsis;padding:9px 2px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--muted);font:700 11px var(--mono);letter-spacing:1px;text-transform:uppercase;cursor:pointer}
 .market-tabs button[aria-selected="true"]{border-color:var(--charge);color:var(--ink);box-shadow:0 0 12px -4px var(--charge-glow)}
 .market-balance{display:flex;align-items:center;gap:8px;margin:0 0 4px;font:700 22px var(--mono);color:var(--ink)}.market-balance .coin{font-size:26px}
 .market-blurb{margin:0 0 12px}
@@ -657,7 +661,28 @@ body.hard .city-plane .plane-windows{fill:#d9a8ff}
 
 /* The shooting star: drawn from tail to head in a blink, then fades. */
 .city-meteor{position:absolute;left:0;top:0;pointer-events:none}
-.city-meteor line{stroke-dasharray:100;stroke-dashoffset:100;animation:meteor 1.1s ease-out forwards}
+.city-meteor line{stroke-dasharray:100;stroke-dashoffset:100;animation:meteor 1.1s ease-out both}
+/* The Market's aurora (Extras): soft green and violet curtains rippling over the night sky. It fades
+   with daylight, dims under cloud, and is gone while the city is dark. */
+.city-aurora{display:none;position:absolute;left:-15%;right:-15%;top:2%;height:46%;pointer-events:none;mix-blend-mode:screen;filter:blur(9px);opacity:calc(.6 - var(--daylight,0) * 1.2);transition:opacity 1.5s ease;-webkit-mask-image:repeating-linear-gradient(90deg,#000 0 6px,rgba(0,0,0,.82) 6px 9px);mask-image:repeating-linear-gradient(90deg,#000 0 6px,rgba(0,0,0,.82) 6px 9px)}
+.city.aurora .city-aurora{display:block}
+.city.out .city-aurora{opacity:0}
+.city.weather-rain .city-aurora,.city.weather-snow .city-aurora,.city.weather-fog .city-aurora{opacity:calc(.35 - var(--daylight,0) * .6)}
+.city-aurora i{position:absolute;left:0;right:0;height:34%;border-radius:50%;background:linear-gradient(90deg,transparent 2%,rgba(70,255,160,.5) 18%,rgba(120,255,200,.3) 40%,rgba(160,110,255,.42) 62%,rgba(70,255,170,.36) 82%,transparent 98%);box-shadow:0 -18px 30px -8px rgba(80,255,170,.25);animation:aurora-wave 16s ease-in-out infinite alternate}
+.city-aurora i:nth-child(1){top:8%}
+.city-aurora i:nth-child(2){top:30%;opacity:.75;animation-duration:21s;animation-delay:-7s;background:linear-gradient(90deg,transparent 4%,rgba(170,110,255,.38) 25%,rgba(70,255,160,.42) 55%,rgba(120,200,255,.3) 80%,transparent 96%)}
+.city-aurora i:nth-child(3){top:50%;opacity:.5;animation-duration:26s;animation-delay:-13s}
+@keyframes aurora-wave{0%{transform:translateX(-6%) skewY(-4deg) scaleY(.8)}50%{transform:translateX(3%) skewY(3deg) scaleY(1.15)}100%{transform:translateX(7%) skewY(-2deg) scaleY(.9)}}
+/* The Market's giant robot, walking behind the skyline. */
+.giant-robot{animation:robot-walk linear forwards}
+@keyframes robot-walk{from{transform:translateX(var(--from))}to{transform:translateX(var(--to))}}
+.giant-robot .rb-body{fill:#2c3846}.giant-robot .rb-leg-a,.giant-robot .rb-leg-b{fill:#25303c}
+.giant-robot .rb-eye{fill:#ff5a4c;filter:drop-shadow(0 0 4px #ff5a4c)}.giant-robot .rb-light{fill:#7ad7ff;animation:plane-blink 1.4s steps(1) infinite}
+.giant-robot .rb-walk{animation:robot-bob 1.6s ease-in-out infinite}
+.giant-robot .rb-leg-a{animation:robot-step 1.6s steps(1) infinite}.giant-robot .rb-leg-b{animation:robot-step 1.6s steps(1) -.8s infinite}
+@keyframes robot-bob{0%,100%{transform:translateY(0)}25%,75%{transform:translateY(-3px)}}
+@keyframes robot-step{0%{transform:translateY(-4px)}50%{transform:translateY(0)}}
+.city.out .giant-robot{opacity:0}
 @keyframes meteor{0%{stroke-dashoffset:100;opacity:1}35%{stroke-dashoffset:0;opacity:1}100%{stroke-dashoffset:-60;opacity:0}}
 
 /* The helicopter: flies in from the right, hovers with its searchlight sweeping the roofs, leaves. */

@@ -336,9 +336,11 @@ reset links.
 
 ### Market
 Logged-in players get a **Market** button at the top right (where Log in was; never both) to spend
-coins on looks, in three tabs: **Visitors** (something of theirs that flies over the city on about 3
-questions in 10: a paper plane, hot-air balloon, rocket, sky whale, dragon, or UFO; pixel art in
-`city.mjs` `VISITOR_ART`), **Colors** (the battery, buttons, and city lights in Ice, Rose, Lime, Ember,
+coins on looks, in four tabs: **Visitors** (theirs fly over the city on about 3 questions in 10, on
+top of the usual planes and birds, each turned on or off: a paper plane, hot-air balloon, rocket, sky
+whale, dragon, UFO, meteor shower, or a giant robot walking behind the skyline; pixel art in
+`city.mjs` `VISITOR_ART`), **Extras** (each on or off: an aurora over the night sky, and a fireworks
+finale after every supercharge), **Colors** (the battery, buttons, and city lights in Ice, Rose, Lime, Ember,
 or Silver; hard mode stays purple), and **Lightning** (the supercharge bolt in blue, pink, green, red,
 or rainbow). Items and prices are `MARKET_ITEMS` in `game.mjs`. Coins: a daily puzzle pays its final
 charge (60% pays 60; hard games at their regular-mode equivalent; running out pays 0), and an

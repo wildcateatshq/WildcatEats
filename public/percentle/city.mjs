@@ -82,6 +82,8 @@ const balloonStripes = () => {
   return [red, gold];
 };
 const [balloonRed, balloonGold] = balloonStripes();
+// A pixel firework for the market's picture: a center and 8 sparks around it.
+const burstDots = (cx, cy, r) => [[cx, cy, 1, 1], ...[[1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, 0.7], [0.7, -0.7], [-0.7, -0.7]].map(([dx, dy]) => [Math.round(cx + dx * r), Math.round(cy + dy * r), 1, 1])];
 const VISITOR_ART = {
   "paper-plane": { w: 16, h: 7, seconds: 10, parts: [
     ["pp-top", [[11, 0, 2, 1], [8, 1, 6, 1], [4, 2, 11, 1]]],
@@ -112,6 +114,29 @@ const VISITOR_ART = {
     ["dg-eye", [[20, 5, 1, 1]]],
     ["dg-wing-up", [[9, 1, 2, 5], [11, 0, 3, 6], [14, 2, 2, 4]]],
     ["dg-wing-down", [[9, 9, 3, 2], [12, 9, 3, 3]]]
+  ] },
+  // The meteor shower and the giant robot have their own flights (meteorShower, giantRobot); the
+  // aurora and fireworks finale (Extras) have art only for the market.
+  meteors: { w: 20, h: 12, parts: [
+    ["mt-tail", [[0, 0, 1, 1], [1, 1, 1, 1], [2, 2, 1, 1], [7, 3, 1, 1], [8, 4, 1, 1], [9, 5, 1, 1], [3, 6, 1, 1], [4, 7, 1, 1], [5, 8, 1, 1]]],
+    ["mt-head", [[3, 3, 2, 2], [10, 6, 2, 2], [6, 9, 2, 2]]]
+  ] },
+  robot: { w: 14, h: 24, parts: [
+    ["rb-body", [[6, 0, 1, 2], [4, 2, 7, 4], [6, 6, 3, 1], [2, 7, 11, 7], [0, 7, 2, 9], [13, 8, 1, 8], [4, 14, 7, 2]]],
+    ["rb-leg-a", [[4, 16, 3, 7], [3, 23, 4, 1]]],
+    ["rb-leg-b", [[8, 16, 3, 7], [8, 23, 4, 1]]],
+    ["rb-eye", [[9, 3, 2, 1]]],
+    ["rb-light", [[5, 9, 2, 1], [8, 9, 2, 1], [6, 0, 1, 1]]]
+  ] },
+  aurora: { w: 20, h: 10, parts: [
+    ["au-curtain", [[2, 0, 1, 4], [6, 0, 1, 3], [10, 0, 1, 2], [14, 0, 1, 3], [18, 0, 1, 4]]],
+    ["au-green", [[0, 4, 4, 2], [4, 3, 4, 2], [8, 2, 4, 2], [12, 3, 4, 2], [16, 4, 4, 2]]],
+    ["au-purple", [[0, 6, 4, 1], [4, 5, 4, 1], [8, 4, 4, 1], [12, 5, 4, 1], [16, 6, 4, 1]]]
+  ] },
+  finale: { w: 20, h: 15, parts: [
+    ["fw-gold", burstDots(5, 5, 3)],
+    ["fw-pink", burstDots(14, 4, 3)],
+    ["fw-blue", burstDots(10, 11, 3)]
   ] },
   ufo: { w: 16, h: 8, seconds: 9, parts: [
     ["uf-glow", [[5, 6, 6, 1], [6, 7, 4, 1]]],
@@ -171,6 +196,7 @@ export function createCity(root) {
   let holiday = null; // "halloween", "december", "newyear", "july4" or null
   let snowLevel = 0; // 0 to 1: how much snow sits on the roofs
   let snowFalling = false;
+  let aurora = false; // the Market's aurora (Extras) over the night sky
   let billboard = null; // { x, y, w, h } once drawn
   let billboardText = ["CHARGLE", ""];
   const BILLBOARD_CUTOFF = 25; // the billboard's building loses power below this charge
@@ -455,7 +481,7 @@ export function createCity(root) {
     }
     const rainTileUrl = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160' stroke='#b4c2d4' stroke-opacity='.55' stroke-width='1.3'>${streaks}</svg>`).replace(/'/g, "%27")}")`;
 
-    root.innerHTML = `<div class="city-sky"></div><div class="city-world"><div class="city-glow"></div>
+    root.innerHTML = `<div class="city-sky"></div><div class="city-world"><div class="city-aurora"><i></i><i></i><i></i></div><div class="city-glow"></div>
       <svg class="city-scene" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">
         <defs><radialGradient id="sunGlow"><stop offset="0" stop-color="#ffd86b" stop-opacity=".35"/><stop offset="1" stop-color="#ffd86b" stop-opacity="0"/></radialGradient></defs>
         <g class="stars">${stars}</g>
@@ -528,6 +554,7 @@ export function createCity(root) {
     root.classList.toggle("weather-rain", weatherKind === "rain" && !storming);
     root.classList.toggle("weather-snow", weatherKind === "snow" || snowFalling);
     root.classList.toggle("weather-fog", weatherKind === "fog");
+    root.classList.toggle("aurora", aurora);
     for (const name of ["halloween", "december", "newyear", "july4"]) root.classList.toggle(name, holiday === name);
     root.style.setProperty("--snow", String(snowLevel));
     root.querySelector(".billboard")?.classList.toggle("on", shown > BILLBOARD_CUTOFF);
@@ -827,7 +854,7 @@ export function createCity(root) {
   }
 
   // Pixel fireworks: bursts at spots given as fractions of the screen, each a little after the last.
-  function launch(spots, { repeat = 2, gap = 0.55 } = {}) {
+  function launch(spots, { repeat = 2, gap = 0.55, colors = 3 } = {}) {
     if (reducedMotion() || !buildings.length) return;
     const step = W < 600 ? 5.5 : 11;
     let bursts = "";
@@ -840,7 +867,7 @@ export function createCity(root) {
           dots += `<rect x="${(cx + Math.cos(angle) * s * step).toFixed(0)}" y="${(cy + Math.sin(angle) * s * step).toFixed(0)}" width="${P}" height="${P}" fill-opacity="${(1 - s * 0.16).toFixed(2)}"/>`;
         }
       }
-      bursts += `<g class="burst burst-${k % 3}" style="animation-delay:${(k * gap).toFixed(2)}s;animation-iteration-count:${repeat}">${dots}<rect class="burst-core" x="${(cx - P).toFixed(0)}" y="${(cy - P).toFixed(0)}" width="${P * 2}" height="${P * 2}"/></g>`;
+      bursts += `<g class="burst burst-${k % colors}" style="animation-delay:${(k * gap).toFixed(2)}s;animation-iteration-count:${repeat}">${dots}<rect class="burst-core" x="${(cx - P).toFixed(0)}" y="${(cy - P).toFixed(0)}" width="${P * 2}" height="${P * 2}"/></g>`;
     });
     scene().insertAdjacentHTML("beforeend", `<svg class="city-fireworks" viewBox="0 0 ${W} ${H}" preserveAspectRatio="xMidYMax slice">${bursts}</svg>`);
     const svg = scene().lastElementChild;
@@ -850,6 +877,14 @@ export function createCity(root) {
   // Three fireworks in the open sky beside the final battery, for a strong finish.
   function fireworks() {
     launch(W < 600 ? [[0.1, 0.37], [0.9, 0.31], [0.88, 0.47]] : [[0.18, 0.22], [0.82, 0.16], [0.86, 0.4]]);
+  }
+
+  // The Market's fireworks finale (Extras): a full show across the sky for every supercharge.
+  function finale() {
+    const spots = W < 600
+      ? [[0.12, 0.3], [0.88, 0.24], [0.5, 0.1], [0.15, 0.48], [0.85, 0.44], [0.3, 0.18], [0.7, 0.16], [0.1, 0.16], [0.9, 0.36], [0.5, 0.3]]
+      : [[0.15, 0.22], [0.85, 0.16], [0.5, 0.08], [0.08, 0.4], [0.92, 0.36], [0.3, 0.12], [0.7, 0.1], [0.22, 0.34], [0.78, 0.3], [0.5, 0.24]];
+    launch(spots.sort(() => Math.random() - 0.5), { repeat: 1, gap: 0.28, colors: 5 });
   }
 
   // One small firework in open sky to one side, for a very close guess.
@@ -890,20 +925,59 @@ export function createCity(root) {
   function marketVisitor(kind, y) {
     const art = VISITOR_ART[kind];
     if (!art || !lively()) return;
+    if (kind === "meteors") return meteorShower(y);
+    if (kind === "robot") return giantRobot();
     const s = W < 600 ? 2 : 3;
     drift(`market-visitor visitor-fly-${kind}`, visitorSvg(kind, s), y, art.w * s, art.seconds * (0.9 + Math.random() * 0.2));
   }
 
-  // A shooting star: a quick streak of light with a fading tail, high in the sky.
-  function shootingStar(y) {
+  // A shooting star: a quick streak of light with a fading tail, high in the sky. Each has its own
+  // gradient id, since several can be up at once in a meteor shower.
+  let meteorCount = 0;
+  function shootingStar(y, { x = W * (0.1 + Math.random() * 0.6), angle = (12 + Math.random() * 18) * Math.PI / 180, delay = 0 } = {}) {
     if (!lively()) return;
-    const x = W * (0.1 + Math.random() * 0.6), length = W < 600 ? 110 : 190, angle = (12 + Math.random() * 18) * Math.PI / 180;
+    const length = W < 600 ? 110 : 190;
     const x2 = x + Math.cos(angle) * length, y2 = y + Math.sin(angle) * length;
+    const id = `meteorTail${++meteorCount}`;
     scene().insertAdjacentHTML("beforeend", `<svg class="city-meteor" width="${W}" height="${window.innerHeight}">
-        <defs><linearGradient id="meteorTail" gradientUnits="userSpaceOnUse" x1="${x.toFixed(0)}" y1="${y.toFixed(0)}" x2="${x2.toFixed(0)}" y2="${y2.toFixed(0)}"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".95"/></linearGradient></defs>
-        <line x1="${x.toFixed(0)}" y1="${y.toFixed(0)}" x2="${x2.toFixed(0)}" y2="${y2.toFixed(0)}" stroke="url(#meteorTail)" stroke-width="2.5" stroke-linecap="round" pathLength="100"/></svg>`);
+        <defs><linearGradient id="${id}" gradientUnits="userSpaceOnUse" x1="${x.toFixed(0)}" y1="${y.toFixed(0)}" x2="${x2.toFixed(0)}" y2="${y2.toFixed(0)}"><stop offset="0" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#fff" stop-opacity=".95"/></linearGradient></defs>
+        <line x1="${x.toFixed(0)}" y1="${y.toFixed(0)}" x2="${x2.toFixed(0)}" y2="${y2.toFixed(0)}" stroke="url(#${id})" stroke-width="2.5" stroke-linecap="round" pathLength="100" style="animation-delay:${delay.toFixed(2)}s"/></svg>`);
     const svg = scene().lastElementChild;
-    setTimeout(() => svg.remove(), 1400);
+    setTimeout(() => svg.remove(), 1400 + delay * 1000);
+  }
+
+  // The Market's meteor shower: a dozen shooting stars streaking the same way across the sky over a
+  // few seconds, around height y (screen pixels).
+  function meteorShower(y) {
+    const angle = (18 + Math.random() * 12) * Math.PI / 180;
+    for (let k = 0; k < 12; k++) {
+      shootingStar(Math.max(16, y - 90 + Math.random() * 150), { x: W * (Math.random() * 0.8 - 0.05), angle, delay: k * 0.3 + Math.random() * 0.25 });
+    }
+  }
+
+  // The Market's giant robot: a huge pixel mech walking slowly behind the skyline, its head above the
+  // roofs, its eyes casting a beam over the buildings ahead of it.
+  function giantRobot() {
+    const sceneSvg = root.querySelector(".city-scene");
+    const backRow = sceneSvg?.querySelector(".row");
+    if (!backRow || sceneSvg.querySelector(".giant-robot")) return;
+    const art = VISITOR_ART.robot;
+    const tops = buildings.map(b => b.top).sort((x, y) => x - y);
+    const skyline = tops[Math.floor(tops.length * 0.15)] ?? H * 0.75;
+    const s = Math.max(4, Math.round((H - skyline) / 14));
+    const w = art.w * s, h = art.h * s;
+    const leftToRight = Math.random() < 0.5;
+    const parts = art.parts.map(([cls, rects]) => `<g class="${cls}">${rects.map(([x, y, rw, rh]) => `<rect x="${x * s}" y="${y * s}" width="${rw * s}" height="${rh * s}"/>`).join("")}</g>`).join("");
+    // The eye beam, reaching forward and down over the roofs.
+    const beam = `<defs><linearGradient id="robotBeam" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#ff5a4c" stop-opacity=".45"/><stop offset="1" stop-color="#ff5a4c" stop-opacity="0"/></linearGradient></defs>
+      <polygon class="rb-beam" points="${11 * s},${3 * s} ${11 * s},${3.9 * s} ${34 * s},${17 * s} ${30 * s},${8 * s}" fill="url(#robotBeam)"/>`;
+    const facing = leftToRight ? "" : ` transform="translate(${w} 0) scale(-1 1)"`;
+    // It starts just out of sight (its eye beam reaches about 20 art pixels ahead of it).
+    const from = leftToRight ? -w : W + 22 * s, to = leftToRight ? W + 22 * s : -w;
+    const seconds = Math.round(Math.abs(to - from) / Math.max(18, W / 40));
+    backRow.insertAdjacentHTML("beforebegin", `<g class="giant-robot" style="--from:${from}px;--to:${to}px;animation-duration:${seconds}s"><g transform="translate(0 ${H - h})"><g${facing}><g class="rb-walk">${beam}${parts}</g></g></g></g>`);
+    const el = sceneSvg.querySelector(".giant-robot");
+    el.addEventListener("animationend", event => { if (event.target === el) el.remove(); });
   }
 
   // A blimp drifting slowly just above the rooftops, with a lit banner along its side.
@@ -1079,6 +1153,11 @@ export function createCity(root) {
       snowFalling = falling;
       refresh();
     },
+    setAurora(on) {
+      if (aurora === Boolean(on)) return;
+      aurora = Boolean(on);
+      refresh();
+    },
     setBillboard(lines) {
       billboardText = lines;
       showBillboard();
@@ -1100,6 +1179,7 @@ export function createCity(root) {
     strike,
     fireworks,
     firework,
+    finale,
     searchlights
   };
 }
