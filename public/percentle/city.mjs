@@ -346,7 +346,7 @@ export function createCity(root) {
       rainTile += `<line x1="${x.toFixed(0)}" y1="${y.toFixed(0)}" x2="${(x - 4).toFixed(0)}" y2="${(y + 14).toFixed(0)}" stroke-opacity="${(0.25 + wx() * 0.4).toFixed(2)}"/>`;
     }
     for (let i = 0; i < (phone ? 90 : 210); i++) {
-      snowTile += `<rect x="${px(wx() * W)}" y="${px(wx() * H)}" width="${P}" height="${P}" fill-opacity="${(0.45 + wx() * 0.5).toFixed(2)}"/>`;
+      snowTile += `<rect x="${px(wx() * W)}" y="${px(wx() * H)}" width="${P}" height="${P}" fill-opacity="${(0.25 + wx() * 0.35).toFixed(2)}"/>`;
     }
     const skylineTop = Math.min(...layout.filter(b => b.row === 0).map(b => b.top));
     const fog = [0.2, 0.55, 0.85].map((f, i) => `<ellipse class="fog fog-${i}" cx="${(W * f).toFixed(0)}" cy="${(skylineTop + H * 0.06).toFixed(0)}" rx="${(W * 0.42).toFixed(0)}" ry="${(H * 0.07).toFixed(0)}" fill="url(#fogPuff)"/>`).join("");

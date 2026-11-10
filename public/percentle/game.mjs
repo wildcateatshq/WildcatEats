@@ -359,45 +359,25 @@ export function endlessClock(round) {
   return { hour, time, label: `${isNight ? "Night" : "Day"} ${count}` };
 }
 
-// Weather on the city (rain, snow or fog): one roll per day, seeded by the date so everyone sees the
-// same sky all day, with odds that suit the season. Never rain in winter, never snow in summer.
-//   [snow, rain, fog] chances by month (January = 1).
-const WEATHER_ODDS = {
-  12: [0.3, 0, 0.1], 1: [0.3, 0, 0.1], 2: [0.3, 0, 0.1],
-  3: [0.05, 0.3, 0.1], 4: [0, 0.3, 0.1], 5: [0, 0.3, 0.1],
-  6: [0, 0.2, 0.03], 7: [0, 0.2, 0.03], 8: [0, 0.2, 0.03],
-  9: [0, 0.22, 0.15], 10: [0, 0.22, 0.15], 11: [0.05, 0.22, 0.15]
-};
-export function weatherForDay(date) {
-  // A steady number from 0 to 1 for the date, so a day's weather never changes.
-  let hash = 2166136261;
-  for (const char of `weather:${date}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619) >>> 0;
-  // Scramble it (MurmurHash3's finalizer) so neighbouring dates don't get similar rolls.
-  hash ^= hash >>> 16; hash = Math.imul(hash, 0x85ebca6b); hash ^= hash >>> 13; hash = Math.imul(hash, 0xc2b2ae35); hash ^= hash >>> 16;
-  let roll = (hash >>> 0) / 4294967296;
-  const [snow, rain, fog] = WEATHER_ODDS[Number(date.slice(5, 7))];
-  for (const [kind, chance] of [["snow", snow], ["rain", rain], ["fog", fog]]) {
-    if ((roll -= chance) < 0) return kind;
-  }
-  return null;
-}
-
 // ---------- Coins and the market ----------
 // Logged-in players spend coins in the market on looks: a visitor that flies over the city, the
 // game's colors, and the color of the supercharge lightning. Coins come from playing:
 //   - a daily puzzle pays its final charge in coins (finish on 60% and get 60; running out pays 0),
 //     with hard games counted at their regular-mode equivalent (statsCharge);
 //   - an endless run pays 1 coin for round 1, 2 for round 2, and so on (10 rounds pay 55), up to
-//     ENDLESS_COINS_PER_DAY a day from endless runs.
+//     ENDLESS_COINS_PER_DAY a day from endless runs; going far pays a multiplier on top of that,
+//     uncapped: each round past 10 pays extra (round 11 to 20 pays double, 21 to 30 triple...).
 // What's been earned and bought lives in the save (state.wallet), so it syncs with the account:
-//   wallet.endless  { runId: { date, coins } }  coins each endless run paid
+//   wallet.endless  { runId: { date, coins, base } }  coins each endless run paid, and how many of
+//                                                them were the base pay the daily limit counts
 //   wallet.owned    { itemId: { date, price } }  items bought, and what they cost then (older
 //                                                saves have just the date)
-//   wallet.equipped { category: { id, at } }     what's in use, and when it was picked
+//   wallet.equipped { category: { id, at } }     what's in use, and when it was picked; visitors
+//                   { itemId: { id, at, off } }  are on or off one by one (all on once bought)
 export const ENDLESS_COINS_PER_DAY = 150;
 
 export const MARKET_CATEGORIES = [
-  { id: "visitors", name: "Visitors", blurb: "Something of yours that flies over the city now and then." },
+  { id: "visitors", name: "Visitors", blurb: "Yours fly over the city now and then, along with the usual planes and birds. Turn each one on or off." },
   { id: "colors", name: "Colors", blurb: "The color of the battery, the buttons, and the city's lights. Hard mode stays purple." },
   { id: "lightning", name: "Lightning", blurb: "The color of the bolt that strikes the city when you supercharge." }
 ];
@@ -436,14 +416,24 @@ export function dailyCoins(game) {
   return Math.max(0, Math.round(statsCharge(game.charge ?? chargeLeft(game.score), game.hard)));
 }
 
-// What an endless run of `rounds` pays (1 + 2 + ... + rounds), given what endless runs have already
-// paid today.
-export function endlessCoins(rounds, paidToday = 0) {
-  return Math.max(0, Math.min((rounds * (rounds + 1)) / 2, ENDLESS_COINS_PER_DAY - paidToday));
-}
+// The multiplier on an endless round: x1 for rounds 1 to 10, x2 for 11 to 20, x3 for 21 to 30...
+export const endlessMultiplier = round => 1 + Math.floor((Math.max(1, round) - 1) / 10);
 
+// What an endless run of `rounds` pays, given the base pay endless runs have already had today:
+//   base  = 1 + 2 + ... + rounds, up to what's left of the day's endless limit;
+//   bonus = what the multiplier adds on rounds past 10 (never limited, so a long run always pays);
+//   coins = both.
+export function endlessPay(rounds, baseToday = 0) {
+  const base = Math.max(0, Math.min((rounds * (rounds + 1)) / 2, ENDLESS_COINS_PER_DAY - baseToday));
+  let bonus = 0;
+  for (let round = 11; round <= rounds; round++) bonus += round * (endlessMultiplier(round) - 1);
+  return { base, bonus, coins: base + bonus };
+}
+export const endlessCoins = (rounds, baseToday = 0) => endlessPay(rounds, baseToday).coins;
+
+// The base pay endless runs have had on a date (older runs, saved before the bonus, are all base).
 export function endlessCoinsOn(wallet, date) {
-  return Object.values(wallet?.endless || {}).filter(run => run.date === date).reduce((sum, run) => sum + run.coins, 0);
+  return Object.values(wallet?.endless || {}).filter(run => run.date === date).reduce((sum, run) => sum + (Number.isFinite(run.base) ? run.base : run.coins), 0);
 }
 
 // Coins earned, spent, and left.
@@ -456,6 +446,11 @@ export function coinBalance(state) {
   // What each item cost when it was bought, so a later price change doesn't touch it.
   const spent = Object.entries(wallet.owned || {}).reduce((sum, [id, bought]) => sum + (Number.isFinite(bought?.price) ? bought.price : marketItem(id)?.price || 0), 0);
   return { earned, spent, balance: earned - spent };
+}
+
+// The visitors a player owns and has on (every one, unless turned off).
+export function activeVisitors(wallet) {
+  return MARKET_ITEMS.filter(item => item.category === "visitors" && item.price > 0 && wallet?.owned?.[item.id] && !wallet?.equipped?.[item.id]?.off);
 }
 
 // The item in use for a category (the free one if nothing else is).

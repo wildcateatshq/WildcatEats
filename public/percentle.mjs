@@ -1,6 +1,6 @@
-import { achievementsForGame, ACHIEVEMENTS, formatValue, fromPosition, roundToScale, scaleDecimals, scaleOf, scaleStep, toPosition, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, statsCharge, easternDate, endlessClock, finalCharge, weatherForDay, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
+import { achievementsForGame, ACHIEVEMENTS, formatValue, fromPosition, roundToScale, scaleDecimals, scaleOf, scaleStep, toPosition, endlessAchievements, applyGuessKey, bestGuessIndex, chargeLeft, chargeTrack, crowdRank, dailyTotal, DRAIN_RATE, drainRateFor, endlessOrder, questionKey, roundsSurvived, statsCharge, easternDate, endlessClock, finalCharge, guessEntryFrom, guessEntryText, isOutOfCharge, litLevel, longestStreak, lowBatteryTier, pointsOff, streakAchievements, utcDate, viewForProgress } from "/percentle/game.mjs";
 import { createCity, visitorSvg } from "/percentle/city.mjs";
-import { MARKET_CATEGORIES, MARKET_ITEMS, coinBalance, dailyCoins, emptyWallet, endlessCoins, endlessCoinsOn, equippedItem, marketItem } from "/percentle/game.mjs";
+import { MARKET_CATEGORIES, MARKET_ITEMS, coinBalance, dailyCoins, emptyWallet, endlessPay, endlessCoinsOn, equippedItem, marketItem, activeVisitors } from "/percentle/game.mjs";
 
 // The game's name everywhere players see it (title, wordmark, start screen, share text).
 const GAME_NAME = "Chargle";
@@ -179,43 +179,69 @@ const VISITORS = [
   { name: "birds", chance: 0.45, fits: sky => sky.hour !== null && [5, 6, 7, 17, 18, 19].includes(Math.floor(((sky.hour % 24) + 24) % 24)) }
 ];
 const VISITOR_GAP_MS = 25000;
+// The player's own market visitors come on top of the usual ones, on their own roll with each
+// question: about 3 questions in 10, a little more the more of them are on.
 const MARKET_VISITOR_CHANCE = 0.3;
+const MARKET_VISITOR_EXTRA = 0.04; // per visitor on beyond the first, up to MARKET_VISITOR_MAX
+const MARKET_VISITOR_MAX = 0.5;
+const MARKET_VISITOR_GAP_MS = 20000;
 // Local testing only: http://localhost:3010/?clock=13 starts endless runs that many hours later
 // (13 = 10 AM), to see the daytime city without playing through the night.
 const CLOCK_SHIFT = location.hostname === "localhost" ? Number(new URLSearchParams(location.search).get("clock")) || 0 : 0;
 // Local testing only: http://localhost:3010/?visitor=blimp sends that visitor with every question.
 const FORCED_VISITOR = location.hostname === "localhost" ? new URLSearchParams(location.search).get("visitor") : null;
 let lastVisitorAt = -VISITOR_GAP_MS;
-let visitorTimer;
-function maybeFlyPlane() {
-  clearTimeout(visitorTimer);
-  if (document.body.classList.contains("starting")) return;
-  const sky = city.state();
-  let visitor = FORCED_VISITOR;
-  if (!visitor) {
-    if (Date.now() - lastVisitorAt < VISITOR_GAP_MS) return;
-    // A visitor bought in the market comes by on about 3 questions in 10.
-    const mine = equippedItem(state.wallet, "visitors");
-    if (mine.price > 0 && Math.random() < MARKET_VISITOR_CHANCE) visitor = `market:${mine.id.replace("visitor-", "")}`;
-    let roll = Math.random();
-    visitor ||= VISITORS.filter(v => v.fits(sky)).find(v => (roll -= v.chance) < 0)?.name;
-    if (!visitor) return;
-  }
-  visitorTimer = setTimeout(() => {
-    // Planes, birds and shooting stars cross between the bottom of the moon and the top of the
-    // question's button; the blimp and helicopter stay low over the rooftops.
+let lastMarketVisitorAt = -MARKET_VISITOR_GAP_MS;
+let visitorTimer, marketVisitorTimer;
+
+// When a visitor crosses: between the bottom of the moon and the top of the question's button.
+function flyAfter(delay, fly) {
+  return setTimeout(() => {
     const moon = document.querySelector("#city .moon")?.getBoundingClientRect();
     const button = document.querySelector("#questionAction")?.getBoundingClientRect();
     if (!moon || !button || document.body.classList.contains("starting")) return;
     const top = Math.max(16, moon.bottom + 16), bottom = button.top - 30;
-    const y = bottom > top ? top + Math.random() * (bottom - top) : top;
+    fly(bottom > top ? top + Math.random() * (bottom - top) : top);
+  }, delay);
+}
+
+function maybeFlyPlane() {
+  clearTimeout(visitorTimer);
+  clearTimeout(marketVisitorTimer);
+  if (document.body.classList.contains("starting")) return;
+  maybeFlyMarketVisitor();
+  const sky = city.state();
+  let visitor = FORCED_VISITOR && !marketItem(`visitor-${FORCED_VISITOR}`) ? FORCED_VISITOR : null;
+  if (!visitor) {
+    if (FORCED_VISITOR || Date.now() - lastVisitorAt < VISITOR_GAP_MS) return;
+    let roll = Math.random();
+    visitor = VISITORS.filter(v => v.fits(sky)).find(v => (roll -= v.chance) < 0)?.name;
+    if (!visitor) return;
+  }
+  // Planes, birds and shooting stars cross the sky; the blimp and helicopter stay low over the rooftops.
+  visitorTimer = flyAfter(FORCED_VISITOR ? 1200 : 1500 + Math.random() * 6000, y => {
     lastVisitorAt = Date.now();
     if (visitor === "plane") city.plane(y);
     else if (visitor === "shootingStar") city.shootingStar(Math.max(20, y - 60));
     else if (visitor === "birds") city.birds(y);
-    else if (visitor.startsWith("market:")) city.marketVisitor(visitor.slice("market:".length), y);
     else city[visitor]?.();
-  }, FORCED_VISITOR ? 1200 : 1500 + Math.random() * 6000);
+  });
+}
+
+// The player's own visitors (Market), on their own roll: one of those that are on.
+function maybeFlyMarketVisitor() {
+  let kind = FORCED_VISITOR && marketItem(`visitor-${FORCED_VISITOR}`) ? FORCED_VISITOR : null;
+  if (!kind) {
+    const mine = activeVisitors(state.wallet);
+    if (!mine.length || Date.now() - lastMarketVisitorAt < MARKET_VISITOR_GAP_MS) return;
+    const chance = Math.min(MARKET_VISITOR_MAX, MARKET_VISITOR_CHANCE + MARKET_VISITOR_EXTRA * (mine.length - 1));
+    if (Math.random() >= chance) return;
+    kind = mine[Math.floor(Math.random() * mine.length)].id.replace("visitor-", "");
+  }
+  marketVisitorTimer = flyAfter(FORCED_VISITOR ? 1200 : 2500 + Math.random() * 7000, y => {
+    lastMarketVisitorAt = Date.now();
+    city.marketVisitor(kind, y);
+  });
 }
 
 // The billboard on a rooftop: the player's streak once it's going, otherwise the game's name and
@@ -255,22 +281,31 @@ function holidayOn(date) {
   return null;
 }
 
-// Weather on the city: one roll per day by season (weatherForDay in game.mjs).
+// Weather on the city: today's real forecast for Villanova (percentle/sky.js); clear if it can't load.
 let weatherNow = null;
+let weatherHigh = null; // today's high in Villanova (°F), when the forecast loaded
 async function loadWeather() {
   // Local testing only: ?weather=rain, snow, fog or clear.
   const forced = location.hostname === "localhost" ? new URLSearchParams(location.search).get("weather") : null;
   if (forced) return forced === "clear" ? null : forced;
-  return weatherForDay(easternDate());
+  try {
+    const response = await fetch("/api/percentle/weather");
+    if (!response.ok) return null;
+    const { weather, high } = await response.json();
+    weatherHigh = Number.isFinite(high) ? high : null;
+    return ["rain", "snow", "fog"].includes(weather) ? weather : null;
+  } catch {
+    return null;
+  }
 }
 
 // Snow on the roofs: settled whenever it's snowing; in endless runs from December to February it
-// also falls and piles up round by round.
+// also falls and piles up round by round, on days cold enough for snow.
 function updateSnow(round = 0) {
   const month = Number(easternDate().slice(5, 7));
   const winter = month === 12 || month <= 2;
   if (weatherNow === "snow") city.setSnow(1, true);
-  else if (endlessMode && winter) city.setSnow(Math.min(1, round / 12), true);
+  else if (endlessMode && winter && weatherHigh !== null && weatherHigh <= 40) city.setSnow(Math.min(1, round / 12), true);
   else city.setSnow(0, false);
 }
 
@@ -750,8 +785,13 @@ function showMarket(category = MARKET_CATEGORIES[0].id) {
   const about = MARKET_CATEGORIES.find(group => group.id === category);
   const cards = MARKET_ITEMS.filter(item => item.category === category).map(item => {
     const owned = item.price === 0 || Boolean(wallet.owned[item.id]);
-    const using = inUse.id === item.id;
-    const button = using ? '<button type="button" disabled>In use</button>'
+    // Visitors are each on or off (the usual ones always come); colors and lightning are one at a time.
+    const visitor = category === "visitors";
+    const on = visitor && (item.price === 0 || (owned && !wallet.equipped[item.id]?.off));
+    const using = visitor ? on : inUse.id === item.id;
+    const button = visitor && item.price === 0 ? '<button type="button" disabled>Always on</button>'
+      : visitor && owned ? `<button type="button" class="${on ? "toggle-on" : ""}" data-toggle="${item.id}" aria-pressed="${on}">${on ? "On" : "Off"}</button>`
+      : using ? '<button type="button" disabled>In use</button>'
       : owned ? `<button type="button" data-use="${item.id}">Use</button>`
       : item.price <= balance ? `<button type="button" class="buy" data-buy="${item.id}">Buy · ${item.price}</button>`
       : `<button type="button" disabled>${item.price} coins</button>`;
@@ -759,7 +799,7 @@ function showMarket(category = MARKET_CATEGORIES[0].id) {
         <span class="market-name">${escapeHtml(item.name)}</span>${button}</article>`;
   }).join("");
   openDialog("Market", `<p class="market-balance"><span class="coin" aria-hidden="true"></span>${balance} coins</p>
-    <p class="account-note">Earn coins by playing: a daily puzzle pays the charge you finish with (60% pays 60), and an endless run pays 1 coin for round 1, 2 for round 2, and so on, up to 150 a day.</p>
+    <p class="account-note">Earn coins by playing: a daily puzzle pays the charge you finish with (60% pays 60), and an endless run pays 1 coin for round 1, 2 for round 2, and so on, up to 150 a day. Going far pays more on top, with no limit: rounds 11 to 20 pay double, 21 to 30 triple, and so on.</p>
     <div class="market-tabs" role="tablist">${MARKET_CATEGORIES.map(group => `<button type="button" role="tab" data-tab="${group.id}" aria-selected="${group.id === category}">${group.name}</button>`).join("")}</div>
     <p class="market-blurb">${escapeHtml(about.blurb)}</p>
     <div class="market-grid">${cards}</div>`);
@@ -771,6 +811,12 @@ function showMarket(category = MARKET_CATEGORIES[0].id) {
   };
   dialog.querySelectorAll("[data-use]").forEach(button => button.addEventListener("click", () => {
     use(button.dataset.use);
+    showMarket(category);
+  }));
+  dialog.querySelectorAll("[data-toggle]").forEach(button => button.addEventListener("click", () => {
+    const id = button.dataset.toggle;
+    wallet.equipped[id] = { id, at: Date.now(), off: !wallet.equipped[id]?.off };
+    save();
     showMarket(category);
   }));
   // Purchases go through the server, which pays for them from the account's checked coins.
@@ -1898,11 +1944,12 @@ function renderEndlessResults() {
   const bests = endlessHard ? state.endless.hardBest : state.endless.best;
   const previousBest = bests[period] ?? 0;
   if (!progress.recorded) {
-    // The run's coins: 1 for round 1, 2 for round 2... up to the day's endless limit.
+    // The run's coins: 1 for round 1, 2 for round 2... up to the day's endless limit, plus the
+    // multiplier bonus for rounds past 10 (game.mjs endlessPay).
     const date = easternDate();
-    const coins = endlessCoins(rounds, endlessCoinsOn(state.wallet, date));
+    const { coins, base } = endlessPay(rounds, endlessCoinsOn(state.wallet, date));
     const runId = crypto.randomUUID();
-    state.wallet.endless[runId] = { date, coins };
+    state.wallet.endless[runId] = { date, coins, base };
     // For an account, the server checks the run itself (percentle/verify.js): the questions asked,
     // in order, and the guesses. It's kept here until the server has it.
     state.wallet.pending[runId] = {

@@ -10,6 +10,7 @@ import {
   coinBalance,
   dailyCoins,
   endlessCoins,
+  endlessPay,
   endlessCoinsOn,
   equippedItem,
   ENDLESS_COINS_PER_DAY,
@@ -25,7 +26,6 @@ import {
   drainRateFor,
   roundsSurvived,
   endlessClock,
-  weatherForDay,
   dailyTotal,
   guessEntryFrom,
   guessEntryText,
@@ -42,6 +42,7 @@ import {
   questionKey,
   scoreColor,
   viewForProgress,
+  activeVisitors
 } from "../public/percentle/game.mjs";
 
 test("points off is absolute percentage point difference", () => {
@@ -111,8 +112,12 @@ test("coins: a daily game pays its charge, an endless run pays 1 + 2 + ... per r
   assert.equal(dailyCoins({ charge: -12 }), 0, "running out pays nothing");
   assert.equal(endlessCoins(1), 1);
   assert.equal(endlessCoins(10), 55);
-  assert.equal(endlessCoins(20, 120), ENDLESS_COINS_PER_DAY - 120, "no more than the day's endless limit");
+  assert.equal(endlessCoins(9, 120), ENDLESS_COINS_PER_DAY - 120, "no more than the day's endless limit");
   assert.equal(endlessCoins(5, ENDLESS_COINS_PER_DAY), 0);
+  assert.deepEqual(endlessPay(20), { base: 150, bonus: 155, coins: 305 }, "rounds 11-20 pay double, past the day's limit");
+  assert.deepEqual(endlessPay(30), { base: 150, bonus: 665, coins: 815 }, "rounds 21-30 pay triple");
+  assert.deepEqual(endlessPay(20, ENDLESS_COINS_PER_DAY), { base: 0, bonus: 155, coins: 155 }, "the bonus isn't limited");
+  assert.equal(endlessCoinsOn({ endless: { a: { date: "2026-11-02", coins: 305, base: 150 } } }, "2026-11-02"), 150, "the limit counts base pay");
   const wallet = { endless: { a: { date: "2026-11-02", coins: 55 }, b: { date: "2026-11-01", coins: 30 } }, owned: { "color-ice": "2026-11-02" }, equipped: { colors: { id: "color-ice", at: 1 }, lightning: { id: "lightning-pink", at: 2 } } };
   assert.equal(endlessCoinsOn(wallet, "2026-11-02"), 55);
   assert.deepEqual(coinBalance({ games: [{ charge: 60 }, { charge: 90 }], wallet: { ...wallet, owned: { "color-ice": { date: "2026-11-02", price: 150 } } } }),
@@ -317,21 +322,11 @@ test("the moon's phase matches the U.S. Naval Observatory's 2026 phase times", a
   }
 });
 
-test("the city's weather is one roll per day that suits the season", () => {
-  assert.equal(weatherForDay("2026-10-31"), weatherForDay("2026-10-31"), "the same all day");
-  const counts = { winter: {}, summer: {} };
-  let decemberRain = 0;
-  for (let day = new Date("2026-01-01T12:00:00Z"); day < new Date("2031-01-01T12:00:00Z"); day.setUTCDate(day.getUTCDate() + 1)) {
-    const date = day.toISOString().slice(0, 10);
-    const month = Number(date.slice(5, 7));
-    const kind = weatherForDay(date) ?? "clear";
-    if (month === 12 && kind === "rain") decemberRain++;
-    const season = [12, 1, 2].includes(month) ? "winter" : [6, 7, 8].includes(month) ? "summer" : null;
-    if (season) counts[season][kind] = (counts[season][kind] || 0) + 1;
-  }
-  assert.equal(decemberRain, 0, "never rain in December");
-  assert.equal(counts.summer.snow ?? 0, 0, "never snow in summer");
-  const winterDays = Object.values(counts.winter).reduce((a, b) => a + b, 0);
-  assert.ok(counts.winter.snow / winterDays > 0.2 && counts.winter.snow / winterDays < 0.4, "winter snows about 30% of days");
-  assert.ok((counts.winter.clear ?? 0) / winterDays > 0.5, "most days are clear");
+
+test("every visitor you own flies, unless you turn it off", () => {
+  const wallet = { owned: { "visitor-paper-plane": { date: "2026-11-10" }, "visitor-ufo": { date: "2026-11-10" } }, equipped: { visitors: { id: "visitor-ufo", at: 1 } } };
+  assert.deepEqual(activeVisitors(wallet).map(item => item.id), ["visitor-paper-plane", "visitor-ufo"]);
+  wallet.equipped["visitor-ufo"] = { id: "visitor-ufo", at: 2, off: true };
+  assert.deepEqual(activeVisitors(wallet).map(item => item.id), ["visitor-paper-plane"]);
+  assert.deepEqual(activeVisitors({ owned: {}, equipped: {} }), [], "the usual ones aren't market visitors");
 });

@@ -17,6 +17,7 @@ const { createStatsStore } = require("./stats");
 const { createStatsRouter } = require("./stats-router");
 const { createAccountStore } = require("./accounts");
 const { createAccountsRouter } = require("./accounts-router");
+const { createSkyRouter } = require("./sky");
 
 const PORT = process.env.PORT || 3000;
 const publicDir = path.join(__dirname, "..", "public");
@@ -55,6 +56,7 @@ app.use("/api/percentle/puzzles", createPuzzleRouter(puzzles, { endless }));
 app.use("/api/percentle/endless", createEndlessRouter(endless, { puzzles }));
 app.use("/api/percentle/stats", createStatsRouter(stats, crowd, { accounts }));
 app.use("/api/percentle/accounts", createAccountsRouter(accounts, { puzzles, endless }));
+app.use("/api/percentle/weather", createSkyRouter());
 app.use((req, res) => res.redirect("/"));
 app.use((err, req, res, next) => {
   console.error(err);

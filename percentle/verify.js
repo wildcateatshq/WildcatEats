@@ -7,7 +7,7 @@
 //
 // Each account's save holds a `verified` record that browsers can't write:
 //   verified.daily        { date: { score, charge, hard?, unpaid? } }  daily games re-scored from their guesses
-//   verified.endless      { runId: { date, coins, rounds } }           endless runs re-scored against their bank
+//   verified.endless      { runId: { date, coins, base, rounds } }     endless runs re-scored against their bank
 //   verified.owned        { itemId: { date, price } }          Market items, bought only through the server
 //   verified.endlessStats { best, hardBest, allTime, hardAllTime, runs }
 // What a save had before this was added is kept as it was (seedVerified), so nobody loses anything.
@@ -147,9 +147,10 @@ async function verifyState(saved, merged, { puzzles, endless, owner = false, tod
     if (verified.endless[id]) continue;
     const scored = await scoreRun(game, run, { endless, today });
     if (!scored) continue;
-    const paidToday = Object.values(verified.endless).filter(other => other.date === run.date).reduce((sum, other) => sum + other.coins, 0);
-    const coins = run.date >= payingFrom(today) ? game.endlessCoins(scored.rounds, paidToday) : 0;
-    verified.endless[id] = { date: run.date, coins, rounds: scored.rounds };
+    // The day's limit counts base pay only; the multiplier bonus for going far is on top.
+    const baseToday = game.endlessCoinsOn({ endless: verified.endless }, run.date);
+    const pay = run.date >= payingFrom(today) ? game.endlessPay(scored.rounds, baseToday) : { coins: 0, base: 0 };
+    verified.endless[id] = { date: run.date, coins: pay.coins, base: pay.base, rounds: scored.rounds };
     const stats = verified.endlessStats;
     const bests = scored.hard ? stats.hardBest : stats.best;
     bests[scored.startsOn] = Math.max(bests[scored.startsOn] ?? 0, scored.rounds);
@@ -172,7 +173,7 @@ function present(game, state, verified, owner) {
     ...state,
     games: Object.entries(verified.daily).sort(([a], [b]) => a.localeCompare(b)).map(([date, played]) => ({ date, ...played })),
     wallet: {
-      endless: Object.fromEntries(Object.entries(verified.endless).map(([id, run]) => [id, { date: run.date, coins: run.coins }])),
+      endless: Object.fromEntries(Object.entries(verified.endless).map(([id, run]) => [id, { date: run.date, coins: run.coins, ...(Number.isFinite(run.base) ? { base: run.base } : {}) }])),
       owned,
       equipped: isObject(wallet.equipped) ? wallet.equipped : {},
       pending: {}
