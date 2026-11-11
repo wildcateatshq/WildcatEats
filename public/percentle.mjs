@@ -775,10 +775,7 @@ function applyCosmetics() {
 }
 
 function marketPreview(item) {
-  if (item.category === "visitors") {
-    const kind = item.id.replace("visitor-", "");
-    return kind === "none" ? '<span class="market-none">Planes, birds and blimps as usual</span>' : visitorSvg(kind, 2);
-  }
+  if (item.category === "visitors") return visitorSvg(item.id.replace("visitor-", ""), 2);
   if (item.category === "extras") return visitorSvg(item.id.replace("extra-", ""), 2);
   if (item.category === "lightning") return `<span class="market-bolt" style="background:${item.swatch}"></span>`;
   return `<span class="market-swatch" style="background:${item.swatch};color:${item.swatch}"></span>`;
@@ -792,12 +789,12 @@ function showMarket(category = MARKET_CATEGORIES[0].id) {
   const toggles = TOGGLE_CATEGORIES.includes(category);
   const inUse = toggles ? null : equippedItem(wallet, category);
   const about = MARKET_CATEGORIES.find(group => group.id === category);
-  const cards = MARKET_ITEMS.filter(item => item.category === category).map(item => {
+  // The usual visitors always come, so they get no card of their own among the toggles.
+  const cards = MARKET_ITEMS.filter(item => item.category === category && !(toggles && item.price === 0)).map(item => {
     const owned = item.price === 0 || Boolean(wallet.owned[item.id]);
-    const on = toggles && (item.price === 0 || (owned && !wallet.equipped[item.id]?.off));
+    const on = toggles && owned && !wallet.equipped[item.id]?.off;
     const using = toggles ? on : inUse.id === item.id;
-    const button = toggles && item.price === 0 ? '<button type="button" disabled>Always on</button>'
-      : toggles && owned ? `<button type="button" class="${on ? "toggle-on" : ""}" data-toggle="${item.id}" aria-pressed="${on}">${on ? "On" : "Off"}</button>`
+    const button = toggles && owned ? `<button type="button" class="${on ? "toggle-on" : ""}" data-toggle="${item.id}" aria-pressed="${on}">${on ? "On" : "Off"}</button>`
       : using ? '<button type="button" disabled>In use</button>'
       : owned ? `<button type="button" data-use="${item.id}">Use</button>`
       : item.price <= balance ? `<button type="button" class="buy" data-buy="${item.id}">Buy · ${item.price}</button>`
@@ -1571,6 +1568,7 @@ function renderResults() {
   stage.innerHTML = `${headline}
     ${practiceMode ? "" : `<section class="crowd-panel" id="crowdPanel" aria-live="polite"><h3 class="crowd-title">How you stack up${hard ? " · Hard mode" : ""}</h3><p class="crowd-copy">Your charge is added anonymously. Never your guesses, name, or account.</p><p class="crowd-status">Seeing how you stack up…</p></section>`}
     <button class="share-button" id="shareButton">Share ${currentDate === today ? "today's" : "this"} result ${ICONS.share}</button>
+    ${practiceMode ? "" : `<button class="next-button secondary-button endless-button" id="resultsEndless" hidden>Keep playing: Endless mode ${INFINITY_ICON}</button>`}
     ${practiceMode ? '<button class="next-button secondary-button" id="replayButton">Play this puzzle again</button><button class="next-button secondary-button" id="todayButton">Back to today\'s puzzle</button>' : ""}
     <button class="next-button secondary-button" id="statsInline">Your stats &amp; archives ${ICONS.right}</button>`;
   setCounterLabel(out ? "Power lost" : "Puzzle complete");
@@ -1587,6 +1585,17 @@ function renderResults() {
   });
   document.querySelector("#todayButton")?.addEventListener("click", returnToToday);
   document.querySelector("#statsInline").addEventListener("click", showStats);
+  // After the daily game, a way straight into endless mode (shown once endless is known to be live).
+  const endlessFromResults = document.querySelector("#resultsEndless");
+  if (endlessFromResults) {
+    endlessLive().then(live => { endlessFromResults.hidden = !live; });
+    endlessFromResults.addEventListener("click", async () => {
+      if (!(await startEndless())) return;
+      window.scrollTo({ top: 0 });
+      render();
+      chargeUp();
+    });
+  }
   if (!practiceMode) loadCrowd(crowdRank(progress.guesses, currentQuestions, rate), out, hard);
   if (out) setTimeout(announceAchievements, 1200);
   else playResultDrain(charge, animate).then(finished => {
@@ -2075,13 +2084,20 @@ function showStartScreen() {
 // Until the first endless bank is big enough, the button shows as "coming soon" and can't be pressed.
 async function updateEndlessButton() {
   const button = document.querySelector("#endlessButton");
+  const live = await endlessLive();
+  if (live === null) return;
+  button.disabled = !live;
+  button.classList.toggle("coming-soon", !live);
+  button.innerHTML = live ? `Endless mode ${INFINITY_ICON}` : "Endless mode · Coming soon";
+}
+
+// Whether endless mode is open yet: true or false, or null if the check failed.
+async function endlessLive() {
   try {
-    const { live } = await (await fetch(`${ENDLESS_URL}/availability`)).json();
-    button.disabled = !live;
-    button.classList.toggle("coming-soon", !live);
-    button.innerHTML = live ? `Endless mode ${INFINITY_ICON}` : "Endless mode · Coming soon";
+    return Boolean((await (await fetch(`${ENDLESS_URL}/availability`)).json()).live);
   } catch (error) {
     console.error("Could not check whether endless mode is live.", error);
+    return null;
   }
 }
 
