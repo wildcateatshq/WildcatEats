@@ -2219,6 +2219,13 @@ document.querySelector("#startButton").addEventListener("click", () => {
     window.scrollTo({ top: 0 });
     // Coming back to a finished puzzle replays the battery draining to today's charge.
     if (!practiceMode && isTodayFinished()) {
+      // "See today's results" always opens the battery report, even when the last answer's reveal
+      // was never moved past.
+      const progress = progressFor();
+      if (progress.revealed < progress.guesses.length) {
+        progress.revealed = progress.guesses.length;
+        save();
+      }
       animateResults = true;
       render();
     } else chargeUp();
